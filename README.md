@@ -3,7 +3,7 @@
 Esta versión conserva el funcionamiento anterior a la incorporación de porcentajes y barras de avance.
 
 Incluye:
-- Inicio de sesión por PIN.
+- Inicio de sesión por PIN..
 - Administración de usuarios/PIN.
 - Carga y descarga de Excel.
 - Estados Pendiente → Armado → Contado → Cargado.
