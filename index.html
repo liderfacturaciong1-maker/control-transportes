@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Control de Transportes — V2</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+<header><div><h1>🚛 Control de Transportes</h1><p>Versión 2 · Multiusuario</p></div><button id="logout" class="secondary hidden">Salir</button></header>
+<main>
+<section id="login" class="card login">
+<h2>Ingresar</h2><p>Introduce tu PIN personal.</p>
+<input id="pin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN">
+<button id="loginBtn">Ingresar</button><div id="loginMsg" class="error"></div>
+</section>
+<section id="app" class="hidden">
+<div class="topbar card"><span>Usuario: <b id="userName"></b></span><span id="connection">Conectando…</span></div>
+<div id="adminPanel" class="card hidden">
+<h2>Administración</h2>
+<div class="upload"><input id="excelFile" type="file" accept=".xlsx,.xls,.csv"><button id="importBtn">Cargar Excel</button><button id="downloadBtn" class="secondary">Descargar Excel</button></div>
+<p class="hint">El Excel debe contener Transporte, Viaje y Placa. La carga reemplaza la lista actual.</p>
+<hr>
+<h3>Usuarios / PIN</h3>
+<div class="userForm"><input id="newName" placeholder="Nombre"><input id="newPin" inputmode="numeric" maxlength="8" placeholder="PIN"><button id="addUser">Crear usuario</button></div>
+<div id="users"></div>
+</div>
+<div class="stats"><div><b id="total">0</b><span>Total</span></div><div><b id="pendientes">0</b><span>Pendientes</span></div><div><b id="armados">0</b><span>Armados</span></div><div><b id="contados">0</b><span>Contados</span></div><div><b id="cargados">0</b><span>Cargados</span></div></div>
+<div class="filters"><input id="search" placeholder="Buscar transporte, viaje o placa…"><select id="statusFilter"><option value="">Todos</option><option>Pendiente</option><option>Armado</option><option>Contado</option><option>Cargado</option></select></div>
+<div class="card tableWrap"><table><thead><tr><th>Transporte</th><th>Viaje</th><th>Placa</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="card"><h2>Historial</h2><div id="history"></div></div>
+</section>
+</main>
+<div id="toast"></div>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body></html>
