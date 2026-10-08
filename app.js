@@ -58,8 +58,13 @@ async function loadUsers(){
 async function addUser(){
  const name=$("newName").value.trim(),pin=$("newPin").value.trim();
  if(!name||!pin){toast("Nombre y PIN son obligatorios");return}
- const {error}=await sb.rpc("admin_create_user",{p_name:name,p_pin:pin});
- if(error){toast(error.message);return} $("newName").value="";$("newPin").value="";loadUsers();toast("Usuario creado");
+ const adminPin=prompt("Confirma el PIN del administrador para crear este usuario:");
+ if(adminPin===null)return;
+ if(!adminPin.trim()){toast("PIN de administrador obligatorio");return}
+ const {error}=await sb.rpc("admin_create_user",{p_name:name,p_pin:pin,p_admin_pin:adminPin.trim()});
+ if(error){toast(error.message);return}
+ $("newName").value="";$("newPin").value="";
+ loadUsers();toast("Usuario creado correctamente");
 }
 async function toggleUser(id,active){
  const {error}=await sb.rpc("admin_set_user_active",{p_user_id:id,p_active:!active});
