@@ -1,97 +1,21 @@
-const cfg=window.APP_CONFIG||{};
-let sb=null,user=null,records=[],timer=null;
-const $=id=>document.getElementById(id);
-const STATES=["Pendiente","Armado","Contado","Cargado"];
-
-function toast(m){$("toast").textContent=m;$("toast").classList.add("show");setTimeout(()=>$("toast").classList.remove("show"),2500)}
+const cfg=window.APP_CONFIG||{};let sb=null,user=null,records=[],pendingImportRows=null;const $=id=>document.getElementById(id);
+function toast(m){$("toast").textContent=m;$("toast").classList.add("show");setTimeout(()=>$("toast").classList.remove("show"),3000)}
 function configured(){return cfg.SUPABASE_URL&&!cfg.SUPABASE_URL.includes("TU-PROYECTO")&&cfg.SUPABASE_ANON_KEY&&!cfg.SUPABASE_ANON_KEY.includes("TU_ANON")}
-
-async function init(){
- if(!configured()){$("loginMsg").innerHTML="Falta configurar <b>config.js</b>. Revisa README.";return}
- sb=supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);
- $("loginBtn").onclick=login;$("pin").onkeydown=e=>e.key==="Enter"&&login();
- $("logout").onclick=logout;$("search").oninput=render;$("statusFilter").onchange=render;
- $("importBtn").onclick=importExcel;$("downloadBtn").onclick=downloadExcel;$("addUser").onclick=addUser;
-}
-async function login(){
- $("loginMsg").textContent="Verificando…";
- const pin=$("pin").value.trim();
- const {data,error}=await sb.rpc("login_by_pin",{p_pin:pin});
- if(error||!data?.length){$("loginMsg").textContent="PIN incorrecto o usuario desactivado.";return}
- user=data[0]; sessionStorage.setItem("transport_user",JSON.stringify(user));
- await showApp();
-}
-async function showApp(){
- $("login").classList.add("hidden");$("app").classList.remove("hidden");$("logout").classList.remove("hidden");
- $("userName").textContent=user.name;$("connection").textContent="● Conectado";
- if(user.is_admin)$("adminPanel").classList.remove("hidden");
- await refresh(); subscribe(); if(user.is_admin)loadUsers();
-}
+async function init(){if(!configured()){$("loginMsg").innerHTML="Falta configurar <b>config.js</b>. Revisa README.";return}sb=supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);$("loginBtn").onclick=login;$("pin").onkeydown=e=>e.key==="Enter"&&login();$("logout").onclick=logout;$("search").oninput=render;$("statusFilter").onchange=render;$("noveltyFilter").onchange=render;$("importBtn").onclick=prepareImport;$("confirmImportBtn").onclick=confirmImport;$("cancelImportBtn").onclick=cancelImport;$("previewClose").onclick=cancelImport;$("downloadBtn").onclick=downloadExcel;$("addUser").onclick=addUser}
+async function login(){$("loginMsg").textContent="Verificando…";const pin=$("pin").value.trim();const{data,error}=await sb.rpc("login_by_pin",{p_pin:pin});if(error||!data?.length){$("loginMsg").textContent="PIN incorrecto o usuario desactivado.";return}user=data[0];sessionStorage.setItem("transport_user",JSON.stringify(user));await showApp()}
+async function showApp(){$("login").classList.add("hidden");$("app").classList.remove("hidden");$("logout").classList.remove("hidden");$("userName").textContent=user.name;$("connection").textContent="● Conectado";if(user.is_admin)$("adminPanel").classList.remove("hidden");await refresh();subscribe();if(user.is_admin)loadUsers()}
 function logout(){sessionStorage.clear();location.reload()}
-async function refresh(){
- const {data,error}=await sb.rpc("list_transports");
- if(error){toast(error.message);return} records=data||[];render();loadHistory();
-}
-function render(){
- const q=($("search").value||"").toLowerCase(), sf=$("statusFilter").value;
- const list=records.filter(r=>(!sf||r.estado===sf)&&(!q||[r.transporte,r.viaje,r.placa,r.novedad].join(" ").toLowerCase().includes(q)));
- $("total").textContent=records.length;
- $("pendientes").textContent=records.filter(r=>r.estado==="Pendiente").length;
- $("armados").textContent=records.filter(r=>r.estado==="Armado").length;
- $("contados").textContent=records.filter(r=>r.estado==="Contado").length;
- $("cargados").textContent=records.filter(r=>r.estado==="Cargado").length;
- $("rows").innerHTML=list.map(r=>`<tr><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td>${esc(r.novedad||"")}</td><td><span class="badge ${r.estado}">${r.estado}</span></td><td><button onclick="advance(${r.id})" ${r.estado==="Cargado"?"disabled":""}>${r.estado==="Pendiente"?"Armar":r.estado==="Armado"?"Contar":"Cargar"}</button></td></tr>`).join("")||'<tr><td colspan="6">No hay registros.</td></tr>';
-}
-async function advance(id){
- const {data,error}=await sb.rpc("advance_transport",{p_transport_id:id});
- if(error){toast(error.message);return} toast("Estado actualizado");await refresh();
-}
-async function loadHistory(){
- const {data,error}=await sb.rpc("recent_history",{p_limit:30});
- if(error)return;
- $("history").innerHTML=(data||[]).map(h=>`<div class="historyItem"><b>${esc(h.usuario)}</b> · ${esc(h.placa)} · Viaje ${esc(h.viaje)}<br>${h.estado_anterior} → <b>${h.estado_nuevo}</b> · ${new Date(h.created_at).toLocaleString("es-CO")}</div>`).join("")||"Sin movimientos.";
-}
-async function loadUsers(){
- const {data,error}=await sb.rpc("admin_users"); if(error)return;
- $("users").innerHTML=(data||[]).map(u=>`<div class="userRow"><span>${esc(u.name)} ${u.is_admin?"👑":""}</span><span>PIN: ••••</span><button onclick="toggleUser('${u.id}',${u.active})" class="secondary">${u.active?"Desactivar":"Activar"}</button></div>`).join("");
-}
-async function addUser(){
- const name=$("newName").value.trim(),pin=$("newPin").value.trim();
- if(!name||!pin){toast("Nombre y PIN son obligatorios");return}
- const adminPin=prompt("Confirma el PIN del administrador para crear este usuario:");
- if(adminPin===null)return;
- if(!adminPin.trim()){toast("PIN de administrador obligatorio");return}
- const {error}=await sb.rpc("admin_create_user",{p_name:name,p_pin:pin,p_admin_pin:adminPin.trim()});
- if(error){toast(error.message);return}
- $("newName").value="";$("newPin").value="";
- loadUsers();toast("Usuario creado correctamente");
-}
-async function toggleUser(id,active){
- const {error}=await sb.rpc("admin_set_user_active",{p_user_id:id,p_active:!active});
- if(error){toast(error.message);return}loadUsers();
-}
-async function importExcel(){
- const f=$("excelFile").files[0];if(!f){toast("Selecciona un archivo");return}
- const buf=await f.arrayBuffer(),wb=XLSX.read(buf,{type:"array"}),sheet=wb.Sheets[wb.SheetNames[0]],data=XLSX.utils.sheet_to_json(sheet,{defval:""});
- if(!data.length){toast("Excel vacío");return}
- const keys=Object.keys(data[0]),norm=s=>String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s/g,"");
- const find=n=>keys.find(k=>norm(k)===n);const kt=find("transporte"),kv=find("viaje"),kp=find("placa"),kn=find("novedad");
- if(!kt||!kv||!kp||!kn){toast("El Excel debe contener Transporte, Viaje, Placa y Novedad");return}
- const rows=data.map(x=>({transporte:String(x[kt]),viaje:String(x[kv]),placa:String(x[kp]),novedad:String(x[kn]??"")}));
- const {data:result,error}=await sb.rpc("replace_transports",{p_rows:rows});
- if(error){toast(error.message);return}
- const added=Number(result?.added??rows.length),existing=Number(result?.existing??0);
- toast(existing?`Se agregaron ${added} nuevos. ${existing} ya existían y se conservaron.`:`Se agregaron ${added} nuevos transportes.`);
- $("excelFile").value="";
- await refresh();
-}
-async function downloadExcel(){
- const {data,error}=await sb.rpc("list_transports");if(error)return;
- const out=(data||[]).map(r=>({Transporte:r.transporte,Viaje:r.viaje,Placa:r.placa,Novedad:r.novedad||"",Estado:r.estado}));
- const ws=XLSX.utils.json_to_sheet(out),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Transportes");XLSX.writeFile(wb,"transportes_actualizados.xlsx");
-}
-function subscribe(){
- sb.channel("transportes-live").on("postgres_changes",{event:"*",schema:"public",table:"transportes"},()=>refresh()).subscribe();
-}
-function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
-init();
+async function refresh(){const{data,error}=await sb.rpc("list_transports");if(error){toast(error.message);return}records=data||[];render();loadHistory()}
+function render(){const q=($("search").value||"").toLowerCase(),sf=$("statusFilter").value,nf=$("noveltyFilter").value;const list=records.filter(r=>{const text=[r.transporte,r.viaje,r.placa,r.novedad].join(" ").toLowerCase(),has=String(r.novedad||"").trim()!=="";return(!sf||r.estado===sf)&&(!nf||(nf==="con"?has:!has))&&(!q||text.includes(q))});$("total").textContent=records.length;$("pendientes").textContent=records.filter(r=>r.estado==="Pendiente").length;$("armados").textContent=records.filter(r=>r.estado==="Armado").length;$("contados").textContent=records.filter(r=>r.estado==="Contado").length;$("cargados").textContent=records.filter(r=>r.estado==="Cargado").length;$("novedades").textContent=records.filter(r=>String(r.novedad||"").trim()!=="").length;$("rows").innerHTML=list.map(r=>{const has=String(r.novedad||"").trim()!=="";return `<tr class="${has?"hasNovelty":""}"><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td>${has?`<span class="novelty">${esc(r.novedad)}</span>`:"—"}</td><td><span class="badge ${r.estado}">${r.estado}</span></td><td><button onclick="advance(${r.id})" ${r.estado==="Cargado"?"disabled":""}>${r.estado==="Pendiente"?"Armar":r.estado==="Armado"?"Contar":"Cargar"}</button></td></tr>`}).join("")||'<tr><td colspan="6">No hay registros con estos filtros.</td></tr>'}
+async function advance(id){const r=records.find(x=>Number(x.id)===Number(id));if(!r)return;const next=r.estado==="Pendiente"?"Armado":r.estado==="Armado"?"Contado":r.estado==="Contado"?"Cargado":null;if(!next)return;if(!confirm(`¿Confirmas el cambio de estado?\n\nPlaca: ${r.placa}\nEstado: ${r.estado} → ${next}`))return;const{error}=await sb.rpc("advance_transport",{p_transport_id:id});if(error){toast(error.message);return}toast(`Estado actualizado: ${r.estado} → ${next}`);await refresh()}
+async function loadHistory(){const{data,error}=await sb.rpc("recent_history",{p_limit:30});if(error)return;$("history").innerHTML=(data||[]).map(h=>`<div class="historyItem"><b>${esc(h.usuario)}</b> · ${esc(h.placa)} · Viaje ${esc(h.viaje)}<br>${h.estado_anterior} → <b>${h.estado_nuevo}</b> · ${new Date(h.created_at).toLocaleString("es-CO")}</div>`).join("")||"Sin movimientos."}
+async function loadUsers(){const{data,error}=await sb.rpc("admin_users");if(error)return;$("users").innerHTML=(data||[]).map(u=>`<div class="userRow"><span>${esc(u.name)} ${u.is_admin?"👑":""}</span><span>PIN: ••••</span><button onclick="toggleUser('${u.id}',${u.active})" class="secondary">${u.active?"Desactivar":"Activar"}</button></div>`).join("")}
+async function addUser(){const name=$("newName").value.trim(),pin=$("newPin").value.trim();if(!name||!pin){toast("Nombre y PIN son obligatorios");return}const adminPin=prompt("Confirma el PIN del administrador para crear este usuario:");if(adminPin===null)return;if(!adminPin.trim()){toast("PIN de administrador obligatorio");return}const{error}=await sb.rpc("admin_create_user",{p_name:name,p_pin:pin,p_admin_pin:adminPin.trim()});if(error){toast(error.message);return}$("newName").value="";$("newPin").value="";loadUsers();toast("Usuario creado correctamente")}
+async function toggleUser(id,active){const{error}=await sb.rpc("admin_set_user_active",{p_user_id:id,p_active:!active});if(error){toast(error.message);return}loadUsers()}
+function norm(s){return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s/g,"")}
+async function prepareImport(){const f=$("excelFile").files[0];if(!f){toast("Selecciona un archivo");return}const buf=await f.arrayBuffer(),wb=XLSX.read(buf,{type:"array"}),sheet=wb.Sheets[wb.SheetNames[0]],data=XLSX.utils.sheet_to_json(sheet,{defval:""});if(!data.length){toast("Excel vacío");return}const keys=Object.keys(data[0]),find=n=>keys.find(k=>norm(k)===n),kt=find("transporte"),kv=find("viaje"),kp=find("placa"),kn=find("novedad");if(!kt||!kv||!kp||!kn){toast("El Excel debe contener Transporte, Viaje, Placa y Novedad");return}const rows=data.map(x=>({transporte:String(x[kt]??"").trim(),viaje:String(x[kv]??"").trim(),placa:String(x[kp]??"").trim(),novedad:String(x[kn]??"").trim()})).filter(x=>x.transporte||x.viaje||x.placa);const seen=new Set();let duplicates=0;const unique=rows.filter(x=>{const k=[x.transporte,x.viaje,x.placa].join("|").toLowerCase();if(seen.has(k)){duplicates++;return false}seen.add(k);return true});const existingKeys=new Set(records.map(r=>[String(r.transporte).trim(),String(r.viaje).trim(),String(r.placa).trim()].join("|").toLowerCase()));const existing=unique.filter(x=>existingKeys.has([x.transporte,x.viaje,x.placa].join("|").toLowerCase())).length;pendingImportRows=unique;$("previewText").innerHTML=`<b>${rows.length}</b> filas leídas.<br>✅ <b>${unique.length-existing}</b> nuevas para agregar.<br>⚠️ <b>${existing}</b> ya existen y se conservarán sin cambiar su estado.<br>♻️ <b>${duplicates}</b> duplicadas dentro del Excel no se agregarán.`;$("previewModal").classList.remove("hidden")}
+async function confirmImport(){if(!pendingImportRows)return;$("confirmImportBtn").disabled=true;const{data:result,error}=await sb.rpc("replace_transports",{p_rows:pendingImportRows});$("confirmImportBtn").disabled=false;if(error){toast(error.message);return}const added=Number(result?.added??pendingImportRows.length),existing=Number(result?.existing??0);cancelImport();$("excelFile").value="";toast(`Listo: ${added} nuevos. ${existing} ya existían y se conservaron.`);await refresh()}
+function cancelImport(){pendingImportRows=null;$("previewModal").classList.add("hidden")}
+async function downloadExcel(){const{data,error}=await sb.rpc("list_transports");if(error)return;const out=(data||[]).map(r=>({Transporte:r.transporte,Viaje:r.viaje,Placa:r.placa,Novedad:r.novedad||"",Estado:r.estado}));const ws=XLSX.utils.json_to_sheet(out),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Transportes");XLSX.writeFile(wb,"transportes_actualizados.xlsx")}
+function subscribe(){sb.channel("transportes-live").on("postgres_changes",{event:"*",schema:"public",table:"transportes"},()=>refresh()).subscribe()}
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}init();
