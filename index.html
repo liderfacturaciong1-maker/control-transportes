@@ -1,4 +1,5 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Control de Transportes — V4.1</title><link rel="stylesheet" href="styles.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><style>.novelty{font-weight:700}.previewModal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:18px;z-index:999}.previewCard{background:#fff;border-radius:16px;padding:24px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25)}.previewActions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}.hidden{display:none!important}@media(max-width:700px){.tableWrap{overflow-x:auto}.tableWrap table{min-width:760px}.filters{display:grid;grid-template-columns:1fr;gap:8px}.upload,.userForm{display:grid;gap:8px}.previewActions{flex-direction:column}.previewActions button{width:100%}}</style></head><body><header><div><h1>🚛 Control de Transportes</h1><p>Versión 4.1 · Operación</p></div><button id="logout" class="secondary hidden">Salir</button></header><main><section id="login" class="card login"><h2>Ingresar</h2><p>Introduce tu PIN personal.</p><input id="pin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN"><button id="loginBtn">Ingresar</button><div id="loginMsg" class="error"></div></section><section id="app" class="hidden"><div class="topbar card"><span>Usuario: <b id="userName"></b></span><span id="connection">Conectando…</span></div><div id="adminPanel" class="card hidden"><h2>Administración</h2><div class="upload"><input id="excelFile" type="file" accept=".xlsx,.xls,.csv"><button id="importBtn">Revisar Excel</button><button id="downloadBtn" class="secondary">Descargar Excel</button></div><p class="hint">El Excel debe contener Transporte, Viaje, Placa y Novedad. Antes de cargarlo podrás revisar cuántos registros son nuevos y cuántos ya existen.</p><hr><h3>Usuarios / PIN</h3><div class="userForm"><input id="newName" placeholder="Nombre"><input id="newPin" inputmode="numeric" maxlength="8" placeholder="PIN"><button id="addUser">Crear usuario</button></div><div id="users"></div></div><div class="stats"><div><b id="total">0</b><span>Total</span></div><div><b id="pendientes">0</b><span>Pendientes</span></div><div><b id="armados">0</b><span>Armados</span></div><div><b id="contados">0</b><span>Contados</span></div><div><b id="cargados">0</b><span>Cargados</span></div><div><b id="novedades">0</b><span>Con novedad</span></div></div><div class="progressItem">
+   <div class="progressItem">
     <div class="progressInfo">
       <span>🔵 Contados</span>
       <b><span id="progressContadoCount">0</span> · <span id="progressContadoPct">0%</span></b>
@@ -9,6 +10,24 @@
   </div>
 
   <div class="progressItem">
+  <div class="progressInfo">
+    <span>🔴 Novedades</span>
+    <b><span id="progressNovedadCount">0</span> · <span id="progressNovedadPct">0%</span></b>
+  </div>
+  <div class="progressTrack">
+    <div id="progressNovedadBar" class="progressBar progressNovedad"></div>
+  </div>
+</div>
+
+<div class="progressItem">
+  <div class="progressInfo">
+    <span>🟠 Armados</span>
+    <b><span id="progressArmadoCount">0</span> · <span id="progressArmadoPct">0%</span></b>
+  </div>
+  <div class="progressTrack">
+    <div id="progressArmadoBar" class="progressBar progressArmado"></div>
+  </div>
+</div><div class="progressItem">
     <div class="progressInfo">
       <span>🟢 Cargados</span>
       <b><span id="progressCargadoCount">0</span> · <span id="progressCargadoPct">0%</span></b>
