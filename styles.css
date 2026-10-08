@@ -8,7 +8,7 @@
 .progressArmado{background:#f97316}
 .progressCargado{background:#22c55e}
 body{
-background-image:linear-gradient(rgba(244,246,248,.50),rgba(244,246,248,.50)),url('./images.jpeg');
+background-image:linear-gradient(rgba(244,246,248,.35),rgba(244,246,248,.35)),url('./images.jpeg');
 background-size:cover;
 background-position:center;
 background-attachment:fixed;
