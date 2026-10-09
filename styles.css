@@ -22,3 +22,11 @@
 @media(max-height:720px){.statChartCard{padding:18px 16px 12px!important}.statChartPercent{margin-bottom:8px!important}.truckChart{height:55px!important;margin:8px 12px 12px!important}.statChartHint{margin-top:8px!important}.statChartVehicleList{margin-top:6px!important;padding-top:6px!important}.statChartVehicleList #statChartVehicles{height:24vh!important;height:min(24vh,210px)!important;}}
 
 .permissionGrid{display:grid;grid-template-columns:1fr;gap:8px;padding:12px;border:1px solid #d5dce3;border-radius:10px;margin:10px 0}.permissionGrid label{display:flex;gap:8px;align-items:center}.permissionGrid input{width:auto}.userRow{align-items:flex-start;gap:10px;flex-wrap:wrap}.userRow small{line-height:1.6}
+
+
+/* Confirmación clara para eliminar transportes, sin pedir escribir una frase */
+.deleteConfirmCard{max-width:480px;border-top:5px solid #a61b1b;}
+.deleteConfirmCard h2{margin-top:0;color:#8f1515;}
+.deleteConfirmCard p{line-height:1.55;}
+.deleteConfirmCard .previewActions button{min-width:130px;}
+#confirmDeleteBtn:disabled{opacity:.65;cursor:wait;}
