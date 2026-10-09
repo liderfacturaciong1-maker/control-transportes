@@ -30,3 +30,5 @@
 .deleteConfirmCard p{line-height:1.55;}
 .deleteConfirmCard .previewActions button{min-width:130px;}
 #confirmDeleteBtn:disabled{opacity:.65;cursor:wait;}
+
+.categoryTabs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0;padding:10px}.categoryTab{flex:1;min-width:170px;background:#eef2f7;color:#253247;border:1px solid #d5dde8}.categoryTab.active{background:#1769aa;color:#fff;border-color:#1769aa}.categoryTab:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
