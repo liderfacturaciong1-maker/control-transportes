@@ -26,7 +26,71 @@ function norm(s){return String(s).toLowerCase().normalize("NFD").replace(/[\u030
 async function prepareImport(){if(!permissions.can_upload&&!permissions.is_admin){toast("No tienes permiso para cargar archivos.");return}const f=$("excelFile").files[0];if(!f){toast("Selecciona un archivo");return}const buf=await f.arrayBuffer(),wb=XLSX.read(buf,{type:"array"});const required=["Viajes HYM y URBAN","Viajes KA","Viajes Tradicional"];const optional=["Viajes 2KA","Viajes 2","Custodias"];const expected=[...required];const sheetFor=label=>wb.SheetNames.find(n=>norm(n)===norm(label));const missing=required.filter(n=>!sheetFor(n));if(missing.length){toast("Faltan pestañas en el Excel: "+missing.join(", "));return}for(const category of optional){if(sheetFor(category))expected.push(category)}const tapaSheet=sheetFor("Tapa Códigos");if(!tapaSheet){toast("Falta la pestaña Tapa Códigos en el Excel.");return}const tapaData=XLSX.utils.sheet_to_json(wb.Sheets[tapaSheet],{defval:""});if(tapaData.length){const tk=Object.keys(tapaData[0]),findT=n=>tk.find(k=>norm(k)===norm(n));const tTrans=findT("transporte"),tVeh=findT("vehiculo"),tViaje=findT("viaje"),tMat=findT("material"),tDen=findT("denominacion"),tCant=findT("cantidad"),tFam=findT("familia"),tDesc=findT("descripcion");if(!tTrans||!tVeh||!tViaje||!tMat||!tDen||!tCant||!tFam||!tDesc){toast("Tapa Códigos debe tener FAMILIA, TRANSPORTE, VEHICULO, VIAJE, MATERIAL, DENOMINACION, CANTIDAD y DESCRIPCION.");return}pendingTapaRows=tapaData.map(x=>({familia:String(x[tFam]??"").trim(),descripcion:String(x[tDesc]??"").trim(),transporte:String(x[tTrans]??"").trim(),vehiculo:String(x[tVeh]??"").trim(),viaje:String(x[tViaje]??"").trim(),material:String(x[tMat]??"").trim(),denominacion:String(x[tDen]??"").trim(),cantidad:Number(String(x[tCant]??"0").replace(/,/g,""))||0})).filter(x=>x.familia||x.descripcion||x.transporte||x.vehiculo||x.viaje||x.material||x.denominacion)}else{pendingTapaRows=[]}let rows=[];for(const category of expected){const data=XLSX.utils.sheet_to_json(wb.Sheets[sheetFor(category)],{defval:""});if(!data.length)continue;const keys=Object.keys(data[0]),find=n=>keys.find(k=>norm(k)===n),kt=find("transporte"),kv=find("viaje"),kp=find("placa"),kn=find("novedad");if(!kt||!kv||!kp||!kn){toast("La pestaña "+category+" debe contener Transporte, Viaje, Placa y Novedad");return}rows.push(...data.map(x=>({transporte:String(x[kt]??"").trim(),viaje:String(x[kv]??"").trim(),placa:String(x[kp]??"").trim(),novedad:String(x[kn]??"").trim(),categoria:category})).filter(x=>x.transporte||x.viaje||x.placa))}if(!rows.length){toast("Las pestañas de viajes están vacías");return}const seen=new Set();let duplicates=0;const unique=rows.filter(x=>{const k=[x.categoria,x.transporte,x.viaje,x.placa].join("|").toLowerCase();if(seen.has(k)){duplicates++;return false}seen.add(k);return true});const existingKeys=new Set(records.map(r=>[r.categoria||"Viajes Tradicional",r.transporte,r.viaje,r.placa].map(v=>String(v??"").trim()).join("|").toLowerCase()));const existing=unique.filter(x=>existingKeys.has([x.categoria,x.transporte,x.viaje,x.placa].map(v=>String(v??"").trim()).join("|").toLowerCase())).length;pendingImportRows=unique;$("previewText").innerHTML=`<b>${rows.length}</b> filas leídas entre las pestañas de viajes y <b>${pendingTapaRows.length}</b> filas de Tapa Códigos.<br>✅ <b>${unique.length-existing}</b> nuevas para agregar.<br>🔄 <b>${existing}</b> ya existen: se actualizará su Novedad y se conservarán estado, placa física y disponibilidad.<br>♻️ <b>${duplicates}</b> duplicadas dentro del Excel no se agregarán.`;$("previewModal").classList.remove("hidden")}
 async function confirmImport(){if(!permissions.can_upload&&!permissions.is_admin){toast("No tienes permiso para cargar archivos.");return}if(!pendingImportRows)return;$("confirmImportBtn").disabled=true;const{data:result,error}=await sb.rpc("replace_transports_secure",{p_rows:pendingImportRows,p_pin:loginPin});if(error){$("confirmImportBtn").disabled=false;toast(error.message);return}const tapaResult=await sb.rpc("replace_tapa_codigos_ka_secure",{p_rows:pendingTapaRows||[],p_pin:loginPin});$("confirmImportBtn").disabled=false;if(tapaResult.error){toast("Los viajes se importaron, pero Tapa Códigos no: "+tapaResult.error.message+" Ejecuta el SQL incluido y vuelve a importar.");return}const added=Number(result?.added??pendingImportRows.length),existing=Number(result?.existing??0);cancelImport();$("excelFile").value="";await refreshTapa();toast(`Listo: ${added} nuevos. ${existing} ya existían y se conservaron.`);await refresh()}
 function cancelImport(){pendingImportRows=null;$("previewModal").classList.add("hidden")}
-async function downloadExcel(){if(!permissions.can_upload&&!permissions.is_admin){toast("No tienes permiso para descargar archivos.");return}const{data,error}=await sb.rpc("list_transports_with_category");if(error){toast(error.message);return}const fields=await sb.rpc("list_transport_vehicle_fields");const map=new Map((fields.data||[]).map(x=>[String(x.id),x]));const wb=XLSX.utils.book_new();for(const category of ["Viajes HYM y URBAN","Viajes KA","Viajes Tradicional"]){const out=(data||[]).filter(r=>(r.categoria||"Viajes Tradicional")===category).map(r=>{const x=map.get(String(r.id))||{};return {Transporte:r.transporte,Viaje:r.viaje,Placa:r.placa,Novedad:r.novedad||"", "Disponibilidad De Vehiculos":x.estado_vehiculo||"", "Placa Fisica":x.cambio_placa||"",Estado:r.estado}});XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(out),category)}XLSX.writeFile(wb,"transportes_actualizados.xlsx")}
+async function downloadExcel(){
+if(!permissions.can_upload&&!permissions.is_admin){toast("No tienes permiso para descargar archivos.");return}
+const{data,error}=await sb.rpc("list_transports_with_category");
+if(error){toast(error.message);return}
+const fields=await sb.rpc("list_transport_vehicle_fields");
+const map=new Map((fields.data||[]).map(x=>[String(x.id),x]));
+const wb=XLSX.utils.book_new();
+const categories=["Viajes HYM y URBAN","Viajes KA","Viajes Tradicional","Viajes 2KA","Viajes 2","Custodias"];
+const allRows=(data||[]).map(r=>{const x=map.get(String(r.id))||{};return {categoria:r.categoria||"Viajes Tradicional",Transporte:r.transporte||"",Viaje:r.viaje||"",Placa:r.placa||"",Novedad:r.novedad||"", "Disponibilidad de vehículos":x.estado_vehiculo||"", "Placa física":x.cambio_placa||"",Estado:r.estado||"Pendiente"}});
+const visible=categoryMultiMode&&selectedCategories.length?allRows.filter(r=>selectedCategories.includes(r.categoria)):activeCategory==="Todos"?allRows:allRows.filter(r=>r.categoria===activeCategory);
+const selected=visible.length?visible:allRows;
+const dateText=new Date().toLocaleDateString("es-CO",{year:"numeric",month:"long",day:"numeric"});
+const navy="123047",blue="1769AA",pale="EAF1F7",white="FFFFFF",gray="5B6573";
+function styleSheet(ws,{titleRow=1,headerRow=3,lastCol=7,autoFilter=true}={}){
+const range=XLSX.utils.decode_range(ws["!ref"]||"A1:A1");
+ws["!cols"]=[{wch:18},{wch:14},{wch:16},{wch:34},{wch:24},{wch:18},{wch:16},{wch:16}];
+ws["!freeze"]={xSplit:0,ySplit:headerRow};
+ws["!autofilter"]=autoFilter?{ref:XLSX.utils.encode_range({s:{r:headerRow-1,c:0},e:{r:range.e.r,c:lastCol}})}:undefined;
+ws["!pageSetup"]={orientation:"landscape",paperSize:9,fitToWidth:1,fitToHeight:0,scale:0};
+ws["!printOptions"]={horizontalCentered:true};
+ws["!margins"]={left:0.25,right:0.25,top:0.5,bottom:0.5,header:0.2,footer:0.2};
+ws["!pageSetup"].fitToPage=true;
+for(let c=0;c<=lastCol;c++){
+ const h=ws[XLSX.utils.encode_cell({r:headerRow-1,c})];
+ if(h)h.s={fill:{fgColor:{rgb:blue}},font:{bold:true,color:{rgb:white},name:"Aptos",sz:10},alignment:{horizontal:"center",vertical:"center",wrapText:true},border:{bottom:{style:"medium",color:{rgb:navy}}}};
+}
+ws["!rows"]=ws["!rows"]||[];
+ws["!rows"][0]={hpt:28};ws["!rows"][headerRow-1]={hpt:30};
+for(let r=headerRow;r<=range.e.r;r++){
+ ws["!rows"][r]={hpt:22};
+ for(let c=0;c<=lastCol;c++){const cell=ws[XLSX.utils.encode_cell({r,c})];if(cell)cell.s={font:{name:"Aptos",sz:10,color:{rgb:"243447"}},fill:{fgColor:{rgb:r%2===0?white:pale}},alignment:{vertical:"center",wrapText:true},border:{bottom:{style:"thin",color:{rgb:"D8E1EA"}}}};}
+}
+}
+const summary=[["CONTROL DE TRANSPORTES"],["REPORTE OPERATIVO PARA IMPRESIÓN"],["Generado el",dateText],["Categoría",categoryMultiMode?selectedCategories.join(" + "):activeCategory],[],["RESUMEN POR CATEGORÍA","CANTIDAD"]];
+categories.forEach(c=>summary.push([c,allRows.filter(r=>r.categoria===c).length]));
+summary.push(["TOTAL GENERAL",allRows.length]);
+const sws=XLSX.utils.aoa_to_sheet(summary);
+sws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:1}},{s:{r:1,c:0},e:{r:1,c:1}}];
+sws["!cols"]=[{wch:36},{wch:24}];sws["!rows"]=[{hpt:30},{hpt:22}];
+for(const addr of ["A1","A2"]){if(sws[addr])sws[addr].s={fill:{fgColor:{rgb:navy}},font:{name:"Aptos Display",bold:true,color:{rgb:white},sz:addr==="A1"?18:12},alignment:{vertical:"center"}}}
+["A6","B6"].forEach(a=>{if(sws[a])sws[a].s={fill:{fgColor:{rgb:blue}},font:{bold:true,color:{rgb:white},name:"Aptos",sz:10},alignment:{horizontal:"center"}}});
+for(let r=6;r<summary.length;r++)for(let c=0;c<2;c++){const cell=sws[XLSX.utils.encode_cell({r,c})];if(cell)cell.s={font:{name:"Aptos",sz:11,bold:r===summary.length-1},fill:{fgColor:{rgb:r%2===0?pale:white}},border:{bottom:{style:"thin",color:{rgb:"D8E1EA"}}}}}
+sws["!pageSetup"]={orientation:"portrait",paperSize:9,fitToWidth:1,fitToHeight:1,scale:0};sws["!pageSetup"].fitToPage=true;sws["!margins"]={left:0.5,right:0.5,top:0.6,bottom:0.6,header:0.2,footer:0.2};
+XLSX.utils.book_append_sheet(wb,sws,"Resumen");
+const reportRows=rows=>rows.map(({categoria,...r})=>r);
+for(const category of categories){
+ const categoryRows=allRows.filter(r=>r.categoria===category);
+ if(!categoryRows.length)continue;
+ const dataRows=reportRows(categoryRows);
+ const ws=XLSX.utils.aoa_to_sheet([["CONTROL DE TRANSPORTES"],[category.toUpperCase()+" · REPORTE PARA ENTREGA"],["Fecha de generación",dateText],[],Object.keys(dataRows[0]||{Transporte:"",Viaje:"",Placa:"",Novedad:"", "Disponibilidad de vehículos":"","Placa física":"","Estado":""}),...dataRows.map(r=>Object.values(r))]);
+ ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:6}},{s:{r:1,c:0},e:{r:1,c:6}}];
+ styleSheet(ws,{headerRow:5,lastCol:6});
+ for(const addr of ["A1","A2"]){if(ws[addr])ws[addr].s={fill:{fgColor:{rgb:navy}},font:{name:"Aptos Display",bold:true,color:{rgb:white},sz:addr==="A1"?18:12},alignment:{vertical:"center"}}}
+ if(ws["A3"])ws["A3"].s={font:{name:"Aptos",color:{rgb:gray},italic:true,sz:9}};
+ XLSX.utils.book_append_sheet(wb,ws,category.slice(0,31));
+}
+const chosenRows=reportRows(selected);
+const combined=XLSX.utils.aoa_to_sheet([["CONTROL DE TRANSPORTES"],["REPORTE CONSOLIDADO PARA IMPRESIÓN"],["Fecha de generación",dateText],["Categorías",categoryMultiMode?selectedCategories.join(", "):activeCategory],[],Object.keys(chosenRows[0]||{Transporte:"",Viaje:"",Placa:"",Novedad:"", "Disponibilidad de vehículos":"","Placa física":"","Estado":""}),...chosenRows.map(r=>Object.values(r))]);
+combined["!merges"]=[{s:{r:0,c:0},e:{r:0,c:6}},{s:{r:1,c:0},e:{r:1,c:6}}];
+styleSheet(combined,{headerRow:6,lastCol:6});
+for(const addr of ["A1","A2"]){if(combined[addr])combined[addr].s={fill:{fgColor:{rgb:navy}},font:{name:"Aptos Display",bold:true,color:{rgb:white},sz:addr==="A1"?18:12},alignment:{vertical:"center"}}}
+if(combined["A3"])combined["A3"].s={font:{name:"Aptos",color:{rgb:gray},italic:true,sz:9}};
+XLSX.utils.book_append_sheet(wb,combined,"Reporte imprimible");
+XLSX.writeFile(wb,"Control_Transportes_Reporte_Ejecutivo.xlsx",{cellStyles:true});
+}
 function subscribe(){sb.channel("transportes-live").on("postgres_changes",{event:"*",schema:"public",table:"transportes"},()=>refresh()).subscribe()}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function switchModule(module){activeModule=module;const main=module==="main",checkin=module==="checkin",tapa=module==="tapa";$("mainModuleView").classList.toggle("hidden",!main);$("checkinModuleView").classList.toggle("hidden",!checkin);$("tapaModuleView").classList.toggle("hidden",!tapa);$("mainModuleBtn").classList.toggle("active",main);$("checkinModuleBtn").classList.toggle("active",checkin);$("tapaModuleBtn").classList.toggle("active",tapa);if(checkin)refreshCheckin();if(tapa)refreshTapa()}
