@@ -34,14 +34,14 @@ const fields=await sb.rpc("list_transport_vehicle_fields");
 const map=new Map((fields.data||[]).map(x=>[String(x.id),x]));
 const wb=XLSX.utils.book_new();
 const categories=["Viajes HYM y URBAN","Viajes KA","Viajes Tradicional","Viajes 2KA","Viajes 2","Custodias"];
-const allRows=(data||[]).map(r=>{const x=map.get(String(r.id))||{};return {categoria:r.categoria||"Viajes Tradicional",Transporte:r.transporte||"",Viaje:r.viaje||"",Placa:r.placa||"",Novedad:r.novedad||"", "Disponibilidad de vehículos":x.estado_vehiculo||"", "Placa física":x.cambio_placa||"",Estado:r.estado||"Pendiente"}});
+const allRows=(data||[]).map(r=>{const x=map.get(String(r.id))||{};return {categoria:r.categoria||"Viajes Tradicional",Transporte:r.transporte||"",Viaje:r.viaje||"",Placa:r.placa||"", "Placa física":x.cambio_placa||"",Estado:r.estado||"Pendiente",Clientes:""}});
 const visible=categoryMultiMode&&selectedCategories.length?allRows.filter(r=>selectedCategories.includes(r.categoria)):activeCategory==="Todos"?allRows:allRows.filter(r=>r.categoria===activeCategory);
 const selected=visible.length?visible:allRows;
 const dateText=new Date().toLocaleDateString("es-CO",{year:"numeric",month:"long",day:"numeric"});
 const navy="123047",blue="1769AA",pale="EAF1F7",white="FFFFFF",gray="5B6573";
 function styleSheet(ws,{titleRow=1,headerRow=3,lastCol=7,autoFilter=true}={}){
 const range=XLSX.utils.decode_range(ws["!ref"]||"A1:A1");
-ws["!cols"]=[{wch:18},{wch:14},{wch:16},{wch:34},{wch:24},{wch:18},{wch:16},{wch:16}];
+ws["!cols"]=[{wch:20},{wch:16},{wch:16},{wch:20},{wch:18},{wch:32}];
 ws["!freeze"]={xSplit:0,ySplit:headerRow};
 ws["!autofilter"]=autoFilter?{ref:XLSX.utils.encode_range({s:{r:headerRow-1,c:0},e:{r:range.e.r,c:lastCol}})}:undefined;
 ws["!pageSetup"]={orientation:"landscape",paperSize:9,fitToWidth:1,fitToHeight:0,scale:0};
@@ -76,16 +76,16 @@ for(const category of categories){
  if(!categoryRows.length)continue;
  const dataRows=reportRows(categoryRows);
  const ws=XLSX.utils.aoa_to_sheet([["CONTROL DE TRANSPORTES"],[category.toUpperCase()+" · REPORTE PARA ENTREGA"],["Fecha de generación",dateText],[],Object.keys(dataRows[0]||{Transporte:"",Viaje:"",Placa:"",Novedad:"", "Disponibilidad de vehículos":"","Placa física":"","Estado":""}),...dataRows.map(r=>Object.values(r))]);
- ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:6}},{s:{r:1,c:0},e:{r:1,c:6}}];
- styleSheet(ws,{headerRow:5,lastCol:6});
+ ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:5}},{s:{r:1,c:0},e:{r:1,c:5}}];
+ styleSheet(ws,{headerRow:5,lastCol:5});
  for(const addr of ["A1","A2"]){if(ws[addr])ws[addr].s={fill:{fgColor:{rgb:navy}},font:{name:"Aptos Display",bold:true,color:{rgb:white},sz:addr==="A1"?18:12},alignment:{vertical:"center"}}}
  if(ws["A3"])ws["A3"].s={font:{name:"Aptos",color:{rgb:gray},italic:true,sz:9}};
  XLSX.utils.book_append_sheet(wb,ws,category.slice(0,31));
 }
 const chosenRows=reportRows(selected);
 const combined=XLSX.utils.aoa_to_sheet([["CONTROL DE TRANSPORTES"],["REPORTE CONSOLIDADO PARA IMPRESIÓN"],["Fecha de generación",dateText],["Categorías",categoryMultiMode?selectedCategories.join(", "):activeCategory],[],Object.keys(chosenRows[0]||{Transporte:"",Viaje:"",Placa:"",Novedad:"", "Disponibilidad de vehículos":"","Placa física":"","Estado":""}),...chosenRows.map(r=>Object.values(r))]);
-combined["!merges"]=[{s:{r:0,c:0},e:{r:0,c:6}},{s:{r:1,c:0},e:{r:1,c:6}}];
-styleSheet(combined,{headerRow:6,lastCol:6});
+combined["!merges"]=[{s:{r:0,c:0},e:{r:0,c:5}},{s:{r:1,c:0},e:{r:1,c:5}}];
+styleSheet(combined,{headerRow:6,lastCol:5});
 for(const addr of ["A1","A2"]){if(combined[addr])combined[addr].s={fill:{fgColor:{rgb:navy}},font:{name:"Aptos Display",bold:true,color:{rgb:white},sz:addr==="A1"?18:12},alignment:{vertical:"center"}}}
 if(combined["A3"])combined["A3"].s={font:{name:"Aptos",color:{rgb:gray},italic:true,sz:9}};
 XLSX.utils.book_append_sheet(wb,combined,"Reporte imprimible");
