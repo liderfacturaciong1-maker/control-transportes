@@ -38,10 +38,3 @@
 .selectTransportBtn{white-space:nowrap;padding:7px 10px;font-size:12px}
 .selectedTransportBtn{white-space:nowrap;padding:7px 10px;font-size:12px;background:#16803d;color:#fff;border:1px solid #16803d}
 .vehicleState:disabled,.plateChange:disabled{opacity:.68;cursor:not-allowed;background:#eef1f4}
-
-/* Placa física de solo lectura en Pendientes Por Checkin */
-.checkinPhysicalPlate{width:130px;max-width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;color:#253247;font:inherit}
-
-/* Acción de eliminación individual, visible solo a usuarios autorizados */
-.deleteOneBtn{background:#a61b1b;color:#fff;border:0;border-radius:6px;padding:7px 10px;margin-left:6px;white-space:nowrap}
-.deleteOneBtn:hover{background:#7f1515}
