@@ -353,3 +353,79 @@ tbody tr:hover {
     transition: none;
   }
 }
+
+/* =========================================
+   CAMIONES ANIMADOS - CONTROL TRANSPORTES
+   Estilo 3D azul profundo + cian
+   ========================================= */
+
+.categoryTab {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.categoryTab .truck3d {
+  display: inline-block;
+  width: 43px;
+  height: 32px;
+  flex: 0 0 auto;
+  overflow: visible;
+  vertical-align: middle;
+  margin-right: 10px;
+  color: #22D3EE;
+  transform-origin: center bottom;
+  transition: transform .35s ease, filter .35s ease;
+}
+
+.categoryTab .truck3d .truckBody {
+  transform-origin: center;
+  transition: transform .35s ease;
+}
+
+.categoryTab .truck3d .truckWheel {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform .35s ease;
+}
+
+.categoryTab:hover .truck3d,
+.categoryTab:focus-visible .truck3d {
+  transform: translateX(5px) translateY(-2px);
+  filter: drop-shadow(0 3px 5px #22D3EE66);
+}
+
+.categoryTab:hover .truck3d .truckWheel,
+.categoryTab:focus-visible .truck3d .truckWheel {
+  animation: truck3dWheel .55s ease-in-out;
+}
+
+.categoryTab:hover .truck3d .truckBody,
+.categoryTab:focus-visible .truck3d .truckBody {
+  animation: truck3dSuspension .4s ease-in-out;
+}
+
+.categoryTab.active .truck3d {
+  filter: drop-shadow(0 2px 5px #22D3EE55);
+}
+
+@keyframes truck3dWheel {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(180deg); }
+}
+
+@keyframes truck3dSuspension {
+  0%, 100% { transform: translateY(0); }
+  40%      { transform: translateY(-1.5px); }
+  70%      { transform: translateY(.5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .categoryTab .truck3d,
+  .categoryTab .truck3d .truckBody,
+  .categoryTab .truck3d .truckWheel {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
