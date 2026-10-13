@@ -1,15 +1,43 @@
-/* Brújula y Rutero */
-.brujulaPanel{padding:20px}
-.brujulaTitle{display:flex;align-items:center;gap:12px}
-.brujulaTitle h2{display:inline-block;margin:0}
-.brujulaTitle .brujulaTruck{font-size:36px;vertical-align:middle;margin-right:8px}
-.brujulaUpload{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
-.brujulaUpload input{min-width:220px;flex:1}
-.brujulaFilters{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;margin:14px 0}
-.brujulaSummary{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:12px 0}
-.brujulaTableWrap{max-height:65vh;overflow:auto}
-.brujulaTableWrap table{min-width:1900px}
-.brujulaTableWrap th{position:sticky;top:0;background:#12344d;color:#fff;z-index:2}
-.brujulaTableWrap td{white-space:nowrap}
-.brujulaTableWrap tbody tr:nth-child(even){background:#f4f7fa}
-@media(max-width:800px){.brujulaFilters{grid-template-columns:1fr}.brujulaUpload{display:grid}.brujulaUpload button{width:100%}}
+*{box-sizing:border-box}body{margin:0;background:#f4f6f8;color:#17202a;font-family:Arial,sans-serif}header{background:#12344d;color:#fff;padding:18px 5%;display:flex;justify-content:space-between;align-items:center}h1{margin:0;font-size:24px}header p{margin:4px 0;opacity:.8}main{max-width:1250px;margin:24px auto;padding:0 15px}.card{background:#fff;border-radius:12px;padding:18px;margin-bottom:16px;box-shadow:0 2px 10px #0001}.login{max-width:400px;margin:70px auto;text-align:center}.login input,.filters input,.filters select,.userForm input{width:100%;padding:12px;border:1px solid #ccd4dc;border-radius:8px;font-size:16px;margin:6px 0}button{border:0;border-radius:8px;background:#1769aa;color:#fff;padding:11px 15px;font-weight:bold;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}.secondary{background:#e8edf2;color:#17202a}.hidden{display:none!important}.error{color:#c0392b;margin-top:10px}.topbar{display:flex;justify-content:space-between}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.stats div,.stats .statCard{text-align:center;background:#fff;padding:15px;border-radius:10px}.stats .statCard{width:100%;color:#17202a;border:2px solid transparent;box-shadow:0 2px 8px #0000000d;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:94px;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.stats .statCard:hover,.stats .statCard:focus-visible{border-color:#6aa5d8;box-shadow:0 4px 14px #1769aa22;transform:translateY(-2px);outline:none}.stats .statCard span{color:#68747d}.stats .statCard b{font-size:26px;display:block}.stats b{font-size:26px;display:block}.stats span{color:#68747d}.filters{display:grid;grid-template-columns:2fr 1fr;gap:10px;margin:15px 0}table{width:100%;border-collapse:collapse}th,td{padding:12px 10px;border-bottom:1px solid #e6eaee;text-align:left;vertical-align:middle}.badge{padding:6px 9px;border-radius:18px;font-size:12px;font-weight:bold}.Pendiente{background:#eef1f4}.Armado{background:#fff1b8}.Contado{background:#ffd8a0}.Cargado{background:#c9f0d1}.upload,.userForm{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.userForm input{width:220px}.userRow{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eee}.historyItem{padding:9px 0;border-bottom:1px solid #eee;font-size:14px}#toast{position:fixed;right:20px;bottom:20px;background:#17202a;color:#fff;padding:12px 16px;border-radius:8px;opacity:0;transition:.2s}.show{opacity:1!important}@media(max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}.filters{grid-template-columns:1fr}.tableWrap{overflow:auto}table{min-width:1080px}.topbar{display:block}.userForm input{width:100%}}.progressItem{margin:10px 0 14px;max-width:1000px}.progressInfo{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:16px}.progressTrack{width:100%;height:16px;background:#e5e7eb;border-radius:999px;overflow:visible;position:relative;margin:8px 0 14px}.progressBar{height:100%;width:0;border-radius:999px;transition:width .4s ease;position:relative}.progressBar::after{content:'🚚';position:absolute;right:-13px;top:50%;transform:translateY(-50%);animation:truckRoll .45s ease-out both;display:block;font-size:25px;line-height:1;z-index:3;filter:drop-shadow(0 1px 1px rgba(0,0,0,.18));white-space:nowrap;pointer-events:none}.progressContado{background:#2563eb}.progressNovedad{background:#ef4444}.progressArmado{background:#f97316}.progressCargado{background:#22c55e}body{background-image:linear-gradient(rgba(244,246,248,.35),rgba(244,246,248,.35)),url('./images.jpeg');background-size:cover;background-position:center;background-attachment:fixed}.vehicleState,.plateChange{min-width:155px;max-width:220px;width:100%;padding:9px 8px;border:1px solid #ccd4dc;border-radius:7px;background:#fff;font-size:13px}.plateChange{min-width:140px;max-width:160px}.vehicle-bodega{color:#000!important;font-weight:700;background:#8fe3a2!important}.vehicle-sobredimensionado{color:#000!important;font-weight:700;background:#ff9999!important}.vehicle-ok{color:#000!important;font-weight:700;background:#9edfff!important}.plateChange{text-transform:uppercase}
+
+.vehicleState{text-transform:uppercase;text-align:center;text-align-last:center}.vehicleState option{text-transform:uppercase;text-align:center}.progressBar::after{will-change:transform}@keyframes truckRoll{from{transform:translate(-26px,-50%)}to{transform:translate(0,-50%)}}@media(max-width:700px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.statChartVehicleList{margin-top:22px;text-align:left;border-top:1px solid #e3e8ee;padding-top:14px;min-height:0}.statChartVehicleList h3{font-size:16px;margin:0 0 10px}.statChartVehicleList #statChartVehicles{max-height:42vh;max-height:min(42vh,360px);overflow-y:auto;overscroll-behavior:contain;padding-right:4px}.statVehicleRow{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #edf0f3;border-radius:6px;min-height:40px}.statVehicleRow:nth-child(odd){background:#f7f9fb}.statVehicleName{font-weight:700;overflow-wrap:anywhere;line-height:1.35}.statVehiclePlate{font-weight:800;white-space:nowrap;color:#12344d}.statVehicleEmpty{color:#68747d;text-align:center;padding:12px}.progressBar::after{animation:truckRoll .65s ease-out both}@keyframes truckRoll{from{transform:translate(-34px,-50%)}to{transform:translate(0,-50%)}}@media(max-width:520px){.statChartVehicleList #statChartVehicles{max-height:38vh;max-height:min(38vh,280px)}.statVehicleRow{align-items:flex-start}}
+
+/* Correccion: la lista debe tener su propio desplazamiento, sin alargar el modal */
+.statChartVehicleList{display:flex!important;flex-direction:column!important;min-height:0!important;}
+.statChartVehicleList #statChartVehicles{display:block!important;height:min(42vh,360px)!important;max-height:min(42vh,360px)!important;overflow-y:scroll!important;overflow-x:hidden!important;overscroll-behavior:contain; scrollbar-gutter:stable; -webkit-overflow-scrolling:touch;}
+.statVehicleRow{display:block!important;width:100%;box-sizing:border-box;white-space:normal;overflow-wrap:anywhere;}
+@media(max-width:520px){.statChartVehicleList #statChartVehicles{height:min(38vh,280px)!important;max-height:min(38vh,280px)!important;}}
+
+/* FIX definitivo modal de estadisticas: modal dentro de pantalla y lista independiente desplazable */
+.statChartModal{align-items:center!important;justify-content:center!important;overflow:hidden!important;padding:12px!important;}
+.statChartCard{display:flex!important;flex-direction:column!important;width:min(680px,100%)!important;max-height:calc(100vh - 24px)!important;max-height:calc(100dvh - 24px)!important;overflow:hidden!important;padding:24px 20px 18px!important;}
+.statChartCard h2,.statChartCard .statChartTotal,.statChartCard .statChartValue,.statChartCard .statChartPercent,.statChartCard .truckChart,.statChartCard .statChartHint{flex-shrink:0!important;}
+.statChartVehicleList{display:flex!important;flex:1 1 auto!important;flex-direction:column!important;min-height:0!important;overflow:hidden!important;margin-top:12px!important;padding-top:10px!important;}
+.statChartVehicleList h3{flex:0 0 auto!important;}
+.statChartVehicleList #statChartVehicles{display:block!important;flex:1 1 auto!important;height:35vh!important;height:min(35vh,320px)!important;min-height:80px!important;max-height:none!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;scrollbar-gutter:stable!important;-webkit-overflow-scrolling:touch!important;padding:0 8px 0 0!important;}
+.statVehicleRow{display:block!important;width:100%!important;white-space:normal!important;overflow-wrap:anywhere!important;}
+.statVehicleName{display:block!important;white-space:normal!important;overflow-wrap:anywhere!important;}
+@media(max-height:720px){.statChartCard{padding:18px 16px 12px!important}.statChartPercent{margin-bottom:8px!important}.truckChart{height:55px!important;margin:8px 12px 12px!important}.statChartHint{margin-top:8px!important}.statChartVehicleList{margin-top:6px!important;padding-top:6px!important}.statChartVehicleList #statChartVehicles{height:24vh!important;height:min(24vh,210px)!important;}}
+
+.permissionGrid{display:grid;grid-template-columns:1fr;gap:8px;padding:12px;border:1px solid #d5dce3;border-radius:10px;margin:10px 0}.permissionGrid label{display:flex;gap:8px;align-items:center}.permissionGrid input{width:auto}.userRow{align-items:flex-start;gap:10px;flex-wrap:wrap}.userRow small{line-height:1.6}
+
+
+/* Confirmación clara para eliminar transportes, sin pedir escribir una frase */
+.deleteConfirmCard{max-width:480px;border-top:5px solid #a61b1b;}
+.deleteConfirmCard h2{margin-top:0;color:#8f1515;}
+.deleteConfirmCard p{line-height:1.55;}
+.deleteConfirmCard .previewActions button{min-width:130px;}
+#confirmDeleteBtn:disabled{opacity:.65;cursor:wait;}
+
+.categoryTabs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0;padding:10px}.categoryTab{flex:1;min-width:170px;background:#eef2f7;color:#253247;border:1px solid #d5dde8}.categoryTab.active{background:#1769aa;color:#fff;border-color:#1769aa}.categoryTab:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
+
+/* Selección obligatoria del transporte antes de editar campos operativos */
+.transportSelected{outline:2px solid #16803d;outline-offset:-2px;background:#effaf2!important}
+.selectTransportBtn{white-space:nowrap;padding:7px 10px;font-size:12px}
+.selectedTransportBtn{white-space:nowrap;padding:7px 10px;font-size:12px;background:#16803d;color:#fff;border:1px solid #16803d}
+.vehicleState:disabled,.plateChange:disabled{opacity:.68;cursor:not-allowed;background:#eef1f4}
+
+/* Placa física de solo lectura en Pendientes Por Checkin */
+.checkinPhysicalPlate{width:130px;max-width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;color:#253247;font:inherit}
