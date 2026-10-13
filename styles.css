@@ -483,3 +483,243 @@ tbody tr:hover {
 @keyframes spinNeedle{0%{transform:rotate(-115deg)}55%{transform:rotate(40deg)}100%{transform:rotate(-40deg)}}
 .moduleSplash.depart .splashCompass{transform:scale(.6) rotate(40deg);opacity:0;transition:transform .2s ease-in,opacity .2s ease-in}
 @media(prefers-reduced-motion:reduce){.moduleSplash{display:none!important}}
+
+
+/* =========================================
+   V5.3 - Estilo gerencial / fondo ejecutivo
+   ========================================= */
+:root{
+  --exec-bg-1:#edf3f8;
+  --exec-bg-2:#dfeaf3;
+  --exec-ink:#102a43;
+  --exec-accent:#1687c9;
+  --exec-accent-2:#0d5f93;
+  --exec-surface:rgba(255,255,255,.88);
+  --exec-surface-strong:rgba(255,255,255,.95);
+  --exec-border:rgba(168,190,210,.45);
+  --exec-shadow:0 18px 45px rgba(14,36,58,.10);
+}
+
+html{background:linear-gradient(180deg,#edf3f8 0%,#e6eef6 45%,#edf3f8 100%);} 
+body{
+  min-height:100vh;
+  position:relative;
+  color:var(--exec-ink);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(22,135,201,.18) 0 120px, transparent 121px),
+    radial-gradient(circle at 86% 14%, rgba(17,108,168,.12) 0 140px, transparent 141px),
+    radial-gradient(circle at 80% 78%, rgba(34,161,227,.10) 0 180px, transparent 181px),
+    linear-gradient(135deg, rgba(255,255,255,.78), rgba(255,255,255,.55)),
+    linear-gradient(180deg, var(--exec-bg-1), var(--exec-bg-2));
+  background-attachment:fixed;
+  overflow-x:hidden;
+}
+body::before,
+body::after{
+  content:"";
+  position:fixed;
+  inset:auto;
+  pointer-events:none;
+  z-index:0;
+}
+body::before{
+  top:72px;
+  right:-120px;
+  width:380px;
+  height:380px;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(22,135,201,.14) 0%, rgba(22,135,201,.06) 42%, transparent 72%);
+  filter:blur(8px);
+}
+body::after{
+  left:-130px;
+  bottom:-120px;
+  width:420px;
+  height:420px;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(11,71,110,.12) 0%, rgba(11,71,110,.04) 46%, transparent 76%);
+  filter:blur(10px);
+}
+
+header,
+main,
+#toast,
+.cargoSplash,
+.moduleSplash,
+.previewModal,
+.statChartModal,
+.byrTransportOverlay{
+  position:relative;
+  z-index:1;
+}
+
+header{
+  background:linear-gradient(135deg, rgba(9,35,57,.97), rgba(18,59,92,.95) 45%, rgba(22,135,201,.92));
+  border-bottom:1px solid rgba(255,255,255,.12);
+  box-shadow:0 10px 28px rgba(9,35,57,.22);
+  backdrop-filter:blur(10px);
+}
+header h1{letter-spacing:.02em;}
+header p{color:rgba(231,242,250,.92);}
+
+main{
+  max-width:1320px;
+  margin:30px auto;
+}
+
+.card{
+  background:var(--exec-surface);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  border:1px solid var(--exec-border);
+  border-radius:18px;
+  box-shadow:var(--exec-shadow);
+}
+
+.card:hover{
+  box-shadow:0 22px 54px rgba(14,36,58,.12);
+}
+
+.categoryTabs,
+.primaryTruckTabs{
+  background:linear-gradient(180deg, rgba(255,255,255,.84), rgba(238,245,250,.88));
+  border:1px solid rgba(192,211,226,.72);
+  box-shadow:0 10px 30px rgba(16,42,67,.07);
+  backdrop-filter:blur(10px);
+}
+
+.categoryTab,
+.primaryTruckTab{
+  background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(244,249,253,.96));
+  border:1px solid rgba(191,210,224,.90);
+  box-shadow:0 8px 18px rgba(11,23,40,.07);
+}
+
+.categoryTab.active,
+.primaryTruckTab.active{
+  background:linear-gradient(135deg, #0f3552 0%, #15679e 55%, #1aa4e0 100%);
+  box-shadow:0 12px 24px rgba(22,135,201,.24);
+}
+
+.stats .statCard,
+.stats div,
+.byrKpis>div,
+.byrAnalytics,
+.porteriaPanel,
+.modulePermissionEditor,
+.file-heading,
+.previewCard,
+.statChartCard,
+.byrTransportCard{
+  background:var(--exec-surface-strong);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  box-shadow:0 12px 28px rgba(14,36,58,.08);
+}
+
+.stats .statCard{
+  border:1px solid rgba(198,216,229,.95);
+  border-bottom:4px solid #1687c9;
+}
+.stats .statCard b,
+.stats b,
+.byrKpis strong{
+  color:#0b3b60;
+}
+
+.tableWrap{
+  border:1px solid rgba(205,219,230,.85);
+  border-radius:16px;
+  overflow:auto;
+  background:rgba(255,255,255,.92);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+}
+
+th{
+  background:linear-gradient(135deg,#103654,#164f79)!important;
+  color:#fff;
+  letter-spacing:.02em;
+}
+
+.brujulaTableWrap th{
+  background:linear-gradient(135deg,#dfeef7,#cde3f0)!important;
+  color:#0f3c5e!important;
+}
+
+tbody tr:nth-child(even){
+  background:rgba(245,249,252,.95);
+}
+
+tbody tr:hover{
+  background:rgba(228,243,251,.96);
+}
+
+button{
+  box-shadow:0 6px 15px rgba(22,135,201,.18);
+}
+button.secondary{
+  box-shadow:0 5px 14px rgba(15,53,82,.08);
+}
+
+#toast{
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+
+.brujulaPanel,
+#checkinModuleView .card,
+#tapaModuleView .card,
+#cargoModuleView .card,
+#adminModuleView .card,
+#historyPanel.card{
+  position:relative;
+  overflow:hidden;
+}
+.brujulaPanel::before,
+#checkinModuleView .card::before,
+#tapaModuleView .card::before,
+#cargoModuleView .card::before,
+#adminModuleView .card::before,
+#historyPanel.card::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  width:100%;
+  height:5px;
+  background:linear-gradient(90deg,#0f3552 0%, #1687c9 50%, #59c7f3 100%);
+}
+
+.login.card{
+  background:rgba(255,255,255,.93);
+}
+
+@media (max-width: 700px){
+  main{margin:18px auto;}
+  .card{border-radius:14px;}
+  body::before{width:260px;height:260px;right:-90px;}
+  body::after{width:280px;height:280px;left:-80px;bottom:-60px;}
+}
+
+/* V5.5 - Alerta gerencial de vehículos sin salida */
+.porteriaAlertBar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:14px 0 18px}
+.porteriaAlertButton{display:inline-flex;align-items:center;gap:12px;background:linear-gradient(120deg,#103d5a,#156b9b);border:1px solid #22698e;color:white;border-radius:14px;padding:12px 18px;box-shadow:0 8px 20px rgba(14,59,91,.17)}
+.porteriaAlertButton:hover:not(:disabled){background:linear-gradient(120deg,#11496e,#1981b7)}
+.truckCrossIcon{font-size:26px;position:relative;line-height:1;display:inline-flex;padding-right:6px}
+.truckCrossX{position:absolute;top:-8px;right:-6px;display:grid;place-items:center;width:20px;height:20px;background:#d83945;color:#fff;border:2px solid #fff;border-radius:50%;font-size:12px;font-weight:900}
+.porteriaPendingCount{padding:4px 9px;border-radius:999px;background:#fff;color:#104366;font-size:14px;min-width:28px;text-align:center}
+.porteriaAlertHint{color:#54728a;font-size:13px}
+.porteriaPendingOverlay{position:fixed;inset:0;background:rgba(6,27,47,.64);z-index:99990;display:flex;justify-content:center;align-items:center;padding:18px;backdrop-filter:blur(3px)}
+.porteriaPendingCard{background:#fff;width:min(730px,100%);max-height:min(85vh,760px);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 25px 75px rgba(4,25,46,.35)}
+.porteriaPendingHead{display:flex;justify-content:space-between;gap:18px;align-items:start;padding:24px 27px;color:white;background:linear-gradient(120deg,#10334f,#1276ac)}
+.porteriaPendingHead h2{color:#fff;font-size:24px;margin:5px 0 8px}
+.porteriaPendingHead p{color:#e2f1fa;margin:0;font-size:13px;line-height:1.5}
+.porteriaPendingEyebrow{color:#cae9fb;font-size:12px;letter-spacing:.07em;font-weight:800}
+.porteriaPendingClose{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.6);border-radius:50%;min-width:36px;width:36px;height:36px;padding:0}
+.porteriaPendingBody{padding:16px 24px 24px;min-height:0;display:flex;flex-direction:column}
+.porteriaPendingSummary{font-weight:700;color:#164666;margin:0 0 12px}
+.porteriaPendingScroll{overflow:auto;max-height:55vh;border:1px solid #dce8f0;border-radius:10px}
+.porteriaPendingScroll th{position:sticky;top:0;z-index:1;background:#133b5a!important;color:#fff}
+.porteriaPendingScroll td{font-size:14px}
+.porteriaNoPending{text-align:center;padding:28px;color:#47728b}
+@media(max-width:600px){.porteriaAlertButton{width:100%;justify-content:center}.porteriaPendingHead{padding:18px}.porteriaPendingBody{padding:12px}.porteriaPendingHead h2{font-size:20px}}
