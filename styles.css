@@ -429,3 +429,6 @@ tbody tr:hover {
     transform: none !important;
   }
 }
+
+/* Brújula y Rutero dashboard */
+.brujulaPanel{display:grid;gap:15px}.brujulaFilters{display:flex;flex-wrap:wrap;gap:10px}.brujulaFilters>*{flex:1;min-width:160px}.byrKpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.byrKpis>div{background:#eaf4fa;border:1px solid #c6ddeb;border-radius:12px;padding:16px;display:grid;gap:6px}.byrKpis small{color:#315873}.byrKpis strong{color:#083857;font-size:28px}.byrAnalytics{background:#f9fbfd;border:1px solid #dce6ef;border-radius:12px;padding:15px}.byrBarRow{display:grid;grid-template-columns:minmax(100px,170px) 1fr 60px;align-items:center;gap:8px;margin:9px 0}.byrBarRow>span{white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.byrBar{height:14px;background:#e3eaf0;border-radius:9px;overflow:hidden}.byrBar i{display:block;height:100%;background:#0087be;border-radius:9px}.brujulaTableWrap{max-height:540px;overflow:auto}.brujulaTableWrap th{position:sticky;top:0;background:#e9f0f5;z-index:1}.brujulaTableWrap td{white-space:nowrap}@media(max-width:600px){.byrKpis{grid-template-columns:1fr}.byrBarRow{grid-template-columns:100px 1fr 40px}}
