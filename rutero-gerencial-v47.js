@@ -36,9 +36,18 @@ async function importFile(){if(typeof canModule==='function'&&!canModule('rutero
   const unique=dedup(sourceRows,0,width);
   rows=unique.data.map(r=>Array.from({length:width},(_,i)=>r[i]??''));
   audit=[{name:'Rutero',original:sourceRows.length,remaining:rows.length,removed:unique.removed}];
-  processed={Rutero:true};lastName=file.name;
+  lastName=file.name;
+  busy('Guardando el informe compartido en Supabase…');
+  await CTShared.save('rutero',file.name,rows,{headers,audit});
+  processed={Rutero:true};
+  initReportView();
+  busy('Informe gerencial generado a partir de Rutero: '+rows.length.toLocaleString('es-CO')+' registros únicos. No se recalculan fórmulas ni tablas dinámicas.');
+ }catch(e){processed=null;busy('No se pudo guardar el informe compartido: '+e.message+'. El informe publicado anteriormente se conserva.');console.error(e);}finally{$('brujulaUploadBtn').disabled=false;}
+}
+
+function initReportView(){
   const selectConfigs=[['brujulaCenterFilter',/centro|^cd$|origen/,0,'Todos los centros'],['brujulaStatusFilter',/status|estado/,1,'Todos los estados'],['brujulaDestinationFilter',/destino|destinatario/,2,'Todos los destinos']];
-  columnFilters=Array(width).fill('');$('brujulaHead').innerHTML='<tr>'+headers.map((h,i)=>`<th><span>${safe(h)}</span><input class="byrColumnFilter" data-column="${i}" type="search" placeholder="Filtrar…" aria-label="Filtrar ${safe(h)}" autocomplete="off"></th>`).join('')+'</tr>';
+  columnFilters=Array(headers.length).fill('');$('brujulaHead').innerHTML='<tr>'+headers.map((h,i)=>`<th><span>${safe(h)}</span><input class="byrColumnFilter" data-column="${i}" type="search" placeholder="Filtrar…" aria-label="Filtrar ${safe(h)}" autocomplete="off"></th>`).join('')+'</tr>';
   for(const [id,pattern,fallback,label] of selectConfigs){
    const col=headers.findIndex(h=>pattern.test(norm(h)));
    const el=$(id);
@@ -46,12 +55,23 @@ async function importFile(){if(typeof canModule==='function'&&!canModule('rutero
    else{el.disabled=false;choices(el,rows.map(r=>r[col]),label);}
   }
   $('brujulaSearch').value='';
-  $('brujulaLoadedAt').textContent='Archivo: '+file.name+' · '+new Date().toLocaleString('es-CO');
+  $('brujulaLoadedAt').textContent='Archivo: '+lastName+' · '+new Date().toLocaleString('es-CO');
   $('byrAudit').innerHTML=audit.map(x=>`<tr><td>${safe(x.name)}</td><td>${x.original}</td><td>${x.remaining}</td><td>${x.removed}</td></tr>`).join('');
-  draw();busy('Informe gerencial generado a partir de Rutero: '+rows.length.toLocaleString('es-CO')+' registros únicos. No se recalculan fórmulas ni tablas dinámicas.');
- }catch(e){busy('No se pudo procesar: '+e.message);console.error(e);}finally{$('brujulaUploadBtn').disabled=false;}
+  draw();
 }
-
+async function restoreSharedRutero(){
+ if(typeof canModule==='function'&&!canModule('rutero','view'))return;
+ if(processed)return;
+ busy('Recuperando último informe compartido de Supabase…');
+ try{
+  const saved=await CTShared.load('rutero');
+  if(!saved){busy('No hay informe compartido. Un usuario autorizado puede cargar el archivo Rutero.');return;}
+  headers=saved.metadata.headers||[];rows=saved.items;audit=saved.metadata.audit||[];
+  processed={Rutero:true};lastName=saved.filename;
+  initReportView();$('brujulaLoadedAt').textContent='Archivo compartido: '+saved.filename+' · '+new Date(saved.saved_at).toLocaleString('es-CO');
+  busy('Informe gerencial recuperado de Supabase: '+rows.length.toLocaleString('es-CO')+' registros.');
+ }catch(e){busy('No se pudo recuperar Rutero: '+e.message);console.error(e)}
+}
 function col(name){return headers.findIndex(h=>norm(h)===norm(name));}
 function distinctValues(dataset,index){if(index<0)return [];return [...new Set(dataset.map(r=>String(r[index]??'').trim()).filter(Boolean))];}
 function numberOf(value){const s=String(value??'').trim().replace(/\s/g,'');if(!s)return 0;const standardized=s.includes(',')?s.replace(/\./g,'').replace(',','.'):s;const x=Number(standardized);return Number.isFinite(x)?x:0;}
@@ -69,7 +89,7 @@ function showTransport(transport){
 function hideTransport(){$('byrTransportModal').classList.add('hidden');}
 
 function exportFile(){if(!rows.length)return busy('Primero carga un archivo.');const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([headers,...filtered]),'Rutero filtrado');XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(audit.map(x=>({Hoja:x.name,'Filas originales':x.original,'Filas conservadas':x.remaining,'Filas duplicadas':x.removed}))), 'Auditoría');XLSX.writeFile(wb,'Informe_Rutero_'+new Date().toISOString().slice(0,10)+'.xlsx');}
-window.loadBrujulaReport=function(){if(!processed)busy('Versión Rutero 4.7 activa · Carga el Excel con la hoja Rutero (no se requieren otras hojas). El informe permanece en esta sesión.');};
+window.loadBrujulaReport=function(){if(!processed)restoreSharedRutero();};
 function initialize(){if(!$('brujulaUploadBtn'))return;
  $('brujulaHead').addEventListener('input',e=>{if(!e.target.matches('.byrColumnFilter'))return;columnFilters[Number(e.target.dataset.column)]=e.target.value;clearTimeout(filterTimer);filterTimer=setTimeout(draw,180);});
  $('brujulaRows').addEventListener('click',e=>{const b=e.target.closest('.byrTransportLink');if(b)showTransport(b.dataset.transport);});
