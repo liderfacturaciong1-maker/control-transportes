@@ -41,3 +41,18 @@
 
 /* Placa física de solo lectura en Pendientes Por Checkin */
 .checkinPhysicalPlate{width:130px;max-width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;color:#253247;font:inherit}
+/* Brújula y Rutero */
+.brujulaPanel{padding:20px}
+.brujulaTitle{display:flex;align-items:center;gap:12px}
+.brujulaTitle h2{display:inline-block;margin:0}
+.brujulaTitle .brujulaTruck{font-size:36px;vertical-align:middle;margin-right:8px}
+.brujulaUpload{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
+.brujulaUpload input{min-width:220px;flex:1}
+.brujulaFilters{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;margin:14px 0}
+.brujulaSummary{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:12px 0}
+.brujulaTableWrap{max-height:65vh;overflow:auto}
+.brujulaTableWrap table{min-width:1900px}
+.brujulaTableWrap th{position:sticky;top:0;background:#12344d;color:#fff;z-index:2}
+.brujulaTableWrap td{white-space:nowrap}
+.brujulaTableWrap tbody tr:nth-child(even){background:#f4f7fa}
+@media(max-width:800px){.brujulaFilters{grid-template-columns:1fr}.brujulaUpload{display:grid}.brujulaUpload button{width:100%}}
