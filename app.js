@@ -29,7 +29,7 @@ function playCargoSplash(){playModuleSplash("cargo")}
 async function editModulePermissions(id,name){if(!permissions.is_admin)return;selectedPermissionUser=id;$("modulePermissionWho").textContent=name;const{data,error}=await sb.rpc("admin_get_module_permissions",{p_admin_pin:loginPin,p_user_id:id});if(error){toast(error.message);return}const rights=data?.[0]||DEFAULT_MODULE_RIGHTS;for(const mod of ["Cargo","Checkin","Rutero"])for(const mode of ["View","Edit"])$("edit"+mod+mode).checked=!!rights[mod.toLowerCase()+"_"+mode.toLowerCase()];$("modulePermissionEditor").classList.remove("hidden");$("modulePermissionEditor").scrollIntoView({behavior:"smooth",block:"center"})}
 async function saveModulePermissionEdits(){if(!selectedPermissionUser||!permissions.is_admin)return;const rights={};for(const mod of ["Cargo","Checkin","Rutero"])for(const mode of ["View","Edit"])rights[mod.toLowerCase()+"_"+mode.toLowerCase()]=$("edit"+mod+mode).checked;const{error}=await sb.rpc("admin_set_module_permissions",{p_admin_pin:loginPin,p_user_id:selectedPermissionUser,p_rights:rights});if(error){toast(error.message);return}$("modulePermissionEditor").classList.add("hidden");selectedPermissionUser=null;toast("Permisos de módulos guardados");await loadUsers()}
 function setupAdminModuleToggles(){document.querySelectorAll(".moduleToggle").forEach(btn=>{btn.classList.toggle("hidden",!permissions.is_admin);const panel=document.querySelector(`[data-module-panel="${btn.dataset.target}"]`);if(!panel)return;let collapsed=false;try{collapsed=localStorage.getItem(`transport_module_${btn.dataset.target}_collapsed`)==="1"}catch(e){}panel.classList.toggle("collapsed",collapsed);btn.textContent=collapsed?"Desplegar":"Ocultar";btn.onclick=()=>{if(!permissions.is_admin)return;const next=!panel.classList.contains("collapsed");panel.classList.toggle("collapsed",next);btn.textContent=next?"Desplegar":"Ocultar";try{localStorage.setItem(`transport_module_${btn.dataset.target}_collapsed`,next?"1":"0")}catch(e){}}})}
-async function showApp(){$("login").classList.add("hidden");$("app").classList.remove("hidden");$("logout").classList.remove("hidden");$("userName").textContent=user.name;$("connection").textContent="● Conectado";if(permissions.can_upload||permissions.is_admin)$("uploadPanel").classList.remove("hidden");if(permissions.can_create_users||permissions.is_admin)$("usersPanel").classList.remove("hidden");if(permissions.can_delete_all_transports||permissions.is_admin)$("deletePanel").classList.remove("hidden");if(permissions.is_admin||permissions.can_create_users){$("checkinPermissionLabel").classList.remove("hidden")}$("historyPanel").classList.toggle("hidden",!permissions.is_admin);setupAdminModuleToggles();setupCheckinCollapses();applyModuleRights();if(permissions.is_admin){$("permissionLabel").classList.remove("hidden");$("createPermissionLabel").classList.remove("hidden");$("deletePermissionLabel").classList.remove("hidden");$("statusPermissionLabels").classList.remove("hidden")}updateRoleOptions();await refresh();await refreshCheckin();subscribe();if(permissions.is_admin)loadUsers();if(!canModule("cargo","view"))switchModule(canModule("checkin","view")?"checkin":"brujula");else playCargoSplash()}
+async function showApp(){$("login").classList.add("hidden");$("app").classList.remove("hidden");$("logout").classList.remove("hidden");$("userName").textContent=user.name;$("connection").textContent="● Conectado";if(permissions.can_upload||permissions.is_admin)$("uploadPanel").classList.remove("hidden");if(permissions.can_create_users||permissions.is_admin)$("usersPanel").classList.remove("hidden");if(permissions.can_delete_all_transports||permissions.is_admin)$("deletePanel").classList.remove("hidden");if(permissions.is_admin||permissions.can_create_users){$("checkinPermissionLabel").classList.remove("hidden")}$("historyPanel").classList.toggle("hidden",!permissions.is_admin);setupAdminModuleToggles();setupCheckinCollapses();applyModuleRights();if(permissions.is_admin){$("permissionLabel").classList.remove("hidden");$("createPermissionLabel").classList.remove("hidden");$("deletePermissionLabel").classList.remove("hidden");$("statusPermissionLabels").classList.remove("hidden")}updateRoleOptions();await refresh();await refreshCheckin();await loadSharedCheckin();subscribe();if(permissions.is_admin)loadUsers();if(!canModule("cargo","view"))switchModule(canModule("checkin","view")?"checkin":"brujula");else playCargoSplash()}
 function logout(){loginPin="";sessionStorage.clear();location.reload()}
 function updateRoleOptions(){const admin=permissions.is_admin;const opt=$("newRole").querySelector('option[value="Administrador"]');if(opt)opt.disabled=!admin;if(!admin&&$("newRole").value==="Administrador")$("newRole").value="Operativo";if(!admin){$("newCanUpload").checked=false;$("newCanCreateUsers").checked=false;$("newCanDeleteAll").checked=false;["newCanArm","newCanCount","newCanLoad","newCanAvailability","newCanPhysicalPlate"].forEach(id=>$(id).checked=false)}}
 async function refresh(){const{data,error}=await sb.rpc("list_transports_with_category");if(error){toast(error.message);return}records=data||[];const extra=await sb.rpc("list_transport_vehicle_fields");if(!extra.error){const fields=new Map((extra.data||[]).map(x=>[String(x.id),x]));records=records.map(r=>({...r,...(fields.get(String(r.id))||{})}))}render();if(permissions.is_admin)loadHistory()}
@@ -149,13 +149,14 @@ async function loadPorteriaExcel(){if(!canModule("checkin","edit")){toast("Sin p
    if(!transportKey)throw Error("No existe una columna llamada Transporte.");
    const ids=new Set(rows.map(r=>normalizeTransport(r[transportKey])).filter(Boolean));
    if(!ids.size)throw Error("La columna Transporte no contiene identificadores válidos.");
+   await CTShared.save('porteria',file.name,[...ids],{source_rows:rows.length});
    porteriaTransportes=ids;
    const coincidencias=checkinRecords.filter(r=>ids.has(normalizeTransport(r.transporte))).length;
-   $("porteriaSummary").textContent=`Archivo: ${file.name} · ${rows.length.toLocaleString("es-CO")} registros · ${ids.size.toLocaleString("es-CO")} transportes únicos · ${coincidencias.toLocaleString("es-CO")} coincidencias en CHECKIN. Cruce activo en este navegador.`;
+   $("porteriaSummary").textContent=`Archivo: ${file.name} · ${rows.length.toLocaleString("es-CO")} registros · ${ids.size.toLocaleString("es-CO")} transportes únicos · ${coincidencias.toLocaleString("es-CO")} coincidencias en CHECKIN. Cruce guardado en Supabase para los usuarios autorizados.`;
    renderCheckin();toast("Salidas por Portería cargadas correctamente.");
  }catch(err){console.error(err);$("porteriaSummary").textContent="Error: "+err.message;toast("No se pudo procesar Portería: "+err.message)}
 }
-function clearPorteria(){porteriaTransportes=null;$("porteriaExcelFile").value="";$("porteriaSummary").textContent="Sin archivo de portería: el estado aparecerá como Sin datos.";renderCheckin();toast("Cruce de Portería limpiado.")}
+async function clearPorteria(){if(!canModule('checkin','edit'))return toast('Sin permiso');try{await CTShared.clear('porteria')}catch(e){return toast(e.message)}porteriaTransportes=null;$("porteriaExcelFile").value="";$("porteriaSummary").textContent="Sin archivo de portería: el estado aparecerá como Sin datos.";renderCheckin();toast("Cruce de Portería limpiado.")}
 
 let beesCsvRows=[];
 function getBeesStatus(transport){if(!beesCsvRows.length)return "Sin datos";const first=beesCsvRows[0]||{};const routeKey=Object.keys(first).find(k=>String(k).trim().toLowerCase()==="route_external_id");if(!routeKey)return "Sin datos";const id=normalizeTransport(transport);return beesCsvRows.some(r=>normalizeTransport(r[routeKey])===id)?"REALIZADO":"N/A"}
@@ -180,7 +181,9 @@ async function compareBeesCsv(){if(!canModule("checkin","edit")){toast("Sin perm
     if(!raw.length){toast("El archivo de BEES está vacío.");return}
     const first=raw[0], routeKey=Object.keys(first).find(k=>String(k).trim().toLowerCase()==="route_external_id");
     if(!routeKey){toast("No encuentro la columna route_external_id en el CSV.");return}
-    beesCsvRows=raw.filter(r=>normalizeTransport(r[routeKey]));
+    const newBeesRows=raw.filter(r=>normalizeTransport(r[routeKey]));
+    await CTShared.save('bees',file.name,newBeesRows,{source_rows:raw.length});
+    beesCsvRows=newBeesRows;
     const byTransport=new Map();
     for(const r of beesCsvRows){
       const id=normalizeTransport(r[routeKey]);
@@ -208,10 +211,33 @@ async function compareBeesCsv(){if(!canModule("checkin","edit")){toast("Sin perm
     toast("Cruce BEES completado. No se modificaron registros.");
   }catch(e){console.error(e);toast("No se pudo leer el CSV. Descárgalo nuevamente desde BEES.")}
 }
-function clearBeesReport(){
+async function clearBeesReport(){
+  if(!canModule('checkin','edit'))return toast('Sin permiso');try{await CTShared.clear('bees')}catch(e){return toast(e.message)}
   beesCsvRows=[];$("beesCsvFile").value="";$("beesReportRows").innerHTML="";$("beesReport").classList.add("hidden");$("beesReportSummary").textContent="Todavía no se ha cargado un archivo de BEES.";renderCheckin();toast("Reporte limpiado.");
 }
 
 init();
 
 function deleteAllTransports(){if(!permissions.can_delete_all_transports&&!permissions.is_admin){toast("No tienes permiso para eliminar todos los transportes.");return}if(!records.length){toast("No hay transportes para eliminar.");return}$("deleteConfirmCount").textContent=String(records.length);$("deleteConfirmModal").classList.remove("hidden");$("confirmDeleteBtn").focus()}function closeDeleteModal(){$("deleteConfirmModal").classList.add("hidden")}async function confirmDeleteAll(){if(!permissions.can_delete_all_transports&&!permissions.is_admin){closeDeleteModal();toast("No tienes permiso para eliminar todos los transportes.");return}if(!records.length){closeDeleteModal();toast("No hay transportes para eliminar.");return}const count=records.length;$("confirmDeleteBtn").disabled=true;$("confirmDeleteBtn").textContent="Eliminando…";const{data,error}=await sb.rpc("delete_all_transports_secure",{p_pin:loginPin});$("confirmDeleteBtn").disabled=false;$("confirmDeleteBtn").textContent="Sí, eliminar todos";if(error){closeDeleteModal();toast("No se pudo eliminar: "+error.message);return}closeDeleteModal();toast(`Se eliminaron ${data?.deleted??count} transportes y se vació Tapa Códigos KA. El historial se conservó.`);await refresh()}
+
+async function loadSharedCheckin(){
+ if(!canModule('checkin','view'))return;
+ try{
+  const [port,bees]=await Promise.all([CTShared.load('porteria'),CTShared.load('bees')]);
+  porteriaTransportes=port?new Set(port.items):null;
+  if(port)$('porteriaSummary').textContent=`Archivo compartido: ${port.filename} · ${port.items.length.toLocaleString('es-CO')} transportes · Actualizado: ${new Date(port.saved_at).toLocaleString('es-CO')}`;
+  beesCsvRows=bees?.items||[];
+  if(bees){$('beesReportSummary').textContent=`BEES compartido: ${bees.filename} · ${beesCsvRows.length.toLocaleString('es-CO')} registros · Actualizado: ${new Date(bees.saved_at).toLocaleString('es-CO')}`;renderBeesSavedComparison();}
+  renderCheckin();
+ }catch(e){console.error(e);toast('No se pudieron recuperar los reportes compartidos: '+e.message)}
+}
+function renderBeesSavedComparison(){
+ const key=Object.keys(beesCsvRows[0]||{}).find(k=>String(k).trim().toLowerCase()==='route_external_id');if(!key)return;
+ const by=new Map();for(const row of beesCsvRows){const id=normalizeTransport(row[key]);if(!id)continue;let v=by.get(id);if(!v){v={plates:new Set(),drivers:new Set(),count:0};by.set(id,v)}v.count++;const plate=csvCell(row,['vehicle_license_plate']);const driver=csvCell(row,['driver_name']);if(plate)v.plates.add(plate);if(driver)v.drivers.add(driver)}
+ const app=new Set(checkinRecords.map(r=>normalizeTransport(r.transporte)).filter(Boolean));const results=[];
+ for(const id of app){const v=by.get(id);results.push({id,status:v?'Coincide':'Pendiente en BEES',cls:v?'beesMatch':'beesMissing',plates:v?[...v.plates].join(', '):'',drivers:v?[...v.drivers].join(', '):'',count:v?.count||0})}
+ for(const [id,v] of by)if(!app.has(id))results.push({id,status:'Solo en BEES',cls:'beesOnly',plates:[...v.plates].join(', '),drivers:[...v.drivers].join(', '),count:v.count});
+ results.sort((a,b)=>a.id.localeCompare(b.id,undefined,{numeric:true}));
+ $('beesReportRows').innerHTML=results.map(r=>`<tr class="${r.cls}"><td><b>${esc(r.id)}</b></td><td>${esc(r.status)}</td><td>${esc(r.plates)}</td><td>${esc(r.drivers)}</td><td>${r.count}</td></tr>`).join('');
+ $('beesReport').classList.remove('hidden');
+}
