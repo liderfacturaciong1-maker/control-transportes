@@ -56,3 +56,300 @@
 .brujulaTableWrap td{white-space:nowrap}
 .brujulaTableWrap tbody tr:nth-child(even){background:#f4f7fa}
 @media(max-width:800px){.brujulaFilters{grid-template-columns:1fr}.brujulaUpload{display:grid}.brujulaUpload button{width:100%}}
+
+/* ==========================================
+   CONTROL TRANSPORTES FINAL
+   CENTRO DE CONTROL LOGISTICO
+   Rediseño visual sin cambiar funcionalidades
+   ========================================== */
+
+:root {
+  --control-bg: #0B1728;
+  --control-blue: #123B5C;
+  --control-primary: #1687C9;
+  --control-cyan: #22D3EE;
+  --control-text: #172B3F;
+  --control-muted: #64748B;
+  --control-surface: #FFFFFF;
+  --control-border: #D8E3ED;
+  --control-page: #F1F5F9;
+}
+
+/* Fondo general */
+body {
+  color: var(--control-text);
+  background-color: var(--control-page);
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+/* Encabezado principal */
+header {
+  background: linear-gradient(
+    120deg,
+    #0B1728 0%,
+    #123B5C 65%,
+    #14547A 100%
+  );
+  color: #FFFFFF;
+  padding: 20px 5%;
+  border-bottom: 3px solid var(--control-primary);
+  box-shadow: 0 5px 20px #0B17281F;
+}
+
+header h1 {
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+header p {
+  color: #CBDCEB;
+}
+
+/* Paneles y tarjetas */
+.card {
+  background: var(--control-surface);
+  border: 1px solid var(--control-border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 5px 18px rgba(11, 23, 40, 0.06);
+  margin-bottom: 18px;
+}
+
+/* Botones generales */
+button {
+  background: linear-gradient(135deg, #1687C9, #116CA8);
+  color: #FFFFFF;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 11px 17px;
+  font-weight: 700;
+  transition: background .2s ease,
+              box-shadow .2s ease,
+              transform .2s ease;
+}
+
+button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #22A1E3, #1687C9);
+  box-shadow: 0 4px 12px #1687C933;
+  transform: translateY(-1px);
+}
+
+button:focus-visible {
+  outline: 3px solid var(--control-cyan);
+  outline-offset: 3px;
+}
+
+button:disabled {
+  transform: none;
+  box-shadow: none;
+}
+
+button.secondary {
+  background: #E8EFF6;
+  color: #173650;
+  border-color: #D1DFEB;
+}
+
+button.secondary:hover:not(:disabled) {
+  background: #D8E8F5;
+}
+
+/* Pestañas existentes: sin crear nuevas */
+.categoryTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0 20px;
+  padding: 10px;
+  background: #E5EDF5;
+  border: 1px solid #D5E1EC;
+  border-radius: 14px;
+}
+
+.categoryTab {
+  flex: 1 1 170px;
+  min-width: 0;
+  padding: 15px 18px;
+  background: #FFFFFF;
+  color: #173650;
+  border: 1px solid #D4E0EB;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+  box-shadow: 0 2px 5px #0B17280A;
+}
+
+.categoryTab:hover:not(:disabled) {
+  background: #EAF7FF;
+  color: #075985;
+  border-color: #63B8E8;
+}
+
+.categoryTab.active {
+  background: linear-gradient(135deg, #123B5C, #1687C9);
+  color: #FFFFFF;
+  border-color: #1687C9;
+  box-shadow: 0 4px 12px #1687C933;
+}
+
+.categoryTab:focus-visible {
+  outline: 3px solid var(--control-cyan);
+  outline-offset: 3px;
+}
+
+/* Campos de entrada y filtros */
+.login input,
+.filters input,
+.filters select,
+.userForm input,
+.vehicleState,
+.plateChange,
+.checkinPhysicalPlate {
+  border: 1px solid #C9D7E4;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  color: #172B3F;
+}
+
+.login input:focus,
+.filters input:focus,
+.filters select:focus,
+.userForm input:focus {
+  outline: 2px solid #1687C9;
+  outline-offset: 1px;
+  border-color: #1687C9;
+}
+
+/* Tablas */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+th {
+  background: #123B5C;
+  color: #FFFFFF;
+  font-weight: 700;
+}
+
+th,
+td {
+  padding: 13px 11px;
+  border-bottom: 1px solid #E2EAF1;
+}
+
+td {
+  color: #263B50;
+}
+
+tbody tr:nth-child(even) {
+  background-color: #F5F8FB;
+}
+
+tbody tr:hover {
+  background-color: #EAF6FD;
+}
+
+/* Tarjetas de indicadores */
+.stats div,
+.stats .statCard {
+  border-radius: 12px;
+}
+
+.stats .statCard {
+  background: linear-gradient(180deg, #FFFFFF, #F7FAFD);
+  border: 1px solid #DCE7F0;
+  border-bottom: 3px solid #1687C9;
+}
+
+.stats .statCard:hover,
+.stats .statCard:focus-visible {
+  border-color: #22A1E3;
+  box-shadow: 0 6px 18px #1687C91F;
+}
+
+.stats .statCard span,
+.stats span {
+  color: #64748B;
+}
+
+/* Etiquetas de estado: conservar colores actuales */
+.badge {
+  font-weight: 800;
+  border: 1px solid #0000000A;
+}
+
+/* Brújula y Rutero */
+.brujulaPanel {
+  border-radius: 14px;
+}
+
+.brujulaTitle h2 {
+  color: #123B5C;
+  font-weight: 800;
+}
+
+.brujulaTableWrap th {
+  background: #0B1728;
+  color: #FFFFFF;
+}
+
+/* Listas y registros */
+.userRow,
+.historyItem {
+  border-bottom-color: #E2EAF1;
+}
+
+.statChartVehicleList {
+  border-top-color: #DCE7F0;
+}
+
+.statVehiclePlate {
+  color: #123B5C;
+}
+
+/* Notificaciones */
+#toast {
+  background: #0B1728;
+  color: #FFFFFF;
+  border: 1px solid #1687C9;
+  box-shadow: 0 8px 24px #0B172833;
+}
+
+/* Adaptación a dispositivos móviles */
+@media (max-width: 700px) {
+  header {
+    padding: 16px 4%;
+  }
+
+  header h1 {
+    font-size: 21px;
+  }
+
+  main {
+    margin-top: 16px;
+  }
+
+  .card {
+    padding: 15px;
+    border-radius: 11px;
+  }
+
+  .categoryTabs {
+    gap: 7px;
+    padding: 7px;
+  }
+
+  .categoryTab {
+    flex: 1 1 100%;
+    padding: 13px 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  .stats .statCard {
+    transition: none;
+  }
+}
