@@ -8,7 +8,7 @@ const displayedTransport=s=>{const key=transportKey(s);return key?`S${key}`:'';}
 const heading=s=>norm(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9]/g,'');
 const ix=(cols,variants)=>cols.findIndex(x=>variants.includes(heading(x)));
 let statRows=new Map(),statLoaded=false,statFile='',loading=false;
-const SYNC_VERSION='v5.18 status columna I'; // Motor de sincronización v5.18
+const SYNC_VERSION='v5.21 status rutero por transporte'; // Motor de sincronización v5.21
 let cargoFallback=[],cargoFetching=false,cargoLastAttempt=0,cargoError='';
 function cargoSource(){
  // Fuente preferente: los mismos registros usados para construir Cargue y Despacho.
@@ -79,9 +79,12 @@ function render(){if(!$('syncRows'))return;try{
  const ti=ix(report.headers||[],['TRANSPORTE','TRANSPORT','NUMERODETRANSPORTE','NROTRANSPORTE']);
  // Vista rápida de despacho: Transporte por encabezado; Status = columna I del Excel (índice 8).
  // Si los encabezados cambian de posición, el cruce sigue identificando Transporte por nombre.
- const si=8;
+ const statusHeaderIndex=ix(report.headers||[],['STATUS']);
+ // El archivo nuevo ubica Status en I; algunos Ruteros anteriores tienen Cant en I.
+ // Verificar el encabezado antes de interpretar una cantidad como estado.
+ const si=heading(report.headers?.[8])==='STATUS' ? 8 : statusHeaderIndex;
  const quick=new Map();
- if(report.loaded&&ti>=0){
+ if(report.loaded&&ti>=0&&si>=0){
    for(const r of (Array.isArray(report.rows)?report.rows:[])){
      if(!Array.isArray(r))continue;
      const k=transportKey(r[ti]); // S8009001225 y 8009001225 son equivalentes.
@@ -104,8 +107,8 @@ function render(){if(!$('syncRows'))return;try{
  let syncInfo='';
  if(cargoError&&!cargo.length)syncInfo='No se pudo consultar Cargue y Despacho: '+cargoError;
  else if(!cargo.length)syncInfo=cargoFetching?'Consultando transportes de Cargue y Despacho…':'No hay transportes disponibles. Pulsa Actualizar cruce.';
- else syncInfo=`${filtered.length.toLocaleString('es-CO')} registros de Cargue y Despacho visibles. ${report.loaded?'Status leído de la columna I de Vista rápida.':'Sin informe de Vista rápida cargado; Status pendiente.'} ${statLoaded?'Cruce STAT: '+statFile+'.':''}`;
- $('syncMessage').textContent='Motor de sincronización v5.18 · '+syncInfo;
+ else syncInfo=`${filtered.length.toLocaleString('es-CO')} registros de Cargue y Despacho visibles. ${report.loaded?(si>=0?'Status consultado en Vista rápida (columna '+String(si+1)+').':'El archivo Rutero no contiene una columna Status válida.'):'Sin informe de Vista rápida cargado; Status pendiente.'} ${statLoaded?'Cruce STAT: '+statFile+'.':''}`;
+ $('syncMessage').textContent='Motor de sincronización v5.21 · '+syncInfo;
  updateUnsyncedCount();
  $('syncRows').innerHTML=filtered.slice(0,1000).map(r=>`<tr><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td>${esc(r.placa)}</td><td>${esc(r.status)}</td><td><span class="syncBadge ${/^(Sincronizado|En STAT)$/i.test(r.result)?'syncGood':/^(No encontrado|No está en STAT)$/i.test(r.result)?'syncBad':'syncUnknown'}">${esc(r.result)}</span></td></tr>`).join('') || `<tr><td colspan="5" style="text-align:center;padding:20px">${esc(cargoError ? 'Error al consultar transportes: '+cargoError : cargoFetching ? 'Cargando transportes...' : 'No hay transportes disponibles. Pulsa Actualizar cruce.')}</td></tr>`;
  }catch(err){const msg='Error al presentar Sincronización: '+(err?.message||String(err));const m=$('syncMessage');if(m)m.textContent=msg;const body=$('syncRows');if(body)body.innerHTML='<tr><td colspan="5">'+esc(msg)+'</td></tr>';console.error('[Sincronización]',err);}
