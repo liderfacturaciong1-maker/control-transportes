@@ -38,7 +38,7 @@ async function importFile(){if(typeof canModule==='function'&&!canModule('rutero
   audit=[{name:'Rutero',original:sourceRows.length,remaining:rows.length,removed:unique.removed}];
   lastName=file.name;
   busy('Guardando el informe compartido en Supabase…');
-  await CTShared.save('rutero',file.name,rows,{headers,audit});
+  await CTShared.save('rutero',file.name,rows,{headers,audit},(n,total)=>busy('Guardando Rutero en Supabase: bloque '+n+' de '+total+'… El informe anterior sigue disponible hasta finalizar.'));
   processed={Rutero:true};window.dispatchEvent(new Event("rutero-updated"));
   initReportView();
   busy('Informe gerencial generado a partir de Rutero: '+rows.length.toLocaleString('es-CO')+' registros únicos. No se recalculan fórmulas ni tablas dinámicas.');
@@ -65,13 +65,13 @@ async function restoreSharedRutero(){
  if(processed)return;
  busy('Recuperando último informe compartido de Supabase…');
  try{
-  const saved=await CTShared.load('rutero');
+  const saved=await CTShared.load('rutero',(n,total)=>busy('Recuperando Rutero de Supabase: bloque '+n+' de '+total+'…'));
   if(!saved){busy('No hay informe compartido. Un usuario autorizado puede cargar el archivo Rutero.');return;}
   headers=saved.metadata.headers||[];rows=saved.items;audit=saved.metadata.audit||[];
   processed={Rutero:true};lastName=saved.filename;window.dispatchEvent(new Event("rutero-updated"));
   initReportView();$('brujulaLoadedAt').textContent='Archivo compartido: '+saved.filename+' · '+new Date(saved.saved_at).toLocaleString('es-CO');
   busy('Informe gerencial recuperado de Supabase: '+rows.length.toLocaleString('es-CO')+' registros.');
- }catch(e){busy('No se pudo recuperar Rutero: '+e.message);console.error(e)}
+ }catch(e){busy('No se pudo recuperar Rutero: '+e.message+' · Verifica la conexión e intenta entrar nuevamente a Vista rápida.');console.error(e)}
 }
 function col(name){return headers.findIndex(h=>norm(h)===norm(name));}
 function distinctValues(dataset,index){if(index<0)return [];return [...new Set(dataset.map(r=>String(r[index]??'').trim()).filter(Boolean))];}
