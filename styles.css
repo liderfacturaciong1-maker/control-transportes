@@ -835,3 +835,35 @@ select.tapaState:focus-visible{outline:3px solid #f59e0b!important;outline-offse
 
 /* V5.26: Paginación de transportes únicos */
 .byrPager{display:flex;justify-content:flex-end;gap:9px;margin-bottom:5px}.byrPager button{min-width:115px}.byrPager button:disabled{opacity:.42}
+
+
+/* v5.30 - Portada previa al PIN, aislada de los módulos existentes */
+.ctWelcome{position:fixed;inset:0;z-index:200000;isolation:isolate;display:flex;align-items:center;justify-content:center;overflow-y:auto;overscroll-behavior:contain;background:#071a2b;color:white;padding:36px 20px}
+.ctWelcomePhoto,.ctWelcomeTechnology,.ctWelcomeShade{position:absolute;inset:0;pointer-events:none}
+.ctWelcomePhoto{background:url('assets/logistica-principal.jpg') center/cover no-repeat;opacity:.56;animation:ctWelcomeZoom 20s ease-in-out infinite alternate}
+.ctWelcomeTechnology{background:url('assets/logistica-tecnologia.jpg') center/cover no-repeat;opacity:.16;mix-blend-mode:screen;animation:ctWelcomeZoom 24s ease-in-out infinite alternate-reverse}
+.ctWelcomeShade{background:linear-gradient(100deg,rgba(3,17,32,.93),rgba(5,37,63,.82) 48%,rgba(4,28,51,.6)),linear-gradient(0deg,rgba(2,16,28,.8),transparent 55%)}
+.ctWelcomeContent{position:relative;z-index:2;text-align:center;width:min(1080px,100%);margin:auto}
+.ctWelcomeEyebrow{display:inline-block;border:1px solid #ffffff55;background:#ffffff16;padding:10px 18px;border-radius:50px;letter-spacing:.16em;font-weight:800;font-size:.82rem;color:#e3f5ff;margin-bottom:20px}
+.ctWelcome h1{font-size:clamp(2.15rem,5.4vw,4.9rem);line-height:1.07;letter-spacing:-.04em;color:white;text-shadow:0 8px 30px #0008;margin:0 auto 18px;max-width:1000px}
+.ctWelcome h1 em{font-style:normal;color:#76d5ff}
+.ctWelcomeContent>p{font-size:clamp(1rem,1.6vw,1.25rem);line-height:1.5;max-width:690px;margin:0 auto 32px;color:#e4f0f8}
+.ctWelcomeBrands{display:flex;justify-content:center;align-items:stretch;gap:22px;flex-wrap:wrap}
+.ctBrand{width:min(310px,100%);min-height:182px;padding:16px 20px 15px;border:1px solid #ffffff56;border-radius:21px;background:rgba(255,255,255,.96);display:flex;flex-direction:column;align-items:center;justify-content:space-around;gap:9px;box-shadow:0 20px 48px #0007;transition:transform .25s,box-shadow .25s;cursor:pointer}
+.ctBrandLis{background:rgba(0,0,0,.91)}
+.ctBrand img{display:block;width:100%;height:115px;object-fit:contain;max-width:255px}
+.ctBrand span{color:#17415e;font-size:.91rem;font-weight:800}
+.ctBrandLis span{color:white}.ctBrand span strong{margin-left:10px;color:#1687c9}
+.ctBrand:hover,.ctBrand:focus-visible{transform:translateY(-6px);box-shadow:0 27px 60px #0009}
+.ctBrand:focus-visible{outline:3px solid #ffcd45;outline-offset:4px}
+.ctWelcomeHint{font-size:.88rem;opacity:.9;margin-top:24px}
+.ctWelcomeRoute{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+.ctWelcomeRoute span{position:absolute;left:-55%;width:60%;height:2px;background:linear-gradient(90deg,transparent,#a8e6ffbb,transparent);animation:ctFlow 8s linear infinite}
+.ctWelcomeRoute span:nth-child(1){top:22%}.ctWelcomeRoute span:nth-child(2){top:58%;animation-delay:-3s}.ctWelcomeRoute span:nth-child(3){top:83%;animation-delay:-5s}
+.ctWelcomeRoute b{position:absolute;bottom:7%;left:-15%;font-size:49px;filter:drop-shadow(0 10px 8px #0009);animation:ctTruck 13s linear infinite}
+.ctWelcome.ctLeaving{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .35s ease,visibility .35s}
+@keyframes ctFlow{0%{transform:translateX(0)}100%{transform:translateX(300%)}}
+@keyframes ctTruck{0%{left:-12%}100%{left:110%}}
+@keyframes ctWelcomeZoom{from{transform:scale(1)}to{transform:scale(1.12)}}
+@media(max-width:690px){.ctWelcome{padding:24px 14px}.ctWelcomeBrands{gap:12px}.ctBrand{width:min(260px,45%);min-width:145px;min-height:145px;padding:10px}.ctBrand img{height:88px}.ctBrand span{font-size:.75rem}.ctWelcomeContent>p{margin-bottom:18px}}
+@media(prefers-reduced-motion:reduce){.ctWelcomePhoto,.ctWelcomeTechnology,.ctWelcomeRoute span,.ctWelcomeRoute b{animation:none!important}.ctBrand{transition:none}}
