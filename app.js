@@ -175,39 +175,51 @@ async function prepareImport(){if(!canModule("cargo","edit")){toast("Sin permiso
 async function confirmImport(){
   const btn=$('confirmImportBtn');
   const msg=$('importResultMessage');
-  const display=(message,isError=false)=>{if(msg){msg.textContent=message;msg.style.color=isError?'#9f2733':'#124c74';msg.classList.remove('hidden');} if(isError)toast(message);};
-  if(!canModule('cargo','edit')||(!permissions.can_upload&&!permissions.is_admin)){display('Tu usuario no tiene permiso para cargar archivos.',true);return;}
-  if(!Array.isArray(pendingImportRows)||!pendingImportRows.length){display('No hay viajes pendientes por importar. Selecciona nuevamente el archivo.',true);return;}
-  btn.disabled=true;
+  const display=(message,isError=false)=>{
+    if(msg){msg.textContent=message;msg.style.color=isError?'#9f2733':'#124c74';msg.classList.remove('hidden');}
+    if(isError){console.error('[Importación de viajes]',message);toast(message);}
+  };
+  if(!btn){console.error('[Importación] Falta confirmImportBtn');return;}
+  if(!canModule('cargo','edit')||(!permissions.can_upload&&!permissions.is_admin)){display('Sin permisos para importar. Revisa con el administrador.',true);return;}
+  if(!Array.isArray(pendingImportRows)||!pendingImportRows.length){display('No hay viajes pendientes por importar. Selecciona de nuevo el Excel.',true);return;}
+  if(btn.dataset.saving==='1')return;
+  btn.dataset.saving='1';btn.disabled=true;
   const previous=btn.textContent;
-  btn.textContent='Guardando viajes…';
+  let timer;
+  let phase='Enviando viajes a Supabase';
+  const started=Date.now();
+  let saved=false;
   try{
-    display('Guardando '+pendingImportRows.length+' viajes en Supabase…');
-    const {data:result,error}=await sb.rpc('replace_transports_secure',{p_rows:pendingImportRows,p_pin:loginPin});
-    if(error){display('No se pudieron guardar los viajes: '+error.message,true);return;}
-    const added=Number(result?.added??pendingImportRows.length),existing=Number(result?.existing??0);
-    // No invocar la función de Tapa Códigos si el archivo no contiene filas para ella.
+    if(!sb||typeof sb.rpc!=='function')throw Error('La conexión Supabase no está inicializada. Vuelve a iniciar sesión.');
+    const rows=pendingImportRows.map(x=>({...x}));
+    btn.textContent='Guardando viajes…';
+    display(`Paso 1/3: ${phase} (${rows.length} registros). No cierres esta ventana ni repitas la carga.`);
+    timer=setInterval(()=>{const sec=Math.floor((Date.now()-started)/1000);display(`Paso ${saved?'3/3':'1/3'}: ${phase}. Transcurridos ${sec} s.${sec>=15&&!saved?' La respuesta tarda más de lo esperado; no confirmes nuevamente hasta comprobar la base.':''}`);},2000);
+    console.info('[Importación] Enviando',rows.length,'registros al procedimiento replace_transports_secure');
+    const {data:result,error}=await sb.rpc('replace_transports_secure',{p_rows:rows,p_pin:loginPin});
+    if(error){display('Supabase rechazó la carga: '+error.message,true);return;}
+    saved=true;
+    console.info('[Importación] Confirmación Supabase',result);
+    const added=Number(result?.added??0),existing=Number(result?.existing??0);
+    phase='Viajes confirmados por Supabase';
+    display(`Paso 2/3: Supabase confirmó la carga (${added} nuevos; ${existing} ya existentes).`);
     if(Array.isArray(pendingTapaRows)&&pendingTapaRows.length){
-      btn.textContent='Guardando Tapa Códigos…';
-      display('Viajes guardados. Guardando '+pendingTapaRows.length+' filas de Tapa Códigos…');
+      phase='Guardando Tapa Códigos';btn.textContent='Guardando Tapa Códigos…';
       const tapa=await sb.rpc('replace_tapa_codigos_ka_secure',{p_rows:pendingTapaRows,p_pin:loginPin});
-      if(tapa.error){
-        display('Se guardaron los viajes ('+added+' nuevos, '+existing+' existentes), pero Tapa Códigos falló: '+tapa.error.message+'. Los viajes NO se perdieron.',true);
-        await refresh();
-        return;
-      }
+      if(tapa.error){display(`Viajes confirmados (${added} nuevos), pero Tapa Códigos falló: ${tapa.error.message}. No repitas la carga completa.`,true);return;}
       await refreshTapa();
     }
-    display('Carga completada: '+added+' nuevos y '+existing+' existentes.');
-    cancelImport();
-    $('excelFile').value='';
-    await refresh();
-    toast('Carga completada: '+added+' nuevos y '+existing+' existentes.');
+    phase='Actualizando tabla de Cargue y Despacho';
+    display(`Paso 3/3: ${phase}.`);
+    try{await refresh();}catch(refreshError){display(`Supabase confirmó la carga (${added} nuevos), pero falló la actualización de pantalla: ${refreshError.message}. Vuelve a abrir Cargue y Despacho; NO repitas el Excel.`,true);return;}
+    display(`Carga confirmada: ${added} nuevos, ${existing} existentes.`);
+    pendingImportRows=null;pendingTapaRows=null;
+    $('previewModal').classList.add('hidden');$('excelFile').value='';
+    toast(`Carga confirmada: ${added} nuevos, ${existing} existentes.`);
   }catch(e){
-    display('Error durante la carga: '+(e?.message||String(e)),true);
+    display(`${saved?'Los viajes se guardaron, pero hubo un error posterior':'No se pudo confirmar la importación'}: ${e?.message||String(e)}. ${saved?'No repitas la carga.':'Consulta primero si los transportes ya aparecen en Cargue y Despacho.'}`,true);
   }finally{
-    btn.disabled=false;
-    btn.textContent=previous;
+    clearInterval(timer);btn.disabled=false;btn.dataset.saving='0';btn.textContent=previous;
   }
 }
 function cancelImport(){pendingImportRows=null;$("previewModal").classList.add("hidden")}
