@@ -11,6 +11,20 @@ function dedup(data,start,stop){if(!data.length)return {data,removed:0};const se
 function choices(el,values,label){el.innerHTML=`<option value="">${safe(label)}</option>`+[...new Set(values.map(String).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es')).map(v=>`<option value="${safe(v)}">${safe(v)}</option>`).join('');}
 function pickColumn(pattern,fallback){return headers.findIndex(h=>pattern.test(norm(h)));}
 function draw(){if(!rows.length)return;const query=norm($('brujulaSearch').value), filters=[['brujulaCenterFilter',/centro|^cd$|origen/,0],['brujulaStatusFilter',/status|estado/,1],['brujulaDestinationFilter',/destino|destinatario/,2]];filtered=rows.filter(row=> (!query||row.some(v=>norm(v).includes(query)))&&filters.every(([id,pattern,fallback])=>!$(id).value||String(row[pickColumn(pattern,fallback)]??'')===$(id).value)&&columnFilters.every((needle,i)=>!needle||norm(row[i]).includes(norm(needle))));$('brujulaCount').textContent=filtered.length.toLocaleString('es-CO')+' de '+rows.length.toLocaleString('es-CO')+' registros';const transportIndex=pickColumn(/^transporte$/);$('brujulaRows').innerHTML=filtered.slice(0,250).map(row=>'<tr>'+headers.map((_,i)=>i===transportIndex?`<td><button type="button" class="byrTransportLink" data-transport="${safe(row[i])}" title="Ver resumen del transporte">${safe(row[i])}</button></td>`:`<td>${safe(row[i])}</td>`).join('')+'</tr>').join('');$('brujulaLimit').textContent=filtered.length>250?'Se muestran los primeros 250 registros. Exporta para consultar el total.':'';const status=pickColumn(/status|estado/,1);const counts={};for(const row of filtered){const k=status<0?'Sin columna de estado':String(row[status]||'Sin estado');counts[k]=(counts[k]||0)+1;}$('byrKpiTotal').textContent=rows.length.toLocaleString('es-CO');$('byrKpiFiltered').textContent=filtered.length.toLocaleString('es-CO');$('byrKpiDup').textContent=audit.reduce((a,b)=>a+(Number(b.removed)||0),0).toLocaleString('es-CO');$('byrStatusChart').innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,v])=>`<div class="byrBarRow"><span title="${safe(k)}">${safe(k)}</span><div class="byrBar"><i style="width:${Math.max(2,100*v/Math.max(1,filtered.length))}%"></i></div><b>${v}</b></div>`).join('')||'<p>Sin datos</p>';}
+function statusIndexFromRutero(){
+ const normalize=s=>String(s??'').trim().replace(/\.0$/,'').replace(/^S(?=\d)/i,'').toUpperCase();
+ const keyCol=headers.findIndex(h=>norm(h)==='transporte');
+ const statusCol=headers.findIndex(h=>norm(h)==='status');
+ if(keyCol<0||statusCol<0)throw Error('El Rutero debe contener las columnas Transporte y Status.');
+ const statusMap=new Map();
+ for(const row of rows){
+  const key=normalize(row[keyCol]);const status=String(row[statusCol]??'').trim();
+  if(!key||!status)continue;
+  if(!statusMap.has(key))statusMap.set(key,new Set());
+  statusMap.get(key).add(status);
+ }
+ return [...statusMap].map(([key,values])=>[key,[...values].join(' · ')]);
+}
 function busy(txt){$('brujulaMessage').textContent=txt;}
 async function importFile(){if(typeof canModule==='function'&&!canModule('rutero','edit')){busy('No tienes permiso para modificar Brújula y Rutero.');return}
  const file=$('brujulaFile').files[0];
@@ -38,7 +52,8 @@ async function importFile(){if(typeof canModule==='function'&&!canModule('rutero
   audit=[{name:'Rutero',original:sourceRows.length,remaining:rows.length,removed:unique.removed}];
   lastName=file.name;
   busy('Guardando el informe compartido en Supabase…');
-  await CTShared.save('rutero',file.name,rows,{headers,audit},(n,total)=>busy('Guardando Rutero en Supabase: bloque '+n+' de '+total+'… El informe anterior sigue disponible hasta finalizar.'));
+  const statusIndex=statusIndexFromRutero();
+  await CTShared.save('rutero',file.name,rows,{headers,audit,statusIndex,statusIndexVersion:1},(n,total)=>busy('Guardando Rutero en Supabase: bloque '+n+' de '+total+'… El informe anterior sigue disponible hasta finalizar.'));
   processed={Rutero:true};window.dispatchEvent(new Event("rutero-updated"));
   initReportView();
   busy('Informe gerencial generado a partir de Rutero: '+rows.length.toLocaleString('es-CO')+' registros únicos. No se recalculan fórmulas ni tablas dinámicas.');
