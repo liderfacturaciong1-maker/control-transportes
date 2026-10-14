@@ -8,8 +8,27 @@ const displayedTransport=s=>{const key=transportKey(s);return key?`S${key}`:'';}
 const heading=s=>norm(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9]/g,'');
 const ix=(cols,variants)=>cols.findIndex(x=>variants.includes(heading(x)));
 let statRows=new Map(),statLoaded=false,statFile='',loading=false;
-const SYNC_VERSION='v5.21 status rutero por transporte'; // Motor de sincronización v5.21
+const SYNC_VERSION='v5.23 indice status diario'; // Motor de sincronización v5.21
 let cargoFallback=[],cargoFetching=false,cargoLastAttempt=0,cargoError='';
+let statusIndex=new Map(),statusIndexReady=false,statusIndexError='',statusIndexBatch='';
+let statusIndexFetching=false;
+async function loadStatusIndex(force=false){
+ if(statusIndexFetching||typeof sb==='undefined'||!sb||!loginPin)return;
+ if(statusIndexReady&&!force)return;
+ statusIndexFetching=true;statusIndexError='';
+ try{
+  const {data,error}=await sb.rpc('ct_report_info',{p_pin:loginPin,p_kind:'rutero'});
+  if(error)throw error;
+  const meta=data?.[0];
+  if(!meta){statusIndex=new Map();statusIndexReady=false;statusIndexError='No hay un Rutero guardado.';return;}
+  const index=meta.metadata?.statusIndex;
+  if(!Array.isArray(index)){statusIndex=new Map();statusIndexReady=false;statusIndexError='El Rutero vigente todavía no tiene índice de Status; vuelve a cargarlo desde Vista rápida con la versión 5.23.';return;}
+  statusIndex=new Map(index.map(x=>[transportKey(x[0]),String(x[1]??'')]).filter(x=>x[0]));
+  statusIndexReady=true;statusIndexBatch=String(meta.batch_id||'');
+ }catch(e){statusIndexError=e?.message||String(e);}
+ finally{statusIndexFetching=false;render();}
+}
+
 function cargoSource(){
  // Fuente preferente: los mismos registros usados para construir Cargue y Despacho.
  let direct;try{direct=window.getCargoSyncRecords?.();}catch(e){direct=null;}
@@ -95,7 +114,7 @@ function render(){if(!$('syncRows'))return;try{
    }
  }
  const q=norm($('syncSearch')?.value),f=$('syncFilter')?.value||'';
- const rows=cargo.filter(r=>r&&typeof r==='object').map(r=>{const key=transportKey(r.transporte);const statuses=quick.get(key);const status=statuses?.size?[...statuses].join(' · '):'—';
+ const rows=cargo.filter(r=>r&&typeof r==='object').map(r=>{const key=transportKey(r.transporte);const statuses=quick.get(key);const status=statusIndex.get(key)|| (statuses?.size?[...statuses].join(' · '):'—');
   let result;if(statLoaded){const vals=statRows.get(key);result=vals?([...(vals||[])].filter(Boolean).join(' · ')||'En STAT'):'No está en STAT';}
   else result=!report.loaded?'Sin archivo':statuses?.size?'Sincronizado':'No encontrado';
   return {transporte:displayedTransport(r.transporte),viaje:r.viaje??'',placa:r.placa??'',status,result};});
@@ -107,8 +126,8 @@ function render(){if(!$('syncRows'))return;try{
  let syncInfo='';
  if(cargoError&&!cargo.length)syncInfo='No se pudo consultar Cargue y Despacho: '+cargoError;
  else if(!cargo.length)syncInfo=cargoFetching?'Consultando transportes de Cargue y Despacho…':'No hay transportes disponibles. Pulsa Actualizar cruce.';
- else syncInfo=`${filtered.length.toLocaleString('es-CO')} registros de Cargue y Despacho visibles. ${report.loaded?(si>=0?'Status consultado en Vista rápida (columna '+String(si+1)+').':'El archivo Rutero no contiene una columna Status válida.'):'Sin informe de Vista rápida cargado; Status pendiente.'} ${statLoaded?'Cruce STAT: '+statFile+'.':''}`;
- $('syncMessage').textContent='Motor de sincronización v5.21 · '+syncInfo;
+ else syncInfo=`${filtered.length.toLocaleString('es-CO')} registros de Cargue y Despacho visibles. ${statusIndexReady?'Status consultado desde índice de Rutero guardado ('+statusIndex.size+' transportes).':report.loaded&&si>=0?'Status consultado en Vista rápida.':(statusIndexError||'Recuperando índice Status de Rutero…')} ${statLoaded?'Cruce STAT: '+statFile+'.':''}`;
+ $('syncMessage').textContent='Motor de sincronización v5.23 · '+syncInfo;
  updateUnsyncedCount();
  $('syncRows').innerHTML=filtered.slice(0,1000).map(r=>`<tr><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td>${esc(r.placa)}</td><td>${esc(r.status)}</td><td><span class="syncBadge ${/^(Sincronizado|En STAT)$/i.test(r.result)?'syncGood':/^(No encontrado|No está en STAT)$/i.test(r.result)?'syncBad':'syncUnknown'}">${esc(r.result)}</span></td></tr>`).join('') || `<tr><td colspan="5" style="text-align:center;padding:20px">${esc(cargoError ? 'Error al consultar transportes: '+cargoError : cargoFetching ? 'Cargando transportes...' : 'No hay transportes disponibles. Pulsa Actualizar cruce.')}</td></tr>`;
  }catch(err){const msg='Error al presentar Sincronización: '+(err?.message||String(err));const m=$('syncMessage');if(m)m.textContent=msg;const body=$('syncRows');if(body)body.innerHTML='<tr><td colspan="5">'+esc(msg)+'</td></tr>';console.error('[Sincronización]',err);}
@@ -124,12 +143,12 @@ function openUnsynced(){
 function closeUnsynced(){ $('syncAlertModal')?.classList.add('hidden');document.body.classList.remove('syncAlertOpen');$('syncAlertBtn')?.focus(); }
 function updateUnsyncedCount(){const n=currentSyncRows.filter(r=>String(r.result||'').trim().toUpperCase()!=='S-S-U').length;const el=$('syncAlertCount');if(el)el.textContent=n.toLocaleString('es-CO');}
 
-window.renderSyncReport=()=>{render();if(!cargoSource().length)void loadCargoSource();};window.loadSyncStatReport=()=>{render();void loadCargoSource(!cargoSource().length);void restore();};
-window.addEventListener('rutero-updated',render);
+window.renderSyncReport=()=>{render();if(!cargoSource().length)void loadCargoSource();void loadStatusIndex();};window.loadSyncStatReport=()=>{render();void loadCargoSource(!cargoSource().length);void restore();void loadStatusIndex();};
+window.addEventListener('rutero-updated',()=>{statusIndexReady=false;void loadStatusIndex(true);render();});
 window.addEventListener('cargo-records-updated',render);
 window.addEventListener('cargo-records-updated',()=>{cargoFallback=[];render();});
 window.addEventListener('focus',()=>{if(!$('syncModuleView')?.classList.contains('hidden')){render();void loadCargoSource();}});
-function initializeSync514(){for(const id of ['syncSearch','syncFilter'])$(id)?.addEventListener('input',render);$('syncStatUpload')?.addEventListener('click',upload);$('syncRefresh')?.addEventListener('click',()=>{void loadCargoSource(true);void restore();render();});$('syncAlertBtn')?.addEventListener('click',openUnsynced);$('syncAlertClose')?.addEventListener('click',closeUnsynced);$('syncAlertModal')?.addEventListener('click',e=>{if(e.target===$('syncAlertModal'))closeUnsynced();});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('syncAlertModal')?.classList.contains('hidden'))closeUnsynced();});render();}
+function initializeSync514(){for(const id of ['syncSearch','syncFilter'])$(id)?.addEventListener('input',render);$('syncStatUpload')?.addEventListener('click',upload);$('syncRefresh')?.addEventListener('click',()=>{void loadCargoSource(true);void restore();void loadStatusIndex(true);render();});$('syncAlertBtn')?.addEventListener('click',openUnsynced);$('syncAlertClose')?.addEventListener('click',closeUnsynced);$('syncAlertModal')?.addEventListener('click',e=>{if(e.target===$('syncAlertModal'))closeUnsynced();});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('syncAlertModal')?.classList.contains('hidden'))closeUnsynced();});render();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initializeSync514,{once:true});else initializeSync514();
 })();
 
