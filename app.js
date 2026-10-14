@@ -8,7 +8,7 @@ const displayedTransport=s=>{const key=transportKey(s);return key?`S${key}`:'';}
 const heading=s=>norm(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9]/g,'');
 const ix=(cols,variants)=>cols.findIndex(x=>variants.includes(heading(x)));
 let statRows=new Map(),statLoaded=false,statFile='',loading=false;
-const SYNC_VERSION='v5.14 integrada';
+const SYNC_VERSION='v5.15 integrada'; // Motor de sincronización v5.15
 let cargoFallback=[],cargoFetching=false,cargoLastAttempt=0,cargoError='';
 function cargoSource(){
  // Fuente preferente: los mismos registros usados para construir Cargue y Despacho.
@@ -93,7 +93,7 @@ function render(){if(!$('syncRows'))return;try{
  if(cargoError&&!cargo.length)syncInfo='No se pudo consultar Cargue y Despacho: '+cargoError;
  else if(!cargo.length)syncInfo=cargoFetching?'Consultando transportes de Cargue y Despacho…':'No hay transportes disponibles. Pulsa Actualizar cruce.';
  else syncInfo=`${filtered.length.toLocaleString('es-CO')} registros de Cargue y Despacho visibles. ${statLoaded?'Cruce STAT: '+statFile:report.loaded?'Status consultado en Vista rápida.':'Sin archivo de referencia cargado.'}`;
- $('syncMessage').textContent='Motor de sincronización '+SYNC_VERSION+' · '+syncInfo;
+ $('syncMessage').textContent='Motor de sincronización v5.15 · '+syncInfo;
  updateUnsyncedCount();
  $('syncRows').innerHTML=filtered.slice(0,1000).map(r=>`<tr><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td>${esc(r.placa)}</td><td>${esc(r.status)}</td><td><span class="syncBadge ${/^(Sincronizado|En STAT)$/i.test(r.result)?'syncGood':/^(No encontrado|No está en STAT)$/i.test(r.result)?'syncBad':'syncUnknown'}">${esc(r.result)}</span></td></tr>`).join('') || `<tr><td colspan="5" style="text-align:center;padding:20px">${esc(cargoError ? 'Error al consultar transportes: '+cargoError : cargoFetching ? 'Cargando transportes...' : 'No hay transportes disponibles. Pulsa Actualizar cruce.')}</td></tr>`;
  }catch(err){const msg='Error al presentar Sincronización: '+(err?.message||String(err));const m=$('syncMessage');if(m)m.textContent=msg;const body=$('syncRows');if(body)body.innerHTML='<tr><td colspan="5">'+esc(msg)+'</td></tr>';console.error('[Sincronización]',err);}
