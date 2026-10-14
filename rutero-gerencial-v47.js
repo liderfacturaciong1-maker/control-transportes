@@ -39,12 +39,13 @@ async function importFile(){if(typeof canModule==='function'&&!canModule('rutero
   lastName=file.name;
   busy('Guardando el informe compartido en Supabase…');
   await CTShared.save('rutero',file.name,rows,{headers,audit});
-  processed={Rutero:true};
+  processed={Rutero:true};window.dispatchEvent(new Event("rutero-updated"));
   initReportView();
   busy('Informe gerencial generado a partir de Rutero: '+rows.length.toLocaleString('es-CO')+' registros únicos. No se recalculan fórmulas ni tablas dinámicas.');
  }catch(e){processed=null;busy('No se pudo guardar el informe compartido: '+e.message+'. El informe publicado anteriormente se conserva.');console.error(e);}finally{$('brujulaUploadBtn').disabled=false;}
 }
 
+window.getRuteroSyncData=()=>({headers,rows,loaded:Boolean(processed)});
 function initReportView(){
   const selectConfigs=[['brujulaCenterFilter',/centro|^cd$|origen/,0,'Todos los centros'],['brujulaStatusFilter',/status|estado/,1,'Todos los estados'],['brujulaDestinationFilter',/destino|destinatario/,2,'Todos los destinos']];
   columnFilters=Array(headers.length).fill('');$('brujulaHead').innerHTML='<tr>'+headers.map((h,i)=>`<th><span>${safe(h)}</span><input class="byrColumnFilter" data-column="${i}" type="search" placeholder="Filtrar…" aria-label="Filtrar ${safe(h)}" autocomplete="off"></th>`).join('')+'</tr>';
@@ -67,7 +68,7 @@ async function restoreSharedRutero(){
   const saved=await CTShared.load('rutero');
   if(!saved){busy('No hay informe compartido. Un usuario autorizado puede cargar el archivo Rutero.');return;}
   headers=saved.metadata.headers||[];rows=saved.items;audit=saved.metadata.audit||[];
-  processed={Rutero:true};lastName=saved.filename;
+  processed={Rutero:true};lastName=saved.filename;window.dispatchEvent(new Event("rutero-updated"));
   initReportView();$('brujulaLoadedAt').textContent='Archivo compartido: '+saved.filename+' · '+new Date(saved.saved_at).toLocaleString('es-CO');
   busy('Informe gerencial recuperado de Supabase: '+rows.length.toLocaleString('es-CO')+' registros.');
  }catch(e){busy('No se pudo recuperar Rutero: '+e.message);console.error(e)}
@@ -78,12 +79,17 @@ function numberOf(value){const s=String(value??'').trim().replace(/\s/g,'');if(!
 function showTransport(transport){
  const idx=col('Transporte');if(idx<0)return;
  const group=rows.filter(r=>String(r[idx]??'').trim()===String(transport).trim());if(!group.length)return;
- const singular=['Establecimiento','Pedido','Entrega','Status','Transportista','Clientes','APP'];
- const format=(name)=>{const values=distinctValues(group,col(name));return values.length?values.slice(0,18).join(' · ')+(values.length>18?' …':''):'Sin información';};
- const num=(name)=>{const i=col(name);if(i<0)return 'Sin columna';const total=group.reduce((a,r)=>a+numberOf(r[i]),0);return total.toLocaleString('es-CO',{maximumFractionDigits:2});};
+ const find=(...names)=>{for(const name of names){const k=headers.findIndex(h=>norm(h).replace(/[^a-z0-9]/g,'')===norm(name).replace(/[^a-z0-9]/g,''));if(k>=0)return k;}return -1;};
+ const values=(...names)=>distinctValues(group,find(...names));
+ const field=(label,names)=>{const v=values(...names);return `<div class="byrDetailField"><small>${safe(label)}</small><strong>${safe(v.length?v.join(' · '):'Sin información')}</strong></div>`;};
+ const multi=(label,names)=>{const v=values(...names);return `<div class="byrDetailField byrDropdown"><small>${safe(label)} (${v.length})</small><details><summary>${v.length?('Ver '+v.length+' registros'):'Sin información'}</summary><ul>${v.map(x=>`<li>${safe(x)}</li>`).join('')}</ul></details></div>`;};
+ const total=(label,names)=>{const i=find(...names);const val=i<0?'Sin columna':group.reduce((n,r)=>n+numberOf(r[i]),0).toLocaleString('es-CO',{maximumFractionDigits:2});return `<div class="byrDetailField byrDetailTotal"><small>${safe(label)}</small><strong>${safe(val)}</strong></div>`;};
  $('byrDetailTitle').textContent='Transporte '+transport;
- $('byrDetailMeta').textContent=group.length.toLocaleString('es-CO')+' filas asociadas al transporte';
- $('byrDetailContent').innerHTML=singular.map(name=>`<div class="byrDetailField"><small>${safe(name)}</small><strong>${safe(format(name))}</strong></div>`).join('')+`<div class="byrDetailField byrDetailTotal"><small>Cantidad de Cajas (suma de filas)</small><strong>${safe(num('Cantidad de Cajas'))}</strong></div><div class="byrDetailField byrDetailTotal"><small>HL (suma de filas)</small><strong>${safe(num('HL'))}</strong></div>`;
+ $('byrDetailMeta').textContent=group.length.toLocaleString('es-CO')+' registros asociados';
+ $('byrDetailContent').innerHTML=
+ field('Viaje',['Viaje'])+field('Placa',['Placa'])+field('AgServTran',['AgServTran'])+field('Status',['Status'])+field('Destino',['Destino'])+field('Clientes',['Clientes'])+field('APP',['APP'])+field('Teléfono',['Telefono','Teléfono','Celular'])+field('Fecha',['Fecha'])+
+ total('Cantidad de cajas',['Cantidad de Cajas','Cantidad','Cajas'])+total('HL',['HL'])+
+ multi('Establecimientos',['Establecimiento'])+multi('Pedidos',['Pedido'])+multi('Entregas',['Entrega']);
  $('byrTransportModal').classList.remove('hidden');$('byrTransportClose').focus();
 }
 function hideTransport(){$('byrTransportModal').classList.add('hidden');}
