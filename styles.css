@@ -832,3 +832,6 @@ select.tapaState.tapaMissing:disabled {
 select.tapaState option {background:#ffffff!important;color:#152d41!important;font-weight:600;}
 select.tapaState:focus-visible{outline:3px solid #f59e0b!important;outline-offset:2px!important;}
 @media (forced-colors:active){select.tapaState{forced-color-adjust:auto;}}
+
+/* V5.26: Paginación de transportes únicos */
+.byrPager{display:flex;justify-content:flex-end;gap:9px;margin-bottom:5px}.byrPager button{min-width:115px}.byrPager button:disabled{opacity:.42}
