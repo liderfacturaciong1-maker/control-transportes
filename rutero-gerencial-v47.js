@@ -90,9 +90,16 @@ function showTransport(transport){
  field('Viaje',['Viaje'])+field('Placa',['Placa'])+field('AgServTran',['AgServTran'])+field('Status',['Status'])+field('Destino',['Destino'])+field('Clientes',['Clientes'])+field('APP',['APP'])+field('Teléfono',['Telefono','Teléfono','Celular'])+field('Fecha',['Fecha'])+
  total('Cantidad de cajas',['Cantidad de Cajas','Cantidad','Cajas'])+total('HL',['HL'])+
  multi('Establecimientos',['Establecimiento'])+multi('Pedidos',['Pedido'])+multi('Entregas',['Entrega']);
- $('byrTransportModal').classList.remove('hidden');$('byrTransportClose').focus();
+ const modal=$('byrTransportModal');
+ // Ensure the overlay is a direct child of body: nested panels with backdrop-filter
+ // create a containing block for position:fixed and push the dialog below the table.
+ if(modal.parentElement!==document.body) document.body.appendChild(modal);
+ modal.classList.remove('hidden');
+ document.body.classList.add('byrDialogOpen');
+ const pane=modal.querySelector('.byrTransportCard');if(pane)pane.scrollTop=0;
+ $('byrTransportClose').focus();
 }
-function hideTransport(){$('byrTransportModal').classList.add('hidden');}
+function hideTransport(){$('byrTransportModal').classList.add('hidden');document.body.classList.remove('byrDialogOpen');}
 
 function exportFile(){if(!rows.length)return busy('Primero carga un archivo.');const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([headers,...filtered]),'Rutero filtrado');XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(audit.map(x=>({Hoja:x.name,'Filas originales':x.original,'Filas conservadas':x.remaining,'Filas duplicadas':x.removed}))), 'Auditoría');XLSX.writeFile(wb,'Informe_Rutero_'+new Date().toISOString().slice(0,10)+'.xlsx');}
 window.loadBrujulaReport=function(){if(!processed)restoreSharedRutero();};
