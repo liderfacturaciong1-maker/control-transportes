@@ -8,7 +8,7 @@ const displayedTransport=s=>{const key=transportKey(s);return key?`S${key}`:'';}
 const heading=s=>norm(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9]/g,'');
 const ix=(cols,variants)=>cols.findIndex(x=>variants.includes(heading(x)));
 let statRows=new Map(),statLoaded=false,statFile='',loading=false;
-const SYNC_VERSION='v5.15 integrada'; // Motor de sincronización v5.15
+const SYNC_VERSION='v5.18 status columna I'; // Motor de sincronización v5.18
 let cargoFallback=[],cargoFetching=false,cargoLastAttempt=0,cargoError='';
 function cargoSource(){
  // Fuente preferente: los mismos registros usados para construir Cargue y Despacho.
@@ -77,8 +77,20 @@ function render(){if(!$('syncRows'))return;try{
  const cargo=cargoSource();
  let report={headers:[],rows:[],loaded:false};try{report=window.getRuteroSyncData?.()||report;}catch(err){console.warn('Vista rápida no disponible',err);}
  const ti=ix(report.headers||[],['TRANSPORTE','TRANSPORT','NUMERODETRANSPORTE','NROTRANSPORTE']);
- const si=ix(report.headers||[],['STATUS','ESTADO']);
- const quick=new Map();if(report.loaded&&ti>=0){for(const r of (Array.isArray(report.rows)?report.rows:[])){const k=transportKey(r[ti]);if(!k)continue;if(!quick.has(k))quick.set(k,new Set());const s=si>=0?String(r[si]??'').trim():'';if(s)quick.get(k).add(s);}}
+ // Vista rápida de despacho: Transporte por encabezado; Status = columna I del Excel (índice 8).
+ // Si los encabezados cambian de posición, el cruce sigue identificando Transporte por nombre.
+ const si=8;
+ const quick=new Map();
+ if(report.loaded&&ti>=0){
+   for(const r of (Array.isArray(report.rows)?report.rows:[])){
+     if(!Array.isArray(r))continue;
+     const k=transportKey(r[ti]); // S8009001225 y 8009001225 son equivalentes.
+     if(!k)continue;
+     if(!quick.has(k))quick.set(k,new Set());
+     const status=String(r[si]??'').trim();
+     if(status)quick.get(k).add(status);
+   }
+ }
  const q=norm($('syncSearch')?.value),f=$('syncFilter')?.value||'';
  const rows=cargo.filter(r=>r&&typeof r==='object').map(r=>{const key=transportKey(r.transporte);const statuses=quick.get(key);const status=statuses?.size?[...statuses].join(' · '):'—';
   let result;if(statLoaded){const vals=statRows.get(key);result=vals?([...(vals||[])].filter(Boolean).join(' · ')||'En STAT'):'No está en STAT';}
@@ -92,8 +104,8 @@ function render(){if(!$('syncRows'))return;try{
  let syncInfo='';
  if(cargoError&&!cargo.length)syncInfo='No se pudo consultar Cargue y Despacho: '+cargoError;
  else if(!cargo.length)syncInfo=cargoFetching?'Consultando transportes de Cargue y Despacho…':'No hay transportes disponibles. Pulsa Actualizar cruce.';
- else syncInfo=`${filtered.length.toLocaleString('es-CO')} registros de Cargue y Despacho visibles. ${statLoaded?'Cruce STAT: '+statFile:report.loaded?'Status consultado en Vista rápida.':'Sin archivo de referencia cargado.'}`;
- $('syncMessage').textContent='Motor de sincronización v5.15 · '+syncInfo;
+ else syncInfo=`${filtered.length.toLocaleString('es-CO')} registros de Cargue y Despacho visibles. ${report.loaded?'Status leído de la columna I de Vista rápida.':'Sin informe de Vista rápida cargado; Status pendiente.'} ${statLoaded?'Cruce STAT: '+statFile+'.':''}`;
+ $('syncMessage').textContent='Motor de sincronización v5.18 · '+syncInfo;
  updateUnsyncedCount();
  $('syncRows').innerHTML=filtered.slice(0,1000).map(r=>`<tr><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td>${esc(r.placa)}</td><td>${esc(r.status)}</td><td><span class="syncBadge ${/^(Sincronizado|En STAT)$/i.test(r.result)?'syncGood':/^(No encontrado|No está en STAT)$/i.test(r.result)?'syncBad':'syncUnknown'}">${esc(r.result)}</span></td></tr>`).join('') || `<tr><td colspan="5" style="text-align:center;padding:20px">${esc(cargoError ? 'Error al consultar transportes: '+cargoError : cargoFetching ? 'Cargando transportes...' : 'No hay transportes disponibles. Pulsa Actualizar cruce.')}</td></tr>`;
  }catch(err){const msg='Error al presentar Sincronización: '+(err?.message||String(err));const m=$('syncMessage');if(m)m.textContent=msg;const body=$('syncRows');if(body)body.innerHTML='<tr><td colspan="5">'+esc(msg)+'</td></tr>';console.error('[Sincronización]',err);}
