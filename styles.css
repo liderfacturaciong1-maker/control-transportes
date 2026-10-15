@@ -911,3 +911,14 @@ select.tapaState:focus-visible{outline:3px solid #f59e0b!important;outline-offse
   background: #e9f5ff !important;
   border-color: #8bc5e8 !important;
 }
+
+/* v5.56: botón de actualización global, siempre visible al desplazarse */
+.ctManualRefresh{position:fixed!important;right:clamp(10px,1.4vw,23px);top:50%;transform:translateY(-50%);z-index:17000!important;display:flex;align-items:center;gap:7px;padding:11px 13px;border-radius:999px;border:1px solid rgba(255,255,255,.85);background:linear-gradient(145deg,#0b6db0,#1595d5);color:#fff!important;font-size:13px;font-weight:800;box-shadow:0 8px 26px #05355966;cursor:pointer;min-width:0;max-width:calc(100vw - 24px);white-space:nowrap;transition:filter .2s ease, box-shadow .2s ease}
+.ctManualRefresh:hover{filter:brightness(1.12);box-shadow:0 8px 30px #0374b288}
+.ctManualRefresh:focus-visible{outline:3px solid #faba35;outline-offset:3px}
+.ctManualRefresh:disabled{opacity:.65;cursor:progress}
+.ctManualRefresh .ctRefreshGlyph{font-size:24px;line-height:.85;font-weight:600;display:inline-block}
+.ctManualRefresh.is-refreshing .ctRefreshGlyph{animation:ctButtonRotate .8s linear infinite}
+@keyframes ctButtonRotate{to{transform:rotate(360deg)}}
+@media(max-width:650px){.ctManualRefresh{right:9px;top:auto;bottom:78px;transform:none;padding:11px;border-radius:50%;width:49px;height:49px;justify-content:center}.ctManualRefresh .ctRefreshLabel{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.ctManualRefresh .ctRefreshGlyph{font-size:27px}}
+@media(prefers-reduced-motion:reduce){.ctManualRefresh.is-refreshing .ctRefreshGlyph{animation:none}}
