@@ -537,15 +537,52 @@ function checkinKey(row){return (row.is_online||Number(row.transport_id)<0?'onli
 function checkinClosedRows(){return checkinRecords.filter(r=>r.checkin_estado==='Realizado'&&!checkinClosedArchive.has(checkinKey(r)));}
 function showCheckinView(view){checkinView=view==='closed'?'closed':'pending';renderCheckin();}
 function dateStamp(){const fmt=new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});return fmt.format(new Date());}
-function downloadCheckinClosure(){const data=checkinClosedRows();if(!data.length){toast('No hay transportes realizados para descargar.');return;}
- if(typeof XLSX==='undefined'){toast('No se encuentra la biblioteca Excel');return;}
- const out=[['CIERRE DE CHECKIN'],['Fecha y hora:',dateStamp()],['Total realizados:',data.length],[],['TRANSPORTE','VIAJE','PLACA','PLACA FÍSICA','CLASE CARGUE','ACCIÓN','NOVEDAD']];
- for(const r of data)out.push([String(r.transporte||''),String(r.viaje||''),String(r.placa||''),String(r.placa_fisica||''),r.is_online||Number(r.transport_id)<0?'En línea':'Preventa','Realizado',String(r.checkin_novedad||'')]);
- const ws=XLSX.utils.aoa_to_sheet(out);ws['!cols']=[{wch:20},{wch:24},{wch:18},{wch:18},{wch:22},{wch:18},{wch:55}];
- ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Cierre CHECKIN');
- XLSX.writeFile(wb,'Cierre_Checkin_'+new Date().toLocaleDateString('en-CA',{timeZone:'America/Bogota'})+'.xlsx');checkinHasExported=true;
- toast('Excel de cierre generado. Conserva el archivo antes de limpiar.');
+function downloadCheckinClosure(){
+ const data=checkinClosedRows();
+ if(!data.length){toast('No hay transportes realizados para descargar.');return;}
+ if(typeof XLSX==='undefined'){toast('No se encuentra la biblioteca Excel.');return;}
+ const now=new Date();
+ const datePart=new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',day:'2-digit',month:'2-digit',year:'numeric'}).format(now);
+ const timePart=new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',hour:'2-digit',minute:'2-digit',hour12:false}).format(now);
+ // Encabezado y tabla con la misma estructura del formato impreso de referencia.
+ const values=[
+  ['CIERRE DE CHECKIN','','','','','',''],
+  ['Fecha y hora:',`${datePart}    -    ${timePart}`,'','','','',''],
+  ['Total realizados:',data.length,'','','','',''],
+  ['','','','','','',''],
+  ['TRANSPORTE','VIAJE','PLACA','PLACA FÍSICA','CLASE CARGUE','ACCIÓN','NOVEDAD']
+ ];
+ for(const r of data){values.push([
+  String(r.transporte||''),String(r.viaje||''),String(r.placa||''),String(r.placa_fisica||''),
+  r.is_online||Number(r.transport_id)<0?'En línea':'Preventa',
+  'Realizado',String(r.checkin_novedad||'')
+ ]);}
+ const ws=XLSX.utils.aoa_to_sheet(values);
+ const orange='F79646',dark='000000',light='FBD4B4',pale='FCE8D6',white='FFFFFF';
+ const fineBorder={top:{style:'thin',color:{rgb:'D7D7D7'}},bottom:{style:'thin',color:{rgb:'D7D7D7'}},left:{style:'thin',color:{rgb:'D7D7D7'}},right:{style:'thin',color:{rgb:'D7D7D7'}}};
+ const mainBorder={top:{style:'medium',color:{rgb:dark}},bottom:{style:'medium',color:{rgb:dark}},left:{style:'medium',color:{rgb:dark}},right:{style:'medium',color:{rgb:dark}}};
+ const cellStyle=(r,c,style)=>{const addr=XLSX.utils.encode_cell({r,c});if(!ws[addr])ws[addr]={t:'s',v:''};ws[addr].s=style;};
+ for(let c=0;c<7;c++)cellStyle(0,c,{font:{name:'Aptos',bold:true,sz:14,color:{rgb:white}},fill:{patternType:'solid',fgColor:{rgb:orange}},alignment:{horizontal:'center',vertical:'center'},border:mainBorder});
+ for(let r=1;r<=2;r++)for(let c=0;c<2;c++)cellStyle(r,c,{font:{name:'Aptos',bold:c===0,sz:11,color:{rgb:c===0?white:dark}},fill:{patternType:'solid',fgColor:{rgb:c===0?orange:white}},alignment:{horizontal:c===0?'center':'left',vertical:'center',indent:c===1?1:0},border:mainBorder});
+ for(let c=0;c<7;c++)cellStyle(4,c,{font:{name:'Aptos',bold:true,sz:11,color:{rgb:white}},fill:{patternType:'solid',fgColor:{rgb:orange}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:mainBorder});
+ for(let r=5;r<values.length;r++)for(let c=0;c<7;c++){
+  const fill=r%2===1?light:pale;
+  cellStyle(r,c,{font:{name:'Aptos',sz:10,color:{rgb:dark}},fill:{patternType:'solid',fgColor:{rgb:fill}},alignment:{horizontal:'center',vertical:'center',wrapText:c===6},border:fineBorder});
+ }
+ ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}}];
+ ws['!cols']=[{wch:20},{wch:24},{wch:17},{wch:20},{wch:22},{wch:17},{wch:38}];
+ ws['!rows']=[{hpt:26},{hpt:22},{hpt:22},{hpt:13},{hpt:31},...data.map(()=>({hpt:24}))];
+ ws['!autofilter']={ref:`A5:G${values.length}`};
+ ws['!pageSetup']={orientation:'landscape',paperSize:9,fitToWidth:1,fitToHeight:0};
+ ws['!margins']={left:0.25,right:0.25,top:0.35,bottom:0.35,header:0.15,footer:0.15};
+ ws['!print_area']=`A1:G${values.length}`;
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Cierre CHECKIN');
+ const fileDate=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+ XLSX.writeFile(wb,`Cierre_Checkin_${fileDate}.xlsx`,{cellStyles:true});
+ checkinHasExported=true;
+ toast('Excel de cierre generado con formato de impresión. Conserva el archivo antes de limpiar.');
 }
+
 async function clearCheckinClosure(){const rows=checkinClosedRows();if(!rows.length){toast('No hay datos de cierre para limpiar.');return;}
  if(!canModule('checkin','edit')||!(permissions.is_admin||permissions.can_manage_checkin)){toast('Sin permiso para limpiar cierres.');return;}
  if(!checkinHasExported){toast('Primero descarga el Excel de Cierre CHECKIN.');return;}
