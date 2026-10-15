@@ -894,3 +894,20 @@ select.tapaState:focus-visible{outline:3px solid #f59e0b!important;outline-offse
 .checkinLoadClass{display:inline-block;padding:6px 12px;border-radius:999px;font-weight:800;white-space:nowrap;font-size:.86rem;letter-spacing:.01em}
 .checkinLoadOnline{background:#daf8ec;color:#066642;border:1px solid #73ceaa}
 .checkinLoadPreventa{background:#e3efff;color:#0a4d89;border:1px solid #94bfe9}
+
+/* v5.55 — Contraste accesible en las pestañas principales */
+.primaryTruckTabs .primaryTruckTab:not(.active),
+.primaryTruckTabs .primaryTruckTab:not(.active) span:not(.primaryIcon),
+.primaryTruckTabs .primaryTruckTab:not(.active) .primaryIcon {
+  color: #123a58 !important;
+  -webkit-text-fill-color: #123a58 !important;
+}
+.primaryTruckTabs .primaryTruckTab.active,
+.primaryTruckTabs .primaryTruckTab.active span:not(.primaryIcon) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+.primaryTruckTabs .primaryTruckTab:not(.active):hover {
+  background: #e9f5ff !important;
+  border-color: #8bc5e8 !important;
+}
