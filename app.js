@@ -169,7 +169,7 @@ function initializeSync514(){for(const id of ['syncSearch','syncFilter'])$(id)?.
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initializeSync514,{once:true});else initializeSync514();
 })();
 
-const cfg=window.APP_CONFIG||{};let sb=null,user=null,records=[],pendingImportRows=null,pendingTapaRows=null,tapaRecords=[],loginPin="",selectedTransportId=null,selectedCheckinId=null,activeModule="main",activeTopModule="cargo",activeCategory="Viajes HYM y URBAN",selectedCategories=[],categoryMultiMode=false,permissions={is_admin:false,can_upload:false,can_create_users:false,can_delete_all_transports:false,can_arm:false,can_count:false,can_load:false,can_edit_availability:false,can_edit_physical_plate:false,can_manage_checkin:false};window.getCargoSyncRecords = () => records;
+const cfg=window.APP_CONFIG||{};let sb=null,user=null,onlineTrips=[],records=[],pendingImportRows=null,pendingTapaRows=null,tapaRecords=[],loginPin="",selectedTransportId=null,selectedCheckinId=null,activeModule="main",activeTopModule="cargo",activeCategory="Viajes HYM y URBAN",selectedCategories=[],categoryMultiMode=false,permissions={is_admin:false,can_upload:false,can_create_users:false,can_delete_all_transports:false,can_arm:false,can_count:false,can_load:false,can_edit_availability:false,can_edit_physical_plate:false,can_manage_checkin:false};window.getCargoSyncRecords = () => records;
 const $=id=>document.getElementById(id);
 function toast(m){$("toast").textContent=m;$("toast").classList.add("show");setTimeout(()=>$("toast").classList.remove("show"),3000)}
 function configured(){return cfg.SUPABASE_URL&&!cfg.SUPABASE_URL.includes("TU-PROYECTO")&&cfg.SUPABASE_ANON_KEY&&!cfg.SUPABASE_ANON_KEY.includes("TU_ANON")}
@@ -204,6 +204,14 @@ function setupAdminModuleToggles(){document.querySelectorAll(".moduleToggle").fo
 async function showApp(){$("login").classList.add("hidden");$("app").classList.remove("hidden");$("logout").classList.remove("hidden");$("userName").textContent=user.name;$("connection").textContent="● Conectado";if(permissions.can_upload||permissions.is_admin)$("uploadPanel").classList.remove("hidden");if(permissions.can_create_users||permissions.is_admin)$("usersPanel").classList.remove("hidden");if(permissions.can_delete_all_transports||permissions.is_admin)$("deletePanel").classList.remove("hidden");if(permissions.is_admin||permissions.can_create_users){$("checkinPermissionLabel").classList.remove("hidden")}$("historyPanel").classList.toggle("hidden",!permissions.is_admin);setupAdminModuleToggles();setupCheckinCollapses();applyModuleRights();if(permissions.is_admin){$("permissionLabel").classList.remove("hidden");$("createPermissionLabel").classList.remove("hidden");$("deletePermissionLabel").classList.remove("hidden");$("statusPermissionLabels").classList.remove("hidden")}updateRoleOptions();await refresh();await refreshCheckin();await loadSharedCheckin();subscribe();if(permissions.is_admin)loadUsers();if(!canModule("cargo","view"))switchModule(canModule("checkin","view")?"checkin":"brujula");else playCargoSplash()}
 function logout(){loginPin="";sessionStorage.clear();location.reload()}
 function updateRoleOptions(){const admin=permissions.is_admin;const opt=$("newRole").querySelector('option[value="Administrador"]');if(opt)opt.disabled=!admin;if(!admin&&$("newRole").value==="Administrador")$("newRole").value="Operativo";if(!admin){$("newCanUpload").checked=false;$("newCanCreateUsers").checked=false;$("newCanDeleteAll").checked=false;["newCanArm","newCanCount","newCanLoad","newCanAvailability","newCanPhysicalPlate"].forEach(id=>$(id).checked=false)}}
+
+async function loadOnlineTrips(){
+ if(!sb||!loginPin)return;
+ const result=await sb.rpc('ct_online_trip_list_secure',{p_pin:loginPin});
+ if(result.error){console.warn('[Viajes en línea]',result.error.message);onlineTrips=[];return;}
+ onlineTrips=Array.isArray(result.data)?result.data:[];
+}
+
 async function refresh(){const{data,error}=await sb.rpc("list_transports_with_category");if(error){toast(error.message);return}records=data||[];
 // La fuente de la categoria es el Excel de Cargue y Despacho, no el texto del viaje.
 const categoryResult=await sb.rpc('ct_transport_category_rows_secure',{p_pin:loginPin});
@@ -218,12 +226,13 @@ if(categoryResult.error){
   const noCat=records.filter(r=>r.categoria==='Sin categoría').length;
   if(noCat){toast(`${noCat} viajes sin categoría. Reimporta PRB07.xlsx después de instalar SQL v5.29.`);}
 }
+await loadOnlineTrips();
 const extra=await sb.rpc("list_transport_vehicle_fields");if(!extra.error){const fields=new Map((extra.data||[]).map(x=>[String(x.id),x]));records=records.map(r=>({...r,...(fields.get(String(r.id))||{})}))}window.syncCargoRecords = records;
 window.dispatchEvent(new CustomEvent('cargo-records-updated',{detail:{count:records.length}}));
 render();if(permissions.is_admin)loadHistory()}
-function render(){const categoryRecords=activeCategory==="Todos"?records:(categoryMultiMode&&selectedCategories.length?records.filter(r=>selectedCategories.includes(r.categoria||"Sin categoría")):records.filter(r=>(r.categoria||"Sin categoría")===activeCategory));const q=($("search").value||"").toLowerCase(),sf=$("statusFilter").value,nf=$("noveltyFilter").value;const list=categoryRecords.filter(r=>{const text=[r.transporte,r.viaje,r.placa,r.novedad,r.estado_vehiculo,r.cambio_placa].join(" ").toLowerCase(),has=String(r.novedad||"").trim()!=="";return(!sf||r.estado===sf)&&(!nf||(nf==="con"?has:!has))&&(!q||text.includes(q))});window.currentCargoFilteredRecords=list;window.syncCargoRecords=records;window.renderSyncReport?.();updatePorteriaPendingCount();$("total").textContent=list.length;$("pendientes").textContent=list.filter(r=>r.estado==="Pendiente").length;$("armados").textContent=list.filter(r=>r.estado==="Armado").length;$("contados").textContent=list.filter(r=>r.estado==="Contado").length;$("cargados").textContent=list.filter(r=>r.estado==="Cargado").length;$("novedades").textContent=list.filter(r=>String(r.novedad||"").trim()!=="").length;
+function render(){const allList=[...records,...onlineTrips.map((r,i)=>({id:-1000000-i,transporte:r.transporte,viaje:r.viaje,placa:r.placa,categoria:"Viajes en línea",estado:"Pendiente",novedad:"",is_online:true,created_at:r.created_at}))];const categoryRecords=activeCategory==="Todos"?allList:(categoryMultiMode&&selectedCategories.length?allList.filter(r=>selectedCategories.includes(r.categoria||"Sin categoría")):allList.filter(r=>(r.categoria||"Sin categoría")===activeCategory));const q=($("search").value||"").toLowerCase(),sf=$("statusFilter").value,nf=$("noveltyFilter").value;const list=categoryRecords.filter(r=>{const text=[r.transporte,r.viaje,r.placa,r.novedad,r.estado_vehiculo,r.cambio_placa].join(" ").toLowerCase(),has=String(r.novedad||"").trim()!=="";return(!sf||r.estado===sf)&&(!nf||(nf==="con"?has:!has))&&(!q||text.includes(q))});window.currentCargoFilteredRecords=list;window.syncCargoRecords=records;window.renderSyncReport?.();updatePorteriaPendingCount();$("total").textContent=list.length;$("pendientes").textContent=list.filter(r=>r.estado==="Pendiente").length;$("armados").textContent=list.filter(r=>r.estado==="Armado").length;$("contados").textContent=list.filter(r=>r.estado==="Contado").length;$("cargados").textContent=list.filter(r=>r.estado==="Cargado").length;$("novedades").textContent=list.filter(r=>String(r.novedad||"").trim()!=="").length;
 const total=list.length||1,novedadCount=list.filter(r=>String(r.novedad||"").trim()!=="").length,armadoCount=list.filter(r=>r.estado==="Armado").length,contadoCount=list.filter(r=>r.estado==="Contado").length,cargadoCount=list.filter(r=>r.estado==="Cargado").length;const pct=n=>Math.round(n*100/total);$("progressNovedadCount").textContent=novedadCount;$("progressNovedadPct").textContent=pct(novedadCount)+"%";$("progressNovedadBar").style.width=pct(novedadCount)+"%";$("progressArmadoCount").textContent=armadoCount;$("progressArmadoPct").textContent=pct(armadoCount)+"%";$("progressArmadoBar").style.width=pct(armadoCount)+"%";$("progressContadoCount").textContent=contadoCount;$("progressContadoPct").textContent=pct(contadoCount)+"%";$("progressContadoBar").style.width=pct(contadoCount)+"%";$("progressCargadoCount").textContent=cargadoCount;$("progressCargadoPct").textContent=pct(cargadoCount)+"%";$("progressCargadoBar").style.width=pct(cargadoCount)+"%";
-$("rows").innerHTML=list.map(r=>{const has=String(r.novedad||"").trim()!=="";const ev=r.estado_vehiculo||"";const selected=String(selectedTransportId)===String(r.id);const canAvailability=canModule("cargo","edit")&&(permissions.is_admin||permissions.can_edit_availability);const canPlate=canModule("cargo","edit")&&(permissions.is_admin||permissions.can_edit_physical_plate);const canAction=canModule("cargo","edit")&&(permissions.is_admin||(r.estado==="Pendiente"?permissions.can_arm:r.estado==="Armado"?permissions.can_count:r.estado==="Contado"?permissions.can_load:false));return `<tr class="${has?"hasNovelty ":""}${selected?"transportSelected":""}"><td><button type="button" class="${selected?"selectedTransportBtn":"secondary selectTransportBtn"}" onclick="selectTransport(${r.id})">${selected?"✓ Seleccionado":"Seleccionar"}</button></td><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td>${has?`<span class="novelty">${esc(r.novedad)}</span>`:"—"}</td><td><select class="vehicleState ${vehicleClass(ev)}" aria-label="Disponibilidad De Vehiculos para ${esc(r.placa)}" ${(!selected||!canAvailability)?"disabled":""} onchange="saveVehicleField(${r.id},'estado_vehiculo',this.value)"><option value="">Seleccionar...</option><option ${ev==="Bodega"?"selected":""}>Bodega</option><option ${ev==="Sobredimensionado"?"selected":""}>Sobredimensionado</option><option ${ev==="OK para utilizar"?"selected":""}>OK para utilizar</option></select></td><td><input class="plateChange" aria-label="Placa Fisica para ${esc(r.placa)}" ${(!selected||!canPlate)?"disabled":""} maxlength="8" value="${esc(r.cambio_placa||"")}" placeholder="Máx. 8 caracteres" onchange="this.value=normalizePhysicalPlate(this.value);saveVehicleField(${r.id},'cambio_placa',this.value)" oninput="this.value=normalizePhysicalPlate(this.value)"></td><td><span class="badge ${r.estado}">${esc(r.estado)}</span></td><td><button onclick="advance(${r.id})" ${(!selected||!canAction||r.estado==="Cargado")?"disabled":""}>${r.estado==="Pendiente"?"Armar":r.estado==="Armado"?"Contar":"Cargar"}</button></td><td><span class="porteriaBadge ${getPorteriaStatus(r.transporte)==="Salida"?"porteriaYes":getPorteriaStatus(r.transporte)==="Sin salida"?"porteriaNo":"porteriaUnknown"}">${getPorteriaStatus(r.transporte)}</span></td></tr>`}).join("")||'<tr><td colspan="10">No hay registros con estos filtros.</td></tr>';const selectedRecord=records.find(r=>String(r.id)===String(selectedTransportId));if(selectedTransportId&&!selectedRecord)selectedTransportId=null}
+$("rows").innerHTML=list.map(r=>{const has=String(r.novedad||"").trim()!=="";const ev=r.estado_vehiculo||"";const selected=!r.is_online&&String(selectedTransportId)===String(r.id);const canAvailability=canModule("cargo","edit")&&(permissions.is_admin||permissions.can_edit_availability);const canPlate=canModule("cargo","edit")&&(permissions.is_admin||permissions.can_edit_physical_plate);const canAction=!r.is_online&&canModule("cargo","edit")&&(permissions.is_admin||(r.estado==="Pendiente"?permissions.can_arm:r.estado==="Armado"?permissions.can_count:r.estado==="Contado"?permissions.can_load:false));return `<tr class="${has?"hasNovelty ":""}${selected?"transportSelected":""}"><td>${r.is_online?"—":`<button type="button" class="${selected?"selectedTransportBtn":"secondary selectTransportBtn"}" onclick="selectTransport(${r.id})">${selected?"✓ Seleccionado":"Seleccionar"}</button>`}</td><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td>${has?`<span class="novelty">${esc(r.novedad)}</span>`:"—"}</td><td><select class="vehicleState ${vehicleClass(ev)}" aria-label="Disponibilidad De Vehiculos para ${esc(r.placa)}" ${(r.is_online||!selected||!canAvailability)?"disabled":""} onchange="saveVehicleField(${r.id},'estado_vehiculo',this.value)"><option value="">Seleccionar...</option><option ${ev==="Bodega"?"selected":""}>Bodega</option><option ${ev==="Sobredimensionado"?"selected":""}>Sobredimensionado</option><option ${ev==="OK para utilizar"?"selected":""}>OK para utilizar</option></select></td><td><input class="plateChange" aria-label="Placa Fisica para ${esc(r.placa)}" ${(r.is_online||!selected||!canPlate)?"disabled":""} maxlength="8" value="${esc(r.cambio_placa||"")}" placeholder="Máx. 8 caracteres" onchange="this.value=normalizePhysicalPlate(this.value);saveVehicleField(${r.id},'cambio_placa',this.value)" oninput="this.value=normalizePhysicalPlate(this.value)"></td><td><span class="badge ${r.estado}">${esc(r.estado)}</span></td><td><button onclick="advance(${r.id})" ${(r.is_online||!selected||!canAction||r.estado==="Cargado")?"disabled":""}>${r.estado==="Pendiente"?"Armar":r.estado==="Armado"?"Contar":"Cargar"}</button></td><td>${r.is_online?"<b style=\"color:#047857\">En línea</b>":"—"}</td><td><span class="porteriaBadge ${getPorteriaStatus(r.transporte)==="Salida"?"porteriaYes":getPorteriaStatus(r.transporte)==="Sin salida"?"porteriaNo":"porteriaUnknown"}">${getPorteriaStatus(r.transporte)}</span></td></tr>`}).join("")||'<tr><td colspan="11">No hay registros con estos filtros.</td></tr>';const selectedRecord=records.find(r=>String(r.id)===String(selectedTransportId));if(selectedTransportId&&!selectedRecord)selectedTransportId=null}
 function selectTransport(id){selectedTransportId=String(selectedTransportId)===String(id)?null:String(id);const r=records.find(x=>String(x.id)===String(id));toast(selectedTransportId?`Transporte seleccionado: ${r?.transporte||""} · Viaje ${r?.viaje||""}. Ya puedes modificar los campos permitidos.`:"Selección cancelada.");render()}
 function openStatChart(key){const visible=window.currentCargoFilteredRecords||[];const total=visible.length;const config={total:{label:"Total",rows:visible,color:"#1769aa"},pendientes:{label:"Pendientes",rows:visible.filter(r=>r.estado==="Pendiente"),color:"#64748b"},armados:{label:"Armados",rows:visible.filter(r=>r.estado==="Armado"),color:"#f97316"},contados:{label:"Contados",rows:visible.filter(r=>r.estado==="Contado"),color:"#2563eb"},cargados:{label:"Cargados",rows:visible.filter(r=>r.estado==="Cargado"),color:"#22c55e"},novedades:{label:"Con novedad",rows:visible.filter(r=>String(r.novedad||"").trim()!==""),color:"#ef4444"}};const item=config[key];if(!item)return;const count=item.rows.length,percent=total?Math.round(count*100/total):0;$("statChartTitle").textContent="Avance: "+item.label;$("statChartCount").textContent=count.toLocaleString("es-CO");$("statChartPercent").textContent=percent+"% de los registros filtrados";$("statChartFill").style.width=percent+"%";$("statChartFill").style.background=item.color;$("statChartTruck").style.left=`calc(${Math.min(percent,96)}% - 4px)`;$("statChartTruck").setAttribute("aria-label",`Camión en ${percent} por ciento`);$("statChartTotal").textContent=`Total filtrado: ${total.toLocaleString("es-CO")} transportes`;$("statChartVehicleHeading").textContent=`Transportes en categoría: ${count}`;$("statChartVehicles").innerHTML=count?item.rows.map(r=>`<div class="statVehicleRow"><span class="statVehicleName">${esc(String(r.transporte??"Sin nombre").trim())} - ${esc(String(r.placa??"Sin placa").trim())}</span></div>`).join(""):'<p class="statVehicleEmpty">No hay transportes en esta categoría.</p>';$("statChartModal").classList.remove("hidden");$("statChartClose").focus()}function closeStatChart(){$("statChartModal")?.classList.add("hidden")}
 function normalizePhysicalPlate(value){let v=String(value||"").toLocaleUpperCase("es").replace(/\s+/g,"");if(v&&!v.startsWith("CO"))v="CO"+v;return v.slice(0,8)}
@@ -290,68 +299,78 @@ async function confirmImport(){
 function cancelImport(){pendingImportRows=null;$("previewModal").classList.add("hidden")}
 async function downloadExcel(){
 if(!permissions.can_upload&&!permissions.is_admin){toast("No tienes permiso para descargar archivos.");return}
-const{data,error}=await sb.rpc("list_transports_with_category");
-if(error){toast(error.message);return}
-const fields=await sb.rpc("list_transport_vehicle_fields");
-const map=new Map((fields.data||[]).map(x=>[String(x.id),x]));
-const wb=XLSX.utils.book_new();
-const categories=["Viajes HYM y URBAN","Viajes KA","Viajes Tradicional","Viajes 2KA","Viajes 2","Custodias"];
-const allRows=(data||[]).map(r=>{const x=map.get(String(r.id))||{};return {categoria:r.categoria||"Sin categoría",Transporte:r.transporte||"",Viaje:r.viaje||"",Placa:r.placa||"", "Placa física":x.cambio_placa||"",Estado:r.estado||"Pendiente",Clientes:""}});
-const visible=categoryMultiMode&&selectedCategories.length?allRows.filter(r=>selectedCategories.includes(r.categoria)):activeCategory==="Todos"?allRows:allRows.filter(r=>r.categoria===activeCategory);
-const selected=visible.length?visible:allRows;
-const dateText=new Date().toLocaleDateString("es-CO",{year:"numeric",month:"long",day:"numeric"});
-const navy="123047",blue="1769AA",pale="EAF1F7",white="FFFFFF",gray="5B6573";
-function styleSheet(ws,{titleRow=1,headerRow=3,lastCol=7,autoFilter=true}={}){
-const range=XLSX.utils.decode_range(ws["!ref"]||"A1:A1");
-ws["!cols"]=[{wch:20},{wch:16},{wch:16},{wch:20},{wch:18},{wch:32}];
-ws["!freeze"]={xSplit:0,ySplit:headerRow};
-ws["!autofilter"]=autoFilter?{ref:XLSX.utils.encode_range({s:{r:headerRow-1,c:0},e:{r:range.e.r,c:lastCol}})}:undefined;
-ws["!pageSetup"]={orientation:"landscape",paperSize:9,fitToWidth:1,fitToHeight:0,scale:0};
-ws["!printOptions"]={horizontalCentered:true};
-ws["!margins"]={left:0.25,right:0.25,top:0.5,bottom:0.5,header:0.2,footer:0.2};
-ws["!pageSetup"].fitToPage=true;
-for(let c=0;c<=lastCol;c++){
- const h=ws[XLSX.utils.encode_cell({r:headerRow-1,c})];
- if(h)h.s={fill:{fgColor:{rgb:blue}},font:{bold:true,color:{rgb:white},name:"Aptos",sz:10},alignment:{horizontal:"center",vertical:"center",wrapText:true},border:{bottom:{style:"medium",color:{rgb:navy}}}};
-}
-ws["!rows"]=ws["!rows"]||[];
-ws["!rows"][0]={hpt:28};ws["!rows"][headerRow-1]={hpt:30};
-for(let r=headerRow;r<=range.e.r;r++){
- ws["!rows"][r]={hpt:22};
- for(let c=0;c<=lastCol;c++){const cell=ws[XLSX.utils.encode_cell({r,c})];if(cell)cell.s={font:{name:"Aptos",sz:10,color:{rgb:"243447"}},fill:{fgColor:{rgb:r%2===0?white:pale}},alignment:{vertical:"center",wrapText:true},border:{bottom:{style:"thin",color:{rgb:"D8E1EA"}}}};}
-}
-}
-const summary=[["CONTROL DE TRANSPORTES"],["REPORTE OPERATIVO PARA IMPRESIÓN"],["Generado el",dateText],["Categoría",categoryMultiMode?selectedCategories.join(" + "):activeCategory],[],["RESUMEN POR CATEGORÍA","CANTIDAD"]];
-categories.forEach(c=>summary.push([c,allRows.filter(r=>r.categoria===c).length]));
-summary.push(["TOTAL GENERAL",allRows.length]);
-const sws=XLSX.utils.aoa_to_sheet(summary);
-sws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:1}},{s:{r:1,c:0},e:{r:1,c:1}}];
-sws["!cols"]=[{wch:36},{wch:24}];sws["!rows"]=[{hpt:30},{hpt:22}];
-for(const addr of ["A1","A2"]){if(sws[addr])sws[addr].s={fill:{fgColor:{rgb:navy}},font:{name:"Aptos Display",bold:true,color:{rgb:white},sz:addr==="A1"?18:12},alignment:{vertical:"center"}}}
-["A6","B6"].forEach(a=>{if(sws[a])sws[a].s={fill:{fgColor:{rgb:blue}},font:{bold:true,color:{rgb:white},name:"Aptos",sz:10},alignment:{horizontal:"center"}}});
-for(let r=6;r<summary.length;r++)for(let c=0;c<2;c++){const cell=sws[XLSX.utils.encode_cell({r,c})];if(cell)cell.s={font:{name:"Aptos",sz:11,bold:r===summary.length-1},fill:{fgColor:{rgb:r%2===0?pale:white}},border:{bottom:{style:"thin",color:{rgb:"D8E1EA"}}}}}
-sws["!pageSetup"]={orientation:"portrait",paperSize:9,fitToWidth:1,fitToHeight:1,scale:0};sws["!pageSetup"].fitToPage=true;sws["!margins"]={left:0.5,right:0.5,top:0.6,bottom:0.6,header:0.2,footer:0.2};
-XLSX.utils.book_append_sheet(wb,sws,"Resumen");
-const reportRows=rows=>rows.map(({categoria,...r})=>r);
-for(const category of categories){
- const categoryRows=allRows.filter(r=>r.categoria===category);
- if(!categoryRows.length)continue;
- const dataRows=reportRows(categoryRows);
- const ws=XLSX.utils.aoa_to_sheet([["CONTROL DE TRANSPORTES"],[category.toUpperCase()+" · REPORTE PARA ENTREGA"],["Fecha de generación",dateText],[],Object.keys(dataRows[0]||{Transporte:"",Viaje:"",Placa:"",Novedad:"", "Disponibilidad de vehículos":"","Placa física":"","Estado":""}),...dataRows.map(r=>Object.values(r))]);
- ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:5}},{s:{r:1,c:0},e:{r:1,c:5}}];
- styleSheet(ws,{headerRow:5,lastCol:5});
- for(const addr of ["A1","A2"]){if(ws[addr])ws[addr].s={fill:{fgColor:{rgb:navy}},font:{name:"Aptos Display",bold:true,color:{rgb:white},sz:addr==="A1"?18:12},alignment:{vertical:"center"}}}
- if(ws["A3"])ws["A3"].s={font:{name:"Aptos",color:{rgb:gray},italic:true,sz:9}};
- XLSX.utils.book_append_sheet(wb,ws,category.slice(0,31));
-}
-const chosenRows=reportRows(selected);
-const combined=XLSX.utils.aoa_to_sheet([["CONTROL DE TRANSPORTES"],["REPORTE CONSOLIDADO PARA IMPRESIÓN"],["Fecha de generación",dateText],["Categorías",categoryMultiMode?selectedCategories.join(", "):activeCategory],[],Object.keys(chosenRows[0]||{Transporte:"",Viaje:"",Placa:"",Novedad:"", "Disponibilidad de vehículos":"","Placa física":"","Estado":""}),...chosenRows.map(r=>Object.values(r))]);
-combined["!merges"]=[{s:{r:0,c:0},e:{r:0,c:5}},{s:{r:1,c:0},e:{r:1,c:5}}];
-styleSheet(combined,{headerRow:6,lastCol:5});
-for(const addr of ["A1","A2"]){if(combined[addr])combined[addr].s={fill:{fgColor:{rgb:navy}},font:{name:"Aptos Display",bold:true,color:{rgb:white},sz:addr==="A1"?18:12},alignment:{vertical:"center"}}}
-if(combined["A3"])combined["A3"].s={font:{name:"Aptos",color:{rgb:gray},italic:true,sz:9}};
-XLSX.utils.book_append_sheet(wb,combined,"Reporte imprimible");
-XLSX.writeFile(wb,"Control_Transportes_Reporte_Ejecutivo.xlsx",{cellStyles:true});
+const btn=$("downloadBtn"),oldText=btn.textContent;btn.disabled=true;btn.textContent="Preparando consolidado…";
+try{
+ const {data,error}=await sb.rpc("list_transports_with_category");if(error)throw Error(error.message);
+ const fields=await sb.rpc("list_transport_vehicle_fields");if(fields.error)throw Error(fields.error.message);
+ const vehicleMap=new Map((fields.data||[]).map(x=>[String(x.id),x]));
+ const normTransport=x=>String(x??'').trim().replace(/^S(?=\d)/i,'').replace(/\.0$/,'').replace(/^0+(?=\d)/,'');
+ const normHeader=x=>String(x??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+ // Cliente = Solic. (identificador único), NO el número de filas del Rutero.
+ const customerCounts=new Map();let ruteroAvailable=false;
+ const ingestRutero=(headers,rows)=>{
+  const cols=headers.map(normHeader),ti=cols.indexOf('transporte');
+  const ci=cols.findIndex(x=>['solic','solicitante','destinatario','destinat','idcliente','codigocliente'].includes(x));
+  if(ti<0||ci<0)return false;
+  const sets=new Map();
+  for(const row of rows){const t=normTransport(row[ti]),id=String(row[ci]??'').trim();if(!t||!id)continue;
+   if(!sets.has(t))sets.set(t,new Set());sets.get(t).add(id);
+  }
+  sets.forEach((clients,t)=>customerCounts.set(t,clients.size));return true;
+ };
+ const current=window.getRuteroSyncData?.();
+ if(current?.loaded&&current.rows?.length)ruteroAvailable=ingestRutero(current.headers||[],current.rows);
+ if(!ruteroAvailable&&window.CTShared){
+  btn.textContent='Consultando clientes del Rutero…';
+  try{
+   const saved=await window.CTShared.load('rutero',(n,total)=>{btn.textContent=`Leyendo Rutero ${n}/${total}…`;});
+   if(saved?.items?.length)ruteroAvailable=ingestRutero(saved.metadata?.headers||[],saved.items);
+  }catch(err){console.warn('[Exportar clientes]',err);throw Error('No se pudo consultar el Rutero para contar clientes: '+err.message);}
+ }
+ if(!ruteroAvailable)toast('No hay Rutero con columna Solic. disponible. Los clientes saldrán como Sin dato.');
+ const categories=['Viajes HYM y URBAN','Viajes KA','Viajes Tradicional','Viajes 2KA','Viajes 2','Custodias'];
+ const base=(data||[]).map(r=>{const v=vehicleMap.get(String(r.id))||{};return {
+  Categoría:r.categoria||'Sin categoría',Transporte:r.transporte||'',Viaje:r.viaje||'',Placa:r.placa||'',
+  'Placa física':v.cambio_placa||'',Estado:r.estado||'Pendiente',
+  Clientes:ruteroAvailable?(customerCounts.get(normTransport(r.transporte))??0):'Sin dato'
+ };});
+ const wb=XLSX.utils.book_new();
+ const dateText=new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+ const navy='123047',blue='1769AA',pale='EAF1F7',white='FFFFFF',gray='536477';
+ const headers=['Categoría','Transporte','Viaje','Placa','Placa física','Estado','Clientes'];
+ function createSheet(title,rows,label){
+  const values=[['OPERACIÓN CD GIRARDOTA'],[title],['Fecha',dateText],['Categorías',label],['Total transportes',rows.length],[],headers,...rows.map(r=>headers.map(h=>r[h]))];
+  const ws=XLSX.utils.aoa_to_sheet(values);ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}},{s:{r:1,c:0},e:{r:1,c:6}}];
+  ws['!cols']=[{wch:25},{wch:19},{wch:22},{wch:18},{wch:20},{wch:16},{wch:13}];
+  ws['!freeze']={xSplit:0,ySplit:7};
+  ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:6,c:0},e:{r:Math.max(6,values.length-1),c:6}})};
+  ws['!rows']=[{hpt:32},{hpt:24},{hpt:21},{hpt:21},{hpt:21},{hpt:10},{hpt:30}];
+  ws['!pageSetup']={orientation:'landscape',paperSize:9,fitToWidth:1,fitToHeight:0,fitToPage:true};
+  ws['!printOptions']={horizontalCentered:true};
+  ws['!margins']={left:.25,right:.25,top:.5,bottom:.5,header:.2,footer:.2};
+  for(let c=0;c<7;c++){
+   const addr=XLSX.utils.encode_cell({r:6,c});if(ws[addr])ws[addr].s={fill:{fgColor:{rgb:blue}},font:{bold:true,color:{rgb:white},name:'Aptos',sz:11},alignment:{horizontal:'center',vertical:'center'},border:{bottom:{style:'medium',color:{rgb:navy}}}};
+  }
+  for(let r=7;r<values.length;r++){ws['!rows'][r]={hpt:22};for(let c=0;c<7;c++){
+   const cell=ws[XLSX.utils.encode_cell({r,c})];if(cell)cell.s={font:{name:'Aptos',sz:10,color:{rgb:'243447'}},fill:{fgColor:{rgb:r%2?pale:white}},alignment:{horizontal:c===6?'center':'left',vertical:'center'},border:{bottom:{style:'thin',color:{rgb:'D8E1EA'}}}};
+  }}
+  for(const addr of ['A1','A2'])if(ws[addr])ws[addr].s={fill:{fgColor:{rgb:navy}},font:{name:'Aptos Display',bold:true,color:{rgb:white},sz:addr==='A1'?18:12},alignment:{vertical:'center'}};
+  for(const addr of ['A3','A4','A5'])if(ws[addr])ws[addr].s={font:{name:'Aptos',sz:10,italic:true,color:{rgb:gray}}};
+  return ws;
+ }
+ // El reporte imprimible siempre incluye TODAS las categorías, aunque la interfaz filtre HYM.
+ XLSX.utils.book_append_sheet(wb,createSheet('REPORTE CONSOLIDADO PARA IMPRESIÓN',base,'Todas las categorías'),'Reporte imprimible');
+ const summary=[['OPERACIÓN CD GIRARDOTA'],['RESUMEN GENERAL DE CARGUE Y DESPACHO'],['Fecha',dateText],['Categorías','Todas las categorías'],[],['Categoría','Transportes'],...categories.map(c=>[c,base.filter(r=>r.Categoría===c).length])];
+ const missing=base.filter(r=>!categories.includes(r.Categoría));if(missing.length)summary.push(['Sin categoría',missing.length]);
+ summary.push(['TOTAL GENERAL',base.length]);
+ const sws=XLSX.utils.aoa_to_sheet(summary);sws['!merges']=[{s:{r:0,c:0},e:{r:0,c:1}},{s:{r:1,c:0},e:{r:1,c:1}}];sws['!cols']=[{wch:36},{wch:25}];
+ for(const addr of ['A1','A2'])if(sws[addr])sws[addr].s={fill:{fgColor:{rgb:navy}},font:{name:'Aptos Display',bold:true,color:{rgb:white},sz:addr==='A1'?17:12}};
+ for(const addr of ['A6','B6'])if(sws[addr])sws[addr].s={fill:{fgColor:{rgb:blue}},font:{bold:true,color:{rgb:white}}};
+ XLSX.utils.book_append_sheet(wb,sws,'Resumen');
+ for(const c of categories){const cr=base.filter(r=>r.Categoría===c);if(cr.length)XLSX.utils.book_append_sheet(wb,createSheet(c.toUpperCase(),cr,c),c.slice(0,31));}
+ XLSX.writeFile(wb,'Operacion_CD_Girardota_Consolidado_'+new Date().toISOString().slice(0,10)+'.xlsx',{cellStyles:true});
+} catch(err){console.error('[Exportación consolidada]',err);toast('No se pudo generar el reporte: '+err.message)}
+finally{btn.disabled=false;btn.textContent=oldText;}
 }
 function subscribe(){sb.channel("transportes-live").on("postgres_changes",{event:"*",schema:"public",table:"transportes"},()=>refresh()).subscribe()}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
