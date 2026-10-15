@@ -205,14 +205,14 @@ async function showApp(){$("login").classList.add("hidden");$("app").classList.r
 function logout(){loginPin="";sessionStorage.clear();location.reload()}
 function updateRoleOptions(){const admin=permissions.is_admin;const opt=$("newRole").querySelector('option[value="Administrador"]');if(opt)opt.disabled=!admin;if(!admin&&$("newRole").value==="Administrador")$("newRole").value="Operativo";if(!admin){$("newCanUpload").checked=false;$("newCanCreateUsers").checked=false;$("newCanDeleteAll").checked=false;["newCanArm","newCanCount","newCanLoad","newCanAvailability","newCanPhysicalPlate"].forEach(id=>$(id).checked=false)}}
 
-// v5.45: vista flotante de transportes de cada categoría, sin cambiar los filtros al pasar el cursor.
+// v5.46: vista flotante al hacer clic en una categoría, conservando su filtro normal.
 function setupCategoryHoverPreview(){
  const tabs=[...document.querySelectorAll('.categoryTab[data-category]')];
  if(!tabs.length||document.getElementById('ctCategoryHover'))return;
  const panel=document.createElement('section');
  panel.id='ctCategoryHover';panel.className='ctCategoryHover';
  panel.setAttribute('role','region');panel.setAttribute('aria-label','Vista previa de transportes por categoría');
- panel.innerHTML=`<div class="ctCategoryHoverTop"><div><div class="ctCategoryHoverEyebrow">VISTA RÁPIDA POR CATEGORÍA</div><h3 id="ctCategoryHoverTitle">Transportes</h3><p id="ctCategoryHoverCount">0 transportes</p></div><button type="button" class="ctCategoryHoverClose" aria-label="Cerrar vista previa">✕</button></div><div class="ctCategoryHoverScroll"><table><thead><tr><th>Transporte</th><th>Viaje</th><th>Placa</th><th>Estado</th></tr></thead><tbody id="ctCategoryHoverRows"></tbody></table></div><p class="ctCategoryHoverFoot">Haz clic en la pestaña para filtrar la tabla principal. Desplázate aquí para revisar todos los transportes.</p>`;
+ panel.innerHTML=`<div class="ctCategoryHoverTop"><div><div class="ctCategoryHoverEyebrow">VISTA RÁPIDA POR CATEGORÍA</div><h3 id="ctCategoryHoverTitle">Transportes</h3><p id="ctCategoryHoverCount">0 transportes</p></div><button type="button" class="ctCategoryHoverClose" aria-label="Cerrar vista previa">✕</button></div><div class="ctCategoryHoverScroll"><table><thead><tr><th>Transporte</th><th>Viaje</th><th>Placa</th><th>Estado</th></tr></thead><tbody id="ctCategoryHoverRows"></tbody></table></div><p class="ctCategoryHoverFoot">La pestaña filtra la tabla principal. Desplázate aquí para revisar todos los transportes.</p>`;
  document.body.appendChild(panel);
  let opened=null,hideTimer=0;
  const esc=(value)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -235,12 +235,12 @@ function setupCategoryHoverPreview(){
  function hide(){clearTimeout(hideTimer);opened=null;panel.classList.remove('ctCategoryHoverVisible')}
  function delayHide(){clearTimeout(hideTimer);hideTimer=setTimeout(hide,280)}
  tabs.forEach(tab=>{
-  tab.addEventListener('mouseenter',()=>show(tab.dataset.category));
-  tab.addEventListener('mouseleave',delayHide);
-  tab.addEventListener('focus',()=>show(tab.dataset.category));
+  tab.addEventListener('click',()=>{
+    const category=tab.dataset.category;
+    if(opened===category)hide(); else show(category);
+  });
  });
- panel.addEventListener('mouseenter',()=>clearTimeout(hideTimer));
- panel.addEventListener('mouseleave',delayHide);
+ // El recuadro permanece abierto hasta cerrar, cambiar de pestaña o hacer clic fuera.
  panel.querySelector('.ctCategoryHoverClose').addEventListener('click',hide);
  document.addEventListener('keydown',e=>{if(e.key==='Escape')hide()});
  document.addEventListener('click',e=>{if(opened&&!e.target.closest('.ctCategoryHover')&&!e.target.closest('.categoryTab[data-category]'))hide()});
