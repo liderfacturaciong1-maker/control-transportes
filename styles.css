@@ -922,3 +922,22 @@ select.tapaState:focus-visible{outline:3px solid #f59e0b!important;outline-offse
 @keyframes ctButtonRotate{to{transform:rotate(360deg)}}
 @media(max-width:650px){.ctManualRefresh{right:9px;top:auto;bottom:78px;transform:none;padding:11px;border-radius:50%;width:49px;height:49px;justify-content:center}.ctManualRefresh .ctRefreshLabel{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.ctManualRefresh .ctRefreshGlyph{font-size:27px}}
 @media(prefers-reduced-motion:reduce){.ctManualRefresh.is-refreshing .ctRefreshGlyph{animation:none}}
+
+/* v5.57 - Navegación separada Seguimiento de Devoluciones */
+.ctSystemHeader{display:flex;justify-content:space-between;align-items:center;gap:22px;flex-wrap:wrap}
+.ctHeaderActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-left:auto}
+.ctReturnsEntry{display:flex;align-items:center;gap:13px;padding:11px 16px;border-radius:17px;color:#fff;background:linear-gradient(120deg,#235b8c,#1576ae);border:1px solid #59bcff;box-shadow:0 8px 22px #061b3260;text-align:left;line-height:1.2;cursor:pointer}
+.ctReturnsEntry:hover{background:linear-gradient(120deg,#2174b0,#1496d1);transform:translateY(-1px)}
+.ctReturnsEntry b{font-size:15px;color:#fff}.ctReturnsEntry small{display:block;color:#d6ecff;font-size:11px;margin-top:4px}
+.ctBoxBottles{font-size:29px;white-space:nowrap;background:#154772;border-radius:12px;padding:8px}
+.ctReturnsBack{white-space:normal}
+#ctReturnsModule{padding:28px 18px;min-height:65vh;max-width:1400px;margin:0 auto}
+.ctReturnsShell{background:#fff;border:1px solid #cbddeb;border-radius:23px;box-shadow:0 12px 38px #102d4817;padding:clamp(24px,4vw,52px)}
+.ctReturnsEyebrow{font-size:13px;letter-spacing:2px;color:#2572a0;font-weight:800}
+.ctReturnsShell h2{font-size:clamp(27px,3vw,40px);margin:12px 0;color:#153b58}
+.ctReturnsShell>p{color:#59748b}
+.ctReturnsEmpty{border:2px dashed #b7d5e7;border-radius:18px;padding:60px 24px;text-align:center;margin-top:35px;background:#f1f9ff}
+.ctReturnsEmptyIcon{font-size:52px}.ctReturnsEmpty h3{color:#194768}
+.ctReturnsEmpty p{max-width:560px;margin:0 auto;color:#58758c}
+.ctReturnsUserToggle{font-size:12px}.ctReturnsUserToggle.ctReturnsGranted{background:#e0f5e8!important;color:#166c3c!important;border-color:#74d29b!important}
+@media(max-width:680px){.ctSystemHeader{align-items:flex-start}.ctHeaderActions{width:100%;justify-content:space-between}.ctReturnsEntry{flex:1;min-width:210px}#ctReturnsModule{padding:12px}}
