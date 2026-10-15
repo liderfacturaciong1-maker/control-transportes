@@ -889,3 +889,8 @@ select.tapaState:focus-visible{outline:3px solid #f59e0b!important;outline-offse
 .ctCategoryHoverFoot{margin:0;padding:11px 20px;font-size:.81rem;color:#56728a;background:#f0f7fc;border-top:1px solid #d5e9f5}
 @media(max-width:650px){.ctCategoryHover{width:calc(100vw - 18px);height:min(580px,calc(100dvh - 30px))}.ctCategoryHoverTop{padding:15px}.ctCategoryHoverScroll td,.ctCategoryHoverScroll th{padding:9px 11px}}
 @media(prefers-reduced-motion:reduce){.ctCategoryHover{transition:none}}
+
+/* v5.49: clasificación visual de origen del cargue en CHECKIN */
+.checkinLoadClass{display:inline-block;padding:6px 12px;border-radius:999px;font-weight:800;white-space:nowrap;font-size:.86rem;letter-spacing:.01em}
+.checkinLoadOnline{background:#daf8ec;color:#066642;border:1px solid #73ceaa}
+.checkinLoadPreventa{background:#e3efff;color:#0a4d89;border:1px solid #94bfe9}
