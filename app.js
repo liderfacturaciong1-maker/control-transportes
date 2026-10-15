@@ -484,7 +484,47 @@ try{
 } catch(err){console.error('[Exportación consolidada]',err);toast('No se pudo generar el reporte: '+err.message)}
 finally{btn.disabled=false;btn.textContent=oldText;}
 }
-function subscribe(){sb.channel("transportes-live").on("postgres_changes",{event:"*",schema:"public",table:"transportes"},()=>refresh()).subscribe()}
+// v5.53: actualizacion colaborativa. Notificaciones Realtime + reconciliacion periodica.
+let ctLiveChannel=null,ctLivePoll=null,ctLiveQueued=false,ctLiveBusy=false,ctLiveLast=0,ctLiveLastTapa=0;
+function ctLiveEditing(){
+ const e=document.activeElement;
+ if(!e)return false;
+ if(e.closest('#welcomeScreen,#login'))return true;
+ return e.matches('input,textarea,select,[contenteditable="true"]')&&!e.matches('[readonly],[disabled]');
+}
+function ctLiveStatus(label,ok=true){const el=$('connection');if(el)el.textContent=(ok?'● ':'◌ ')+label;}
+async function ctLiveUpdate(force=false){
+ if(!sb||!loginPin||document.hidden||ctLiveBusy)return;
+ if(!force&&ctLiveEditing()){ctLiveQueued=true;return;}
+ ctLiveBusy=true;ctLiveQueued=false;
+ try{
+  await refresh();
+  await refreshCheckin();
+  if(activeModule==='tapa'&&Date.now()-ctLiveLastTapa>30000){await refreshTapa();ctLiveLastTapa=Date.now();}
+  if(activeModule==='sync'&&typeof window.renderSyncReport==='function')window.renderSyncReport();
+  ctLiveLast=Date.now();ctLiveStatus('Sincronizado · '+new Intl.DateTimeFormat('es-CO',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'America/Bogota'}).format(new Date()));
+ }catch(e){console.warn('[Sincronizacion]',e);ctLiveStatus('Reconectando datos…',false)}
+ finally{ctLiveBusy=false;}
+}
+let ctLiveTimer=null;
+function ctLiveSchedule(){
+ clearTimeout(ctLiveTimer);
+ ctLiveTimer=setTimeout(()=>void ctLiveUpdate(),450);
+}
+function subscribe(){
+ if(ctLiveChannel)return;
+ ctLiveChannel=sb.channel('transportes-live-v553')
+  .on('postgres_changes',{event:'*',schema:'public',table:'transportes'},ctLiveSchedule)
+  .on('postgres_changes',{event:'*',schema:'public',table:'ct_viajes_en_linea'},ctLiveSchedule)
+  .on('postgres_changes',{event:'*',schema:'public',table:'ct_checkin_archived'},ctLiveSchedule)
+  .subscribe(status=>{if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')ctLiveStatus('Verificando cambios automáticamente…',false)});
+ // Fallback para bases sin publicaciones Realtime y cambios hechos por RPC.
+ ctLivePoll=setInterval(()=>{if(document.hidden||!loginPin)return;void ctLiveUpdate()},12000);
+ window.addEventListener('focus',()=>{if(loginPin)ctLiveSchedule()});
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&loginPin)ctLiveSchedule()});
+ document.addEventListener('focusout',()=>{if(ctLiveQueued&&loginPin)setTimeout(()=>{if(!ctLiveEditing())void ctLiveUpdate(true)},500)},true);
+}
+
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function switchModule(module){const target=(module==="main"||module==="tapa")?"cargo":module==="brujula"?"rutero":module==="sync"?"cargo":"checkin";if(!canModule(target,"view")){toast("Sin permiso para acceder a esta pestaña.");return}const previousTop=(activeModule==="main"||activeModule==="tapa")?"cargo":activeModule==="brujula"?"rutero":activeModule==="sync"?"cargo":"checkin";
 if(previousTop!==target && module!=="tapa")playModuleSplash(target);
