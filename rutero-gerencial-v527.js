@@ -64,6 +64,29 @@ async function importFile(){if(typeof canModule==='function'&&!canModule('rutero
  }catch(e){processed=null;busy('No se pudo guardar el informe compartido: '+e.message+'. El informe publicado anteriormente se conserva.');console.error(e);}finally{$('brujulaUploadBtn').disabled=false;}
 }
 
+async function clearDailyRutero(){
+ if(typeof canModule!=='function'||!canModule('rutero','edit')){busy('No tienes permiso para eliminar el Rutero.');return;}
+ if(!window.CTShared){busy('No se encuentra disponible la conexión con Supabase.');return;}
+ if(!window.confirm('¿Eliminar el Rutero guardado para TODOS los usuarios? Se borrarán las filas del Rutero y los Status usados por Sincronización. Los viajes de Cargue y Despacho NO se borrarán.'))return;
+ const button=$('brujulaClearBtn');button.disabled=true;
+ try{
+  busy('Eliminando Rutero compartido desde Supabase…');
+  await CTShared.clear('rutero');
+  headers=[];rows=[];filtered=[];processed=null;audit=[];lastName='';columnFilters=[];page=0;
+  $('brujulaFile').value='';$('brujulaSearch').value='';
+  for(const id of ['brujulaCenterFilter','brujulaStatusFilter','brujulaDestinationFilter']){
+   const el=$(id);el.innerHTML='<option value="">Todos</option>';el.disabled=false;
+  }
+  $('brujulaHead').innerHTML='';$('brujulaRows').innerHTML='';
+  $('brujulaLoadedAt').textContent='Sin Rutero cargado';$('byrAudit').innerHTML='';
+  for(const id of ['brujulaCount','brujulaLimit'])if($(id))$(id).textContent='';
+  if($('byrKpiFiltered'))$('byrKpiFiltered').textContent='0';
+  if($('byrPrev'))$('byrPrev').disabled=true;if($('byrNext'))$('byrNext').disabled=true;
+  window.dispatchEvent(new Event('rutero-updated'));
+  busy('Rutero anterior eliminado de Supabase. Puedes cargar el nuevo archivo del día.');
+ }catch(err){busy('No se pudo eliminar el Rutero: '+(err?.message||err));}
+ finally{button.disabled=false;}
+}
 window.getRuteroSyncData=()=>({headers,rows,loaded:Boolean(processed)});
 function initReportView(){
   const selectConfigs=[['brujulaCenterFilter',/centro|^cd$|origen/,0,'Todos los centros'],['brujulaStatusFilter',/status|estado/,1,'Todos los estados'],['brujulaDestinationFilter',/destino|destinatario/,2,'Todos los destinos']];
@@ -126,6 +149,6 @@ function initialize(){if(!$('brujulaUploadBtn'))return;
  $('brujulaHead').addEventListener('input',e=>{if(!e.target.matches('.byrColumnFilter'))return;columnFilters[Number(e.target.dataset.column)]=e.target.value;page=0;clearTimeout(filterTimer);filterTimer=setTimeout(draw,180);});
  $('byrPrev').addEventListener('click',()=>{if(page>0){page--;draw();}});$('byrNext').addEventListener('click',()=>{page++;draw();});
  $('brujulaRows').addEventListener('click',e=>{const b=e.target.closest('.byrTransportLink');if(b)showTransport(b.dataset.transport);});
- $('byrTransportClose').addEventListener('click',hideTransport);$('byrTransportModal').addEventListener('click',e=>{if(e.target.id==='byrTransportModal')hideTransport();});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('byrTransportModal').classList.contains('hidden'))hideTransport();});busy(RUTERO_UI_VERSION+' · Una fila por transporte; detalles completos al abrir la ficha.');$('brujulaUploadBtn').onclick=importFile;$('brujulaDownloadBtn').onclick=exportFile;['brujulaSearch','brujulaCenterFilter','brujulaStatusFilter','brujulaDestinationFilter'].forEach(id=>$(id).addEventListener(id==='brujulaSearch'?'input':'change',()=>{page=0;draw();}));}
+ $('byrTransportClose').addEventListener('click',hideTransport);$('byrTransportModal').addEventListener('click',e=>{if(e.target.id==='byrTransportModal')hideTransport();});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('byrTransportModal').classList.contains('hidden'))hideTransport();});busy(RUTERO_UI_VERSION+' · Una fila por transporte; detalles completos al abrir la ficha.');$('brujulaUploadBtn').onclick=importFile;$('brujulaDownloadBtn').onclick=exportFile;$('brujulaClearBtn')?.addEventListener('click',clearDailyRutero);['brujulaSearch','brujulaCenterFilter','brujulaStatusFilter','brujulaDestinationFilter'].forEach(id=>$(id).addEventListener(id==='brujulaSearch'?'input':'change',()=>{page=0;draw();}));}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initialize);else initialize();
 })();
