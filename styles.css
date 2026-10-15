@@ -870,3 +870,22 @@ select.tapaState:focus-visible{outline:3px solid #f59e0b!important;outline-offse
 
 /* Búsqueda inteligente de todas las pestañas */
 .smartSearch{margin:18px 0!important;padding:22px!important;border:1px solid #b9d9f4!important;background:linear-gradient(145deg,#f9fcff,#eaf5fd)!important}.smartSearchHeading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px}.smartSearchHeading h2{margin:0 0 6px;color:#12334f}.smartSearchHeading .hint{margin:0}.smartSearchFields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.smartSearchFields label{display:flex;flex-direction:column;gap:8px;font-weight:750;color:#12334f}.smartSearchFields input,.smartSearchFields select{width:100%;min-width:0;box-sizing:border-box;background:#fff}.smartSummary{margin:16px 0 4px;font-weight:700;color:#175c8f}.smartResultsWrap{margin-top:12px;max-height:350px;overflow:auto}.smartResultsWrap table{min-width:870px}.smartResultsWrap th{position:sticky;top:0;background:#14588a;color:#fff;z-index:1}.smartCategory{color:#14588a;font-weight:700}.smartFoundRow{outline:3px solid #15a2e8;outline-offset:-3px;background:#e2f5ff!important}@media(max-width:760px){.smartSearchFields{grid-template-columns:1fr}.smartSearch{padding:14px!important}}
+
+/* v5.45 - Ventana flotante por categoría */
+.ctCategoryHover{position:fixed;z-index:15000;top:50%;left:50%;transform:translate(-50%,-48%) scale(.985);width:min(930px,calc(100vw - 32px));height:min(610px,calc(100dvh - 40px));display:flex;flex-direction:column;background:#fff;color:#17334e;border:1px solid #b8d3e6;border-radius:18px;box-shadow:0 26px 90px rgba(5,31,55,.34);visibility:hidden;opacity:0;pointer-events:none;transition:opacity .14s ease,transform .14s ease,visibility .14s ease;overflow:hidden}
+.ctCategoryHover.ctCategoryHoverVisible{visibility:visible;opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+.ctCategoryHoverTop{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 24px 14px;background:linear-gradient(115deg,#103c60,#177fbb);color:white}
+.ctCategoryHoverTop h3{margin:4px 0;font-size:clamp(1.15rem,2vw,1.55rem);color:white}
+.ctCategoryHoverTop p{margin:0;color:#cceeff;font-weight:600}
+.ctCategoryHoverEyebrow{font-size:.72rem;letter-spacing:.12em;font-weight:700;color:#b8e8ff}
+.ctCategoryHoverClose{background:#ffffff22!important;border:1px solid #ffffff88!important;color:white!important;border-radius:10px!important;min-width:40px!important;padding:8px 12px!important}
+.ctCategoryHoverScroll{overflow-y:auto;overflow-x:auto;overscroll-behavior:contain;flex:1;min-height:0}
+.ctCategoryHoverScroll table{width:100%;border-collapse:collapse;min-width:540px;font-size:.95rem}
+.ctCategoryHoverScroll th{position:sticky;top:0;z-index:1;background:#e1f0fa;color:#133d5c;padding:13px 16px;text-align:left}
+.ctCategoryHoverScroll td{padding:11px 16px;border-bottom:1px solid #e1edf5;color:#1e3c54}
+.ctCategoryHoverScroll tbody tr:nth-child(even){background:#f4f8fc}
+.ctCategoryHoverScroll tbody tr:hover{background:#e5f5ff}
+.ctCategoryEmpty{text-align:center!important;padding:32px 16px!important;color:#637d90!important}
+.ctCategoryHoverFoot{margin:0;padding:11px 20px;font-size:.81rem;color:#56728a;background:#f0f7fc;border-top:1px solid #d5e9f5}
+@media(max-width:650px){.ctCategoryHover{width:calc(100vw - 18px);height:min(580px,calc(100dvh - 30px))}.ctCategoryHoverTop{padding:15px}.ctCategoryHoverScroll td,.ctCategoryHoverScroll th{padding:9px 11px}}
+@media(prefers-reduced-motion:reduce){.ctCategoryHover{transition:none}}
