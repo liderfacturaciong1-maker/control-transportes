@@ -85,6 +85,20 @@ async function upload(){const file=$('syncStatFile')?.files?.[0];if(!file)return
   alertStatus(`${file.name}: ${parsed.count.toLocaleString('es-CO')} filas leídas; ${parsed.items.length.toLocaleString('es-CO')} transportes. Guardado en Supabase.`);render();
  }catch(err){alertStatus('No se pudo cargar STAT: '+err.message);}finally{btn.disabled=false;}
 }
+async function clearDailyStat(){
+ if(!canEdit()){alertStatus('No tienes permiso para eliminar el archivo STAT.');return;}
+ if(!window.CTShared){alertStatus('No está disponible la conexión con Supabase.');return;}
+ if(!window.confirm('¿Eliminar el archivo Sincronización STAT guardado para TODOS los usuarios? No se borrarán los viajes de Cargue y Despacho ni el Rutero de Vista rápida.'))return;
+ const button=$('syncStatClearBtn');button.disabled=true;
+ try{
+  alertStatus('Eliminando STAT anterior de Supabase…');
+  await CTShared.clear('sync_stat');
+  statRows=new Map();statLoaded=false;statFile='';$('syncStatFile').value='';
+  alertStatus('STAT anterior eliminado de Supabase. Selecciona el archivo actualizado y pulsa Cargar STAT.');
+  render();
+ }catch(err){alertStatus('No se pudo eliminar el STAT: '+(err?.message||err));}
+ finally{button.disabled=false;}
+}
 async function restore(){if(loading||statLoaded||!window.CTShared)return;loading=true;
  try{const data=await window.CTShared.load('sync_stat');if(!data){alertStatus('Sin archivo STAT cargado.');return;}
  const map=new Map();for(const r of data.items||[])if(transportKey(r.transporte))map.set(transportKey(r.transporte),new Set((r.estados||[]).map(String)));
@@ -151,7 +165,7 @@ window.addEventListener('rutero-updated',()=>{statusIndexReady=false;void loadSt
 window.addEventListener('cargo-records-updated',render);
 window.addEventListener('cargo-records-updated',()=>{cargoFallback=[];render();});
 window.addEventListener('focus',()=>{if(!$('syncModuleView')?.classList.contains('hidden')){render();void loadCargoSource();}});
-function initializeSync514(){for(const id of ['syncSearch','syncFilter'])$(id)?.addEventListener('input',render);$('syncStatUpload')?.addEventListener('click',upload);$('syncRefresh')?.addEventListener('click',()=>{void loadCargoSource(true);void restore();void loadStatusIndex(true);render();});$('syncAlertBtn')?.addEventListener('click',openUnsynced);$('syncAlertClose')?.addEventListener('click',closeUnsynced);$('syncAlertModal')?.addEventListener('click',e=>{if(e.target===$('syncAlertModal'))closeUnsynced();});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('syncAlertModal')?.classList.contains('hidden'))closeUnsynced();});render();}
+function initializeSync514(){for(const id of ['syncSearch','syncFilter'])$(id)?.addEventListener('input',render);$('syncStatUpload')?.addEventListener('click',upload);$('syncStatClearBtn')?.addEventListener('click',clearDailyStat);$('syncRefresh')?.addEventListener('click',()=>{void loadCargoSource(true);void restore();void loadStatusIndex(true);render();});$('syncAlertBtn')?.addEventListener('click',openUnsynced);$('syncAlertClose')?.addEventListener('click',closeUnsynced);$('syncAlertModal')?.addEventListener('click',e=>{if(e.target===$('syncAlertModal'))closeUnsynced();});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('syncAlertModal')?.classList.contains('hidden'))closeUnsynced();});render();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initializeSync514,{once:true});else initializeSync514();
 })();
 
@@ -165,7 +179,7 @@ const DEFAULT_MODULE_RIGHTS={cargo_view:true,cargo_edit:true,checkin_view:true,c
 let moduleRights={...DEFAULT_MODULE_RIGHTS},selectedPermissionUser=null;
 function canModule(module,level){return permissions.is_admin||!!moduleRights[module+"_"+level]}
 async function loadModuleRights(){if(permissions.is_admin){moduleRights={cargo_view:true,cargo_edit:true,checkin_view:true,checkin_edit:true,rutero_view:true,rutero_edit:true};return}const{data,error}=await sb.rpc("module_permissions_for_pin",{p_pin:loginPin});if(error){moduleRights={cargo_view:false,cargo_edit:false,checkin_view:false,checkin_edit:false,rutero_view:false,rutero_edit:false};toast("Falta ejecutar SQL de permisos v5.0: "+error.message);return}moduleRights={...DEFAULT_MODULE_RIGHTS,...(data?.[0]||{})};}
-function applyModuleRights(){for(const [key,id] of [["cargo","cargoPrimaryBtn"],["checkin","checkinPrimaryBtn"],["rutero","brujulaPrimaryBtn"]])$(id).classList.toggle("hidden",!canModule(key,"view"));$("syncPrimaryBtn").classList.toggle("hidden",!canModule("cargo","view"));$("noModuleAccess").classList.toggle("hidden",["cargo","checkin","rutero"].some(x=>canModule(x,"view")));$("uploadPanel").classList.toggle("hidden",!(canModule("cargo","edit")&&(permissions.can_upload||permissions.is_admin)));$("importBtn").disabled=!canModule("cargo","edit");$("beesCompareBtn").disabled=!canModule("checkin","edit");$("porteriaUploadBtn").disabled=!canModule("checkin","edit");$("brujulaUploadBtn").disabled=!canModule("rutero","edit");if(!canModule("checkin","edit")){ $("beesClearBtn").disabled=true;$("porteriaClearBtn").disabled=true;}}
+function applyModuleRights(){for(const [key,id] of [["cargo","cargoPrimaryBtn"],["checkin","checkinPrimaryBtn"],["rutero","brujulaPrimaryBtn"]])$(id).classList.toggle("hidden",!canModule(key,"view"));$("syncPrimaryBtn").classList.toggle("hidden",!canModule("cargo","view"));$("noModuleAccess").classList.toggle("hidden",["cargo","checkin","rutero"].some(x=>canModule(x,"view")));$("uploadPanel").classList.toggle("hidden",!(canModule("cargo","edit")&&(permissions.can_upload||permissions.is_admin)));$("importBtn").disabled=!canModule("cargo","edit");$("beesCompareBtn").disabled=!canModule("checkin","edit");$("porteriaUploadBtn").disabled=!canModule("checkin","edit");$("brujulaUploadBtn").disabled=!canModule("rutero","edit");if($("brujulaClearBtn"))$("brujulaClearBtn").disabled=!canModule("rutero","edit");if($("syncStatClearBtn"))$("syncStatClearBtn").disabled=!canModule("cargo","edit");if(!canModule("checkin","edit")){ $("beesClearBtn").disabled=true;$("porteriaClearBtn").disabled=true;}}
 function setupCheckinCollapses(){document.querySelectorAll(".checkinCollapse").forEach(btn=>{const el=$(btn.dataset.collapse),key="ct_checkin_collapsed_"+btn.dataset.collapse;let hidden=false;try{hidden=localStorage.getItem(key)==="1"}catch(e){}el.classList.toggle("hidden",hidden);btn.textContent=hidden?"Mostrar":"Ocultar";btn.onclick=()=>{const hide=!el.classList.contains("hidden");el.classList.toggle("hidden",hide);btn.textContent=hide?"Mostrar":"Ocultar";try{localStorage.setItem(key,hide?"1":"0")}catch(e){}}})}
 // Presentaciones breves: 500 ms totales, solo al ingresar al módulo principal.
 let splashTimer=0, splashExitTimer=0;
