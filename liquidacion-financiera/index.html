@@ -230,6 +230,28 @@ function docsDate(v){if(!v)return '';const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(St
 async function docsLoad(){if(!pin)return;docsMessage('Consultando documentos...');const {data,error}=await sb.rpc('ct_finance_lost_docs_list',{p_pin:pin});if(error){docsMessage('No se pudo consultar: '+error.message,true);return}docsRecords=Array.isArray(data)?data:[];docsRender();docsMessage('Datos actualizados')}
 function docsRender(){const body=$('docsRows');body.replaceChildren();$('docsCount').textContent=docsRecords.length+' documentos';for(const r of docsRecords){const tr=document.createElement('tr');for(const key of docsFields){const td=document.createElement('td');td.textContent=key==='fecha_liquidacion'?docsDate(r[key]):String(r[key]??'');tr.append(td)}const td=document.createElement('td');const b=document.createElement('button');b.className='danger';b.textContent='Eliminar';b.type='button';b.onclick=async()=>{if(!confirm('¿Eliminar este documento extraviado?'))return;b.disabled=true;const {error}=await sb.rpc('ct_finance_lost_docs_delete',{p_pin:pin,p_id:r.id});if(error){docsMessage(error.message,true);b.disabled=false;return}await docsLoad()};td.append(b);tr.append(td);body.append(tr)}}
 $('docsRefresh').onclick=docsLoad;
+// Placas de Documentos Extraviados: mostrar y conservar siempre un único prefijo CO.
+const docsPlateInput=$('docsForm').querySelector('input[name="placa"]');
+function docsNormalizePlate(raw){
+  let value=String(raw??'').toLocaleUpperCase('es-CO').replace(/\s+/g,'');
+  // Quitar todos los prefijos CO de la cadena ingresada antes de añadir uno solo.
+  value=value.replace(/^(?:CO)+/,'');
+  return 'CO'+value;
+}
+docsPlateInput.value='CO';
+docsPlateInput.placeholder='CO';
+docsPlateInput.addEventListener('focus',()=>{
+  if(!docsPlateInput.value.trim())docsPlateInput.value='CO';
+});
+docsPlateInput.addEventListener('input',()=>{
+  const normalized=docsNormalizePlate(docsPlateInput.value);
+  if(docsPlateInput.value!==normalized)docsPlateInput.value=normalized;
+  // Mantener el cursor a continuación del prefijo protegido.
+  if(docsPlateInput.selectionStart<2)docsPlateInput.setSelectionRange(2,2);
+});
+docsPlateInput.addEventListener('blur',()=>{
+  docsPlateInput.value=docsNormalizePlate(docsPlateInput.value);
+});
 // Documentos Extraviados: convertir a MAYÚSCULAS durante la digitación,
 // incluidos textos pegados. No modificar el selector de mes ni la fecha.
 $('docsForm').addEventListener('input',e=>{
@@ -242,7 +264,7 @@ $('docsForm').addEventListener('input',e=>{
     try{el.setSelectionRange(start,end)}catch(_e){}
   }
 });
-$('docsForm').onsubmit=async(e)=>{e.preventDefault();const btn=$('docsSave');const fd=new FormData(e.currentTarget);const payload={p_pin:pin};for(const key of docsFields){const raw=String(fd.get(key)||'').trim();payload['p_'+key]=(key==='fecha_liquidacion')?raw:raw.toLocaleUpperCase('es-CO')}btn.disabled=true;docsMessage('Guardando documento...');try{const {error}=await sb.rpc('ct_finance_lost_docs_create',payload);if(error)throw error;$('docsForm').reset();await docsLoad();docsMessage('Documento guardado correctamente')}catch(err){docsMessage(err.message,true)}finally{btn.disabled=false}};
+$('docsForm').onsubmit=async(e)=>{e.preventDefault();const btn=$('docsSave');const fd=new FormData(e.currentTarget);const payload={p_pin:pin};for(const key of docsFields){const raw=String(fd.get(key)||'').trim();payload['p_'+key]=(key==='fecha_liquidacion')?raw:key==='placa'?docsNormalizePlate(raw):raw.toLocaleUpperCase('es-CO')}if(payload.p_placa==='CO'){docsMessage('Escribe la placa después de CO.',true);docsPlateInput.focus();return}btn.disabled=true;docsMessage('Guardando documento...');try{const {error}=await sb.rpc('ct_finance_lost_docs_create',payload);if(error)throw error;$('docsForm').reset();docsPlateInput.value='CO';await docsLoad();docsMessage('Documento guardado correctamente')}catch(err){docsMessage(err.message,true)}finally{btn.disabled=false}};
 $('docsPdf').onclick=()=>{
   if(!docsRecords.length){docsMessage('No hay documentos para exportar.',true);return}
   if(!window.XLSX){docsMessage('No se cargó el generador Excel. Verifica la conexión.',true);return}
