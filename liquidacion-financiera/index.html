@@ -10,7 +10,7 @@ select{padding-right:34px}
 .docsForm{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0}.docsForm label{display:flex;flex-direction:column;font-size:13px;font-weight:650;color:#31566e;gap:5px}.docsForm input,.docsForm select,.docsForm textarea{width:100%;border:1px solid #bdd3e1;border-radius:9px;padding:10px;font:inherit;min-width:0}.docsForm textarea{resize:vertical;min-height:42px}.docsTable{min-width:1370px}.docsTable td{white-space:normal;word-break:break-word}.docsActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.docsStatus{font-size:13px;color:#235f82}#docsGrid{max-height:570px}@media(max-width:760px){.docsForm{grid-template-columns:1fr}}
 
 /* Restricciones: vigencia y botones de liberación */
-tr.restriccion-vencida, tr.restriccion-vencida:nth-child(even){background:#ffe0e0!important}
+tr.restGrid tbody tr.restriccion-vencida, .restGrid tbody tr.restriccion-vencida:nth-child(even), .restGrid tbody tr.restriccion-vencida td{background:#ffd4d4!important}
 tr.restriccion-aprobada, tr.restriccion-aprobada:nth-child(even){background:#e7f4fe!important}
 .releaseActions{display:flex;gap:7px;flex-wrap:wrap;min-width:270px}
 .releaseActions button{font-size:12px;padding:9px 11px;white-space:nowrap}
@@ -158,15 +158,28 @@ async function restLoad(){
   restRecords=Array.isArray(data)?data:[];
   restRender();restrMessage('Datos actualizados');
 }
-function hoursOpen(r){const t=Date.parse(r.created_at||'');return Number.isFinite(t)?(Date.now()-t)/3600000:0}
+// Alerta por días CALENDARIO en Colombia, tomando la columna Fecha (no created_at).
+function restrictionIsOverdue(r){
+ const raw=String(r.fecha||'').trim();
+ let y,m,d;
+ let match=raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+ if(match){[,y,m,d]=match.map(String)}
+ else {match=raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);if(!match)return false; d=match[1];m=match[2];y=match[3];}
+ const start=Date.UTC(Number(y),Number(m)-1,Number(d));
+ if(!Number.isFinite(start)||new Date(start).getUTCFullYear()!==Number(y)||new Date(start).getUTCMonth()!==Number(m)-1||new Date(start).getUTCDate()!==Number(d))return false;
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+ const val=type=>Number(parts.find(p=>p.type===type)?.value);
+ const today=Date.UTC(val('year'),val('month')-1,val('day'));
+ return today-start>=2*86400000;
+}
 function restRender(){
  const body=$('restRows');body.replaceChildren();
  $('restCount').textContent=restRecords.length+' restricciones sin liberar';
  for(const r of restRecords){
    const tr=document.createElement('tr');
    const state=String(r.estado_liberacion||'ACTIVA');
-   if(state==='APROBADA')tr.classList.add('restriccion-aprobada');
-   else if(hoursOpen(r)>48)tr.classList.add('restriccion-vencida');
+   if(restrictionIsOverdue(r))tr.classList.add('restriccion-vencida');
+   else if(state==='APROBADA')tr.classList.add('restriccion-aprobada');
    for(const k of ['fecha','transporte','placa','transportista','novedad','valor']){
      const td=document.createElement('td');
      td.textContent=k==='valor'?formatCOP(r[k]):k==='novedad'&&r[k]==='OTROS MOTIVO'?`OTROS MOTIVO: ${r.detalle||''}`:String(r[k]??'');
