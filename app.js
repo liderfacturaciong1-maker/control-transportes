@@ -406,6 +406,7 @@ selectedTransportId=null;toast(`Estado actualizado: ${r.estado} → ${next}`);aw
 async function loadHistory(){const{data,error}=await sb.rpc("recent_history",{p_limit:30});if(error)return;$("history").innerHTML=(data||[]).map(h=>`<div class="historyItem"><b>${esc(h.usuario)}</b> · ${esc(h.placa)} · Viaje ${esc(h.viaje)}<br>${h.estado_anterior} → <b>${h.estado_nuevo}</b> · ${new Date(h.created_at).toLocaleString("es-CO")}</div>`).join("")||"Sin movimientos."}
 let ctAdminUsers=[];
 const ctGeneralFlags=[['can_upload','Cargar y descargar archivos'],['can_create_users','Crear usuarios'],['can_manage_checkin','Modificar pendientes de Checkin'],['can_delete_all_transports','Eliminar todos los transportes'],['can_arm','Cambiar a Armado'],['can_count','Cambiar a Contado'],['can_load','Cambiar a Cargado'],['can_edit_availability','Editar disponibilidad'],['can_edit_physical_plate','Editar placa física']];
+const ctFinanceTabs={base:'Pendientes por Liquidar',novedades:'Novedades',restricciones:'Restricciones',documentos:'Documentos Extraviados',reporte:'Reporte Restricciones'};
 const ctModuleLabels={cargo:'Cargue y Despacho',checkin:'CHECKIN',rutero:'Brújula y Rutero'};
 let ctEditorUser=null;
 function ctRenderAdminUsers(){
@@ -442,6 +443,16 @@ async function ctOpenPermissionEditor(id){
  });
  modules.querySelectorAll('input[data-mode="edit"]').forEach(ch=>ch.addEventListener('change',()=>{if(ch.checked)modules.querySelector('input[data-module="'+ch.dataset.module+'"][data-mode="view"]').checked=true}));
  modules.querySelectorAll('input[data-mode="view"]').forEach(ch=>ch.addEventListener('change',()=>{if(!ch.checked)modules.querySelector('input[data-module="'+ch.dataset.module+'"][data-mode="edit"]').checked=false}));
+ const financeRoot=$('ctEditorFinance');financeRoot.replaceChildren();
+ const fresult=await sb.rpc('ct_finance_admin_user_rights',{p_admin_pin:loginPin,p_user_id:id});
+ if(fresult.error){toast('No se pudieron consultar permisos financieros: '+fresult.error.message);return;}
+ const fdata=fresult.data||{};
+ Object.entries(ctFinanceTabs).forEach(([tab,label])=>{
+  const div=document.createElement('div');div.className='ctEditorModule';const title=document.createElement('strong');title.textContent=label;div.append(title);
+  for(const mode of ['view','edit']){const l=document.createElement('label'),ch=document.createElement('input');ch.type='checkbox';ch.dataset.financeTab=tab;ch.dataset.financeMode=mode;ch.checked=!!fdata[tab+'_'+mode];l.append(ch,document.createTextNode(mode==='view'?' Ver':' Modificar'));div.append(l)}financeRoot.append(div);
+ });
+ financeRoot.querySelectorAll('[data-finance-mode="edit"]').forEach(ch=>ch.addEventListener('change',()=>{if(ch.checked)financeRoot.querySelector('[data-finance-tab="'+ch.dataset.financeTab+'"][data-finance-mode="view"]').checked=true}));
+ financeRoot.querySelectorAll('[data-finance-mode="view"]').forEach(ch=>ch.addEventListener('change',()=>{if(!ch.checked)financeRoot.querySelector('[data-finance-tab="'+ch.dataset.financeTab+'"][data-finance-mode="edit"]').checked=false}));
  $('ctEditorDeactivate').textContent=u.active?'Quitar acceso al usuario':'Restaurar acceso';$('ctEditorDeactivate').className=u.active?'danger':'secondary';$('ctEditorStatus').textContent='';$('ctUserPermissionDrawer').classList.remove('hidden');$('ctUserPermissionDrawer').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 async function ctSaveUserRights(){
@@ -456,6 +467,8 @@ async function ctSaveUserRights(){
  try{
   const general=await sb.rpc('admin_set_user_all_permissions_secure',args);if(general.error)throw general.error;
   const modules=await sb.rpc('admin_set_module_permissions',{p_admin_pin:loginPin,p_user_id:u.id,p_rights:rights});if(modules.error)throw Error('Permisos generales guardados, pero falló el acceso a módulos: '+modules.error.message);
+  const financeRights={};for(const tab of Object.keys(ctFinanceTabs))for(const mode of ['view','edit'])financeRights[tab+'_'+mode]=$('ctEditorFinance').querySelector('[data-finance-tab="'+tab+'"][data-finance-mode="'+mode+'"]').checked;
+  const fresult=await sb.rpc('ct_finance_admin_set_user_rights',{p_admin_pin:loginPin,p_user_id:u.id,p_rights:financeRights});if(fresult.error)throw Error('Permisos generales guardados, pero falló Liquidación Financiera: '+fresult.error.message);
   $('ctEditorStatus').textContent='Permisos guardados correctamente';toast('Permisos actualizados');await loadUsers();
  }catch(e){$('ctEditorStatus').textContent='No se pudo completar: '+e.message;toast(e.message)}finally{btn.disabled=false}
 }
@@ -463,11 +476,23 @@ async function ctToggleUserAccess(u){if(!permissions.is_admin||u.is_admin)return
  if(!confirm(u.active?'¿Quitar el acceso a '+u.name+'? Su historial se conservará y podrás restaurar la cuenta.':'¿Restaurar el acceso de '+u.name+'?'))return;
  const {error}=await sb.rpc('admin_set_user_active_secure',{p_admin_pin:loginPin,p_user_id:u.id,p_active:!u.active});if(error){toast(error.message);return}await loadUsers();if(ctEditorUser===u.id)$('ctUserPermissionDrawer').classList.add('hidden');toast(u.active?'Acceso retirado':'Acceso restaurado');
 }
+async function ctDeleteUserForever(){
+ if(!permissions.is_admin||!ctEditorUser)return;
+ const u=ctAdminUsers.find(x=>x.id===ctEditorUser);if(!u||u.is_admin){toast('No es posible eliminar administradores desde este control.');return;}
+ if(!confirm('¿Eliminar DEFINITIVAMENTE la cuenta de '+u.name+'? No podrás restaurarla. Esta operación no elimina transportes ni registros históricos.'))return;
+ const answer=prompt('Para confirmar, escribe exactamente la cédula del usuario: '+u.cedula);
+ if(answer===null||answer.trim()!==String(u.cedula||'').trim()){toast('Cédula incorrecta. No se eliminó la cuenta.');return;}
+ const b=$('ctEditorDeleteForever');b.disabled=true;
+ try{const {error}=await sb.rpc('ct_admin_delete_user_permanent',{p_admin_pin:loginPin,p_user_id:u.id,p_confirm_cedula:answer.trim()});if(error)throw error;
+ $('ctUserPermissionDrawer').classList.add('hidden');ctEditorUser=null;await loadUsers();toast('Usuario eliminado permanentemente');
+ }catch(e){toast('No se pudo eliminar: '+e.message)}finally{b.disabled=false}
+}
 const ctSetupUserPanel=()=>{const create=$('ctToggleCreateUser');if(create)create.onclick=()=>{const pane=$('ctCreateUserForm');pane.classList.toggle('ctCreateUserCollapsed');create.textContent=pane.classList.contains('ctCreateUserCollapsed')?'＋ Nuevo usuario':'− Ocultar creación'};
  $('ctUsersSearch')?.addEventListener('input',ctRenderAdminUsers);$('ctUsersFilter')?.addEventListener('change',ctRenderAdminUsers);
  $('ctEditorClose')?.addEventListener('click',()=>$('ctUserPermissionDrawer').classList.add('hidden'));
  $('ctEditorSave')?.addEventListener('click',ctSaveUserRights);
  $('ctEditorDeactivate')?.addEventListener('click',()=>{const u=ctAdminUsers.find(x=>x.id===ctEditorUser);if(u)ctToggleUserAccess(u)});
+ $('ctEditorDeleteForever')?.addEventListener('click',ctDeleteUserForever);
 };
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ctSetupUserPanel);else ctSetupUserPanel();
 async function addUser(){if(!permissions.can_create_users&&!permissions.is_admin){toast("No tienes permiso para crear usuarios.");return}const name=$("newName").value.trim(),cedula=$("newCedula").value.trim(),pin=$("newPin").value.trim(),role=$("newRole").value;if(!name||!cedula||!pin){toast("Nombre, cédula y PIN son obligatorios");return}if(role==="Administrador"&&!permissions.is_admin){toast("Solo un administrador puede crear administradores.");return}const{data:newUserId,error}=await sb.rpc("admin_create_user_full_secure",{p_name:name,p_cedula:cedula,p_pin:pin,p_creator_pin:loginPin,p_role:role,p_can_upload:permissions.is_admin&&$("newCanUpload").checked,p_can_create_users:permissions.is_admin&&$("newCanCreateUsers").checked,p_can_delete_all_transports:permissions.is_admin&&$("newCanDeleteAll").checked,p_can_arm:permissions.is_admin&&$("newCanArm").checked,p_can_count:permissions.is_admin&&$("newCanCount").checked,p_can_load:permissions.is_admin&&$("newCanLoad").checked,p_can_edit_availability:permissions.is_admin&&$("newCanAvailability").checked,p_can_edit_physical_plate:permissions.is_admin&&$("newCanPhysicalPlate").checked,p_can_manage_checkin:(permissions.is_admin||permissions.can_create_users)&&$("newCanManageCheckin").checked});if(error){toast(error.message);return}$("newName").value="";$("newCedula").value="";$("newPin").value="";$("newRole").value="Operativo";["newCanUpload","newCanCreateUsers","newCanDeleteAll","newCanArm","newCanCount","newCanLoad","newCanAvailability","newCanPhysicalPlate","newCanManageCheckin"].forEach(id=>$(id).checked=false);if(permissions.is_admin&&newUserId){const rights={};for(const mod of ["Cargo","Checkin","Rutero"])for(const mode of ["View","Edit"])rights[mod.toLowerCase()+"_"+mode.toLowerCase()]=$("new"+mod+mode).checked;const res=await sb.rpc("admin_set_module_permissions",{p_admin_pin:loginPin,p_user_id:newUserId,p_rights:rights});if(res.error){toast("Usuario creado, pero faltan permisos de módulos: "+res.error.message);return}}if(permissions.is_admin)await loadUsers();toast("Usuario creado correctamente")}
