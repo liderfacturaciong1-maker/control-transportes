@@ -86,6 +86,26 @@ if(reportDailyTitle){const colombiaDate=new Intl.DateTimeFormat('es-CO',{day:'2-
 
 const cfg=window.APP_CONFIG||{};
 let sb,pin='',records=[],notesMap={};
+const FIN_TABS=['base','novedades','restricciones','documentos','reporte'];
+let finRights={};
+const finCan=(tab,mode='view')=>!!finRights[tab+'_'+mode];
+function finApplyRights(){
+ document.querySelectorAll('.tab[data-tab]').forEach(el=>el.classList.toggle('hidden',!finCan(el.dataset.tab)));
+ for(const tab of FIN_TABS){const section=document.getElementById(tab);if(section&&!finCan(tab))section.classList.add('hidden');}
+ const editableBase=finCan('base','edit'), editableNotes=finCan('novedades','edit'),editableRest=finCan('restricciones','edit'),editableDocs=finCan('documentos','edit');
+ for(const id of ['excel','upload']){const e=document.getElementById(id);if(e)e.disabled=!editableBase;}
+ const b=document.getElementById('openBulkNovedad');if(b)b.classList.toggle('hidden',!editableNotes);
+ const rf=document.getElementById('restForm');if(rf)rf.classList.toggle('hidden',!editableRest);
+ for(const id of ['docsForm']){const e=document.getElementById(id);if(e)e.classList.toggle('hidden',!editableDocs);}
+ document.querySelectorAll('#restRows button').forEach(e=>e.disabled=!editableRest);
+ document.querySelectorAll('#restRows .rest-client-input').forEach(e=>e.disabled=!editableRest);
+ document.querySelectorAll('#novedadesRows .money-input').forEach(e=>e.disabled=!editableNotes);
+ document.querySelectorAll('#docsRows button').forEach(e=>e.disabled=!editableDocs);
+ const first=FIN_TABS.find(x=>finCan(x));
+ if(first){const active=document.querySelector('.tab.active');if(!active||!finCan(active.dataset.tab))document.querySelector('.tab[data-tab="'+first+'"]').click();}
+}
+async function finLoadRights(candidate){const {data,error}=await sb.rpc('ct_finance_my_rights',{p_pin:candidate});if(error)throw error;finRights=data||{};if(!FIN_TABS.some(tab=>finCan(tab)))throw Error('No tienes pestañas financieras autorizadas.');}
+
 let NOTE_OPTIONS=['SIN SOPORTE PAGO ET','SIN SOPORTE EFECTIVO','BANCO CERRADO','TOKEN','CONSIGNACION EN VUELO','DOCUMENTOS NO ENTREGADOS','CUSTODIA','RECONSTRUCCION','VARADO','OTROS MOTIVO'];
 const currencyFmt=new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0});
 const escapeText=(s)=>String(s??'');
@@ -101,13 +121,13 @@ try{
   if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY||!window.supabase||!window.XLSX) throw Error('No se cargó la conexión o el lector de Excel.');
   sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY,{auth:{persistSession:false}})
 }catch(e){$('loginMsg').textContent=e.message;return}
-async function loadNotes(){
+async function loadNotes(){if(!finCan('novedades','view'))return;
   const {data,error}=await sb.rpc('ct_finance_notes_get',{p_pin:pin});
   if(error) throw error;
   notesMap={};
   (Array.isArray(data)?data:[]).forEach(item=>{ notesMap[String(item.record_key||'')]= {novedad:String(item.novedad||''), detalle:String(item.detalle||''), valor:String(item.valor||'')}; });
 }
-async function load(){
+async function load(){if(!finCan('base','view'))return;
   message('Consultando archivo guardado…');
   const [{data,error}, notesRes] = await Promise.all([
     sb.rpc('ct_finance_report_get',{p_pin:pin}),
@@ -243,7 +263,7 @@ function render(){
     wireRowEvents(tr,key,idx,note);
     return tr;
   }));
-  updateDelayCells();
+  updateDelayCells();finApplyRights();
   $('novedadesCount').textContent=`${novedadesFiltered.length} de ${records.length} registros`;
   $('count').textContent=String(records.length);
   $('dateCount').textContent=String(new Set(records.map(r=>r[0]).filter(Boolean)).size);
@@ -262,7 +282,7 @@ function wireRowEvents(tr,key,idx,note){
   money.addEventListener('focus',()=>{ money.value=digitsOnly(money.dataset.raw||money.value); });
   money.addEventListener('blur',()=>{ money.dataset.raw=digitsOnly(money.value); money.value=formatCOP(money.dataset.raw); saveRow(key,select,txt,money,idx,'value'); });
 }
-async function saveRow(key,select,txt,money,idx,kind){
+async function saveRow(key,select,txt,money,idx,kind){if(!finCan('novedades','edit'))return;
   const novedad=select?.value||'';
   const detalle=(novedad==='OTROS MOTIVO' ? norm(txt?.value) : '');
   const valor=digitsOnly(money?.dataset?.raw || money?.value || '');
@@ -308,13 +328,13 @@ $('enter').onclick=async()=>{
     const {data,error}=await sb.rpc('ct_finance_can_access',{p_pin:candidate});
     if(error) throw error;
     if(data!==true){$('loginMsg').textContent='No tienes permiso para Liquidación Financiera.';return}
-    pin=candidate;$('pin').value='';$('login').classList.add('hidden');$('panel').classList.remove('hidden');$('logout').classList.remove('hidden');await load();await Promise.all([loadRestOptions(),checkRestAdmin()])
+    await finLoadRights(candidate);pin=candidate;$('pin').value='';$('login').classList.add('hidden');$('panel').classList.remove('hidden');$('logout').classList.remove('hidden');finApplyRights();if(finCan('base')||finCan('novedades'))await load();if(finCan('restricciones'))await restLoad();if(finCan('restricciones','edit'))await Promise.all([loadRestOptions(),checkRestAdmin()]);finApplyRights()
   }catch(e){$('loginMsg').textContent=e.message}finally{b.disabled=false}
 };
 setInterval(updateDelayCells,60000);
 $('pin').addEventListener('keydown',e=>{if(e.key==='Enter')$('enter').click()});
 $('logout').onclick=()=>location.reload(); $('refresh').onclick=load; $('search').oninput=render; $('novedadesSearch').oninput=render; $('novedadesFechaFiltro').onchange=render; $('novedadesTransportistaFiltro').onchange=render; $('novedadesLimpiarFiltros').onclick=()=>{$('novedadesFechaFiltro').value='';$('novedadesTransportistaFiltro').value='';render()};
-document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b===button)); for(const id of ['base','novedades','restricciones','documentos','reporte']) $(id).classList.toggle('hidden',id!==button.dataset.tab);if(button.dataset.tab==='restricciones' || button.dataset.tab==='reporte')restLoad();if(button.dataset.tab==='documentos')docsLoad()}));
+document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',()=>{if(!finCan(button.dataset.tab))return;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b===button)); for(const id of ['base','novedades','restricciones','documentos','reporte']) $(id).classList.toggle('hidden',id!==button.dataset.tab);if(button.dataset.tab==='restricciones' || button.dataset.tab==='reporte')restLoad();if(button.dataset.tab==='documentos')docsLoad()}));
 const restTransportistas=['LOGISTICA INTELIGENTE SOL','SURTICERVEZAS PACHECO SAS','DISTRIBUIDORA ABURRA SUR','DISTRIBUCIONES Y TRANSPORTE RG SAS'];
 let restRecords=[];
 let restOptionNames=[];
@@ -411,7 +431,7 @@ function celebrateIfNoRestrictions(){
   picture.style.animation='';
   mascotCelebrationTimer=setTimeout(()=>{panel.hidden=true;},2000);
 }
-async function restLoad(){
+async function restLoad(){if(!finCan('restricciones','view'))return;
   if(!pin)return;
   restrMessage('Consultando restricciones…');
   const {data,error}=await sb.rpc('ct_finance_restrictions_list',{p_pin:pin});
@@ -472,7 +492,7 @@ function restRender(){
  }
  reportRender();
 }
-async function changeRelease(r,newState,button){
+async function changeRelease(r,newState,button){if(!finCan('restricciones','edit'))return;
  const messageText=newState==='LIBERADA'?
    `¿Marcar el transporte ${r.transporte} como LIBERADO? Se retirará de Restricciones y del reporte.`:
    `¿Marcar el transporte ${r.transporte} como LIBERADO CON APROBACIÓN? Permanecerá en Restricciones, pero saldrá del reporte.`;
@@ -542,7 +562,7 @@ const docsMeses=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOST
 function docsDefaults(){const f=$('docsForm');f.elements.nombre_cd.value='GIRARDOTA';f.elements.regional.value='ANDES';const parts=new Intl.DateTimeFormat('en-US',{month:'numeric',timeZone:'America/Bogota'}).format(new Date());f.elements.mes.value=docsMeses[Number(parts)-1]||'ENERO';}
 docsDefaults();
 function docsDate(v){if(!v)return '';const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v));return m?`${m[3]}/${m[2]}/${m[1]}`:String(v)}
-async function docsLoad(){if(!pin)return;docsMessage('Consultando documentos...');const {data,error}=await sb.rpc('ct_finance_lost_docs_list',{p_pin:pin});if(error){docsMessage('No se pudo consultar: '+error.message,true);return}docsRecords=Array.isArray(data)?data:[];docsRender();docsMessage('Datos actualizados')}
+async function docsLoad(){if(!finCan('documentos','view'))return;if(!pin)return;docsMessage('Consultando documentos...');const {data,error}=await sb.rpc('ct_finance_lost_docs_list',{p_pin:pin});if(error){docsMessage('No se pudo consultar: '+error.message,true);return}docsRecords=Array.isArray(data)?data:[];docsRender();docsMessage('Datos actualizados')}
 function docsRender(){const body=$('docsRows');body.replaceChildren();$('docsCount').textContent=docsRecords.length+' documentos';for(const r of docsRecords){const tr=document.createElement('tr');for(const key of docsFields){const td=document.createElement('td');td.textContent=key==='fecha_liquidacion'?docsDate(r[key]):String(r[key]??'');tr.append(td)}const td=document.createElement('td');const b=document.createElement('button');b.className='danger';b.textContent='Eliminar';b.type='button';b.onclick=async()=>{if(!confirm('¿Eliminar este documento extraviado?'))return;b.disabled=true;const {error}=await sb.rpc('ct_finance_lost_docs_delete',{p_pin:pin,p_id:r.id});if(error){docsMessage(error.message,true);b.disabled=false;return}await docsLoad()};td.append(b);tr.append(td);body.append(tr)}}
 $('docsRefresh').onclick=docsLoad;
 // Placas de Documentos Extraviados: mostrar y conservar siempre un único prefijo CO.
