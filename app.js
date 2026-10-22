@@ -768,15 +768,15 @@ let ctUnloadedReady=false;
 
 let checkinHasExported=false;
 function checkinKey(row){return (row.is_online||Number(row.transport_id)<0?'online:':'normal:')+String(row.is_online ? -1000000-Number(row.transport_id) : row.transport_id);}
-// CHECKIN v5.59: una unica clasificacion gobierna las tres tablas.
-const CT_CHECKIN_BUILD='5.59-20261022';
+// CHECKIN v5.60: Acción define Cierre; Descargado define Vehículos descargados independientemente.
+const CT_CHECKIN_BUILD='5.60-20261022';
 function ctHasUnloadYes(r){
  const key=checkinKey(r);
  const saved=ctUnloadedMap.get(key);
  // La tabla almacena solo los registros marcados como SI.
  return !!saved;
 }
-function ctCheckinCompleted(r){return String(r.checkin_estado||'').trim().toLocaleLowerCase('es')==='realizado'&&ctHasUnloadYes(r);}
+function ctCheckinCompleted(r){return String(r.checkin_estado||'').trim().toLocaleLowerCase('es')==='realizado';}
 function ctCheckinAvailableRows(){return checkinRecords.filter(r=>!checkinClosedArchive.has(checkinKey(r)));}
 function ctCheckinPartitions(){
  const all=ctCheckinAvailableRows(),pending=[],done=[];
@@ -859,12 +859,12 @@ function ctPendingUnloadRows(){return ctCheckinPartitions().pending;}
 function ctRenderUnloadedPanel(allRows){
  // El mismo filtro aplicado en Pendientes se utiliza para los tres indicadores.
  const visible=ctFilteredCheckinRows(allRows);
- const unloaded=visible.filter(ctCheckinCompleted);
+ const unloaded=visible.filter(ctHasUnloadYes);
  const setText=(id,n)=>{const el=$(id);if(el)el.textContent=String(n)};
  setText('ctTotalToUnload',visible.length);
  setText('ctTotalUnloaded',unloaded.length);
  setText('ctTotalAwaiting',visible.length-unloaded.length);
- const body=$('ctCheckinUnloadedRows');if(body)body.innerHTML=unloaded.map(r=>`<tr><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td>${esc(r.placa_fisica||'—')}</td></tr>`).join('')||'<tr><td colspan="4">Sin vehículos con Acción = Realizado y Descargado = Sí.</td></tr>';
+ const body=$('ctCheckinUnloadedRows');if(body)body.innerHTML=unloaded.map(r=>`<tr><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td>${esc(r.placa_fisica||'—')}</td></tr>`).join('')||'<tr><td colspan="4">Sin vehículos descargados (Descargado = Sí).</td></tr>';
 }
 async function saveCheckinUnloaded(id,value){
  const allowed=canModule('checkin','edit')&&(permissions.is_admin||permissions.can_manage_checkin);
@@ -873,7 +873,7 @@ async function saveCheckinUnloaded(id,value){
  if(!ctUnloadedReady){toast('Primero instala el SQL de Vehículos descargados en Supabase.');await refreshCheckin();return;}
  const r=checkinRecords.find(x=>String(x.transport_id)===String(id));if(!r)return;
  const {error}=await sb.rpc('ct_checkin_unloaded_set_secure',{p_pin:loginPin,p_trip_key:checkinKey(r),p_descargado:value==='si',p_transporte:String(r.transporte||''),p_viaje:String(r.viaje||''),p_placa:String(r.placa||''),p_placa_fisica:String(r.placa_fisica||'')});
- if(error)toast('No se pudo guardar Descargado: '+error.message);else toast(value==='si'?'Descargado = Sí guardado. Pasará al Cierre cuando Acción también sea Realizado.':'Descargado = No guardado.');
+ if(error)toast('No se pudo guardar Descargado: '+error.message);else toast(value==='si'?'Descargado = Sí guardado. Aparece en Vehículos descargados.':'Descargado = No guardado.');
  await refreshCheckin();
 }
 const ctCheckinFilterIds=['ctFTransporte','ctFViaje','ctFPlaca','ctFPlacaFisica','ctFClase','ctFEstado','ctFNovedad','ctFDescargado','ctFPorteria'];
@@ -963,7 +963,7 @@ function renderCheckin(){
  if(closurePanel)closurePanel.classList.toggle('hidden',checkinView!=='closed');
  if(checkinView==='unloaded')return;
  if(checkinView==='closed'){
-  const body=$('ctCheckinClosureRows');if(body)body.innerHTML=closed.map(r=>`<tr><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td>${esc(r.placa)}</td><td>${esc(r.placa_fisica||'—')}</td></tr>`).join('')||'<tr><td colspan="4">Sin vehículos con Acción = Realizado y Descargado = Sí.</td></tr>';
+  const body=$('ctCheckinClosureRows');if(body)body.innerHTML=closed.map(r=>`<tr><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td>${esc(r.placa)}</td><td>${esc(r.placa_fisica||'—')}</td></tr>`).join('')||'<tr><td colspan="4">Sin vehículos con Acción = Realizado.</td></tr>';
   $('ctCheckinClosureCount').textContent=closed.length+' transportes para cierre';return;
  }
  ctUpdateMultiOptions(allRows);
