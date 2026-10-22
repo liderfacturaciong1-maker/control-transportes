@@ -858,20 +858,53 @@ async function saveCheckinUnloaded(id,value){
  await refreshCheckin();
 }
 const ctCheckinFilterIds=['ctFTransporte','ctFViaje','ctFPlaca','ctFPlacaFisica','ctFClase','ctFEstado','ctFNovedad','ctFDescargado','ctFPorteria'];
+const ctMultiSelections=Object.fromEntries(ctCheckinFilterIds.map(id=>[id,new Set()]));
+const ctMultiOptionsCache=new Map();
 function ctNormalizedFilter(value){return String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();}
-function ctFilteredCheckinRows(open){
- const v=id=>ctNormalizedFilter($(id)?.value);
- const values={transporte:v('ctFTransporte'),viaje:v('ctFViaje'),placa:v('ctFPlaca'),fisica:v('ctFPlacaFisica'),clase:v('ctFClase'),estado:v('ctFEstado'),novedad:v('ctFNovedad'),descargado:v('ctFDescargado'),porteria:v('ctFPorteria')};
- return open.filter(r=>{
-  const includes=(value,filter)=>!filter||ctNormalizedFilter(value).includes(filter);
-  const unloaded=ctUnloadedMap.has(checkinKey(r))?'SI':'NO';
-  const clase=r.is_online||Number(r.transport_id)<0?'En línea':'Preventa';
-  return includes(r.transporte,values.transporte)&&includes(r.viaje,values.viaje)&&includes(r.placa,values.placa)&&includes(r.placa_fisica,values.fisica)&&includes(clase,values.clase)&&includes(r.checkin_estado,values.estado)&&includes(r.checkin_novedad,values.novedad)&&includes(unloaded,values.descargado)&&includes(getPorteriaStatus(r.transporte),values.porteria);
- });
+function ctCheckinFieldValue(r,id){
+ switch(id){
+  case 'ctFTransporte':return String(r.transporte??'');
+  case 'ctFViaje':return String(r.viaje??'');
+  case 'ctFPlaca':return String(r.placa??'');
+  case 'ctFPlacaFisica':return String(r.placa_fisica??'');
+  case 'ctFClase':return r.is_online||Number(r.transport_id)<0?'En línea':'Preventa';
+  case 'ctFEstado':return String(r.checkin_estado??'');
+  case 'ctFNovedad':return String(r.checkin_novedad??'');
+  case 'ctFDescargado':return ctUnloadedMap.has(checkinKey(r))?'Sí':'No';
+  case 'ctFPorteria':return String(getPorteriaStatus(r.transporte)||'Sin datos');
+ }
+ return '';
+}
+function ctFilteredCheckinRows(open){return open.filter(r=>ctCheckinFilterIds.every(id=>{
+ const selected=ctMultiSelections[id];return !selected.size||selected.has(ctNormalizedFilter(ctCheckinFieldValue(r,id)));
+}));}
+function ctMultiCaption(id){
+ const box=$(id);if(!box)return;const count=ctMultiSelections[id].size;
+ const cap=box.querySelector('.ctMultiCaption');if(cap)cap.textContent=count===0?'Todos':count===1?[...ctMultiSelections[id]][0]:`${count} seleccionados`;
+}
+function ctUpdateMultiOptions(rows){
+ for(const id of ctCheckinFilterIds){
+  const box=$(id);if(!box)continue;
+  const values=[...new Map(rows.map(r=>{const raw=ctCheckinFieldValue(r,id).trim()||'(Vacío)';return [ctNormalizedFilter(raw),raw]})).entries()].sort((a,b)=>a[1].localeCompare(b[1],'es',{numeric:true}));
+  const signature=JSON.stringify(values);if(ctMultiOptionsCache.get(id)===signature){ctMultiCaption(id);continue;}
+  ctMultiOptionsCache.set(id,signature);
+  const options=box.querySelector('.ctMultiOptions');
+  options.innerHTML=values.map(([normalized,label])=>`<label class="ctMultiOption"><input type="checkbox" value="${esc(normalized)}" ${ctMultiSelections[id].has(normalized)?'checked':''}><span>${esc(label)}</span></label>`).join('')||'<span class="ctMultiEmpty">Sin opciones</span>';
+  const search=box.querySelector('.ctMultiSearch');if(search?.value){const needle=ctNormalizedFilter(search.value);options.querySelectorAll('.ctMultiOption').forEach(option=>{option.hidden=!ctNormalizedFilter(option.textContent).includes(needle)});}
+  ctMultiCaption(id);
+ }
 }
 function ctSetupCheckinFilters(){
- for(const id of ctCheckinFilterIds){const el=$(id);if(el)el.addEventListener(el.tagName==='SELECT'?'change':'input',()=>{if(checkinView==='pending')renderCheckin()});}
- $('ctCheckinFiltersClear')?.addEventListener('click',()=>{for(const id of ctCheckinFilterIds){if($(id))$(id).value='';}renderCheckin();});
+ for(const id of ctCheckinFilterIds){
+  const box=$(id);if(!box)continue;
+  box.addEventListener('toggle',()=>{if(box.open)document.querySelectorAll('.ctMultiSelect[open]').forEach(other=>{if(other!==box)other.open=false;});});
+  box.querySelector('.ctMultiSearch')?.addEventListener('input',e=>{const needle=ctNormalizedFilter(e.target.value);box.querySelectorAll('.ctMultiOption').forEach(option=>option.hidden=!ctNormalizedFilter(option.textContent).includes(needle));});
+  box.querySelector('.ctMultiOptions')?.addEventListener('change',e=>{if(!e.target.matches('input[type="checkbox"]'))return;const value=e.target.value;if(e.target.checked)ctMultiSelections[id].add(value);else ctMultiSelections[id].delete(value);ctMultiCaption(id);if(checkinView==='pending')renderCheckin();});
+  box.querySelector('.ctMultiAll')?.addEventListener('click',()=>{box.querySelectorAll('.ctMultiOption:not([hidden]) input').forEach(input=>{input.checked=true;ctMultiSelections[id].add(input.value)});ctMultiCaption(id);renderCheckin();});
+  box.querySelector('.ctMultiNone')?.addEventListener('click',()=>{ctMultiSelections[id].clear();box.querySelectorAll('.ctMultiOption input').forEach(input=>input.checked=false);ctMultiCaption(id);renderCheckin();});
+ }
+ document.addEventListener('click',e=>{if(!e.target.closest('.ctMultiSelect'))document.querySelectorAll('.ctMultiSelect[open]').forEach(box=>box.open=false);});
+ $('ctCheckinFiltersClear')?.addEventListener('click',()=>{for(const id of ctCheckinFilterIds){ctMultiSelections[id].clear();const box=$(id);box?.querySelectorAll('.ctMultiOption input').forEach(input=>input.checked=false);if(box){box.open=false;const search=box.querySelector('.ctMultiSearch');if(search){search.value='';box.querySelectorAll('.ctMultiOption').forEach(option=>option.hidden=false)}}ctMultiCaption(id);}renderCheckin();});
 }
 function renderCheckin(){
  const rows=$('checkinRows');if(!rows)return;
@@ -890,6 +923,7 @@ function renderCheckin(){
   const body=$('ctCheckinClosureRows');if(body)body.innerHTML=closed.map(r=>`<tr><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td>${esc(r.placa)}</td><td>${esc(r.placa_fisica||'')}</td><td>${r.is_online||Number(r.transport_id)<0?'En línea':'Preventa'}</td><td>Realizado</td><td>${esc(r.checkin_novedad||'')}</td></tr>`).join('')||'<tr><td colspan="7">No hay transportes realizados pendientes de cierre.</td></tr>';
   $('ctCheckinClosureCount').textContent=closed.length+' transportes para cierre';return;
  }
+ ctUpdateMultiOptions(open);
  const filteredOpen=ctFilteredCheckinRows(open);if($('ctCheckinFilterCount'))$('ctCheckinFilterCount').textContent=`${filteredOpen.length} de ${open.length} transportes visibles`;
  rows.innerHTML=filteredOpen.map(r=>{const sel=String(selectedCheckinId)===String(r.transport_id);const canEdit=canModule('checkin','edit')&&(permissions.is_admin||permissions.can_manage_checkin);const cls=r.checkin_estado==='Pendiente'?'status-pendiente':'status-novedad';const beesStatus=getBeesStatus(r.transporte);const porteriaStatus=getPorteriaStatus(r.transporte);const beesClass=beesStatus==='REALIZADO'?'beesMatch':beesStatus==='N/A'?'beesMissing':'';
  return `<tr class="${sel?'checkinSelected':''}"><td><button type="button" class="${sel?'selectedTransportBtn':'secondary'}" onclick="selectCheckin(${r.transport_id})">${sel?'✓ Seleccionado':'Seleccionar'}</button></td><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td><input class="checkinPhysicalPlate" value="${esc(r.placa_fisica||'')}" readonly aria-label="Placa Física" /></td><td><span class="checkinLoadClass ${r.is_online||Number(r.transport_id)<0?'checkinLoadOnline':'checkinLoadPreventa'}">${r.is_online||Number(r.transport_id)<0?'En línea':'Preventa'}</span></td><td><select class="checkinStatus ${cls}" ${(!sel||!canEdit)?'disabled':''} onchange="saveCheckin(${r.transport_id},this.value,null)"><option value="Pendiente" ${r.checkin_estado==='Pendiente'?'selected':''}>Pendiente</option><option value="Realizado">Realizado</option><option value="Con novedad" ${r.checkin_estado==='Con novedad'?'selected':''}>Con novedad</option></select></td><td><input class="checkinNovelty" value="${esc(r.checkin_novedad||'')}" placeholder="Escribir novedad…" ${(!sel||!canEdit)?'disabled':''} onchange="saveCheckin(${r.transport_id},null,this.value)" /></td><td><select aria-label="Descargado para transporte ${esc(r.transporte)}" class="ctUnloadChoice ${ctUnloadedMap.has(checkinKey(r))?'yes': 'no'}" ${(!sel||!canEdit||!ctUnloadedReady)?'disabled':''} onchange="saveCheckinUnloaded(${r.transport_id},this.value)"><option value="no" ${!ctUnloadedMap.has(checkinKey(r))?'selected':''}>No</option><option value="si" ${ctUnloadedMap.has(checkinKey(r))?'selected':''}>Sí</option></select></td><td><span class="beesBadge ${beesClass}">${beesStatus}</span></td><td><span class="porteriaBadge ${porteriaStatus==='Con salida'?'porteriaYes':porteriaStatus==='Sin salida'?'porteriaNo':'porteriaUnknown'}">${porteriaStatus}</span></td></tr>`}).join('')||'<tr><td colspan="11">No se encontraron transportes con los filtros actuales.</td></tr>';
