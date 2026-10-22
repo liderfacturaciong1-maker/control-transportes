@@ -763,10 +763,13 @@ activeModule=module;const cargo=module==="main"||module==="tapa",main=module==="
 let checkinRecords=[];
 let checkinClosedArchive=new Set();
 let checkinView='pending';
+let ctUnloadedMap=new Map();
+let ctUnloadedReady=false;
+
 let checkinHasExported=false;
 function checkinKey(row){return (row.is_online||Number(row.transport_id)<0?'online:':'normal:')+String(row.is_online ? -1000000-Number(row.transport_id) : row.transport_id);}
 function checkinClosedRows(){return checkinRecords.filter(r=>r.checkin_estado==='Realizado'&&!checkinClosedArchive.has(checkinKey(r)));}
-function showCheckinView(view){checkinView=view==='closed'?'closed':'pending';renderCheckin();}
+function showCheckinView(view){checkinView=['closed','unloaded'].includes(view)?view:'pending';renderCheckin();}
 function dateStamp(){const fmt=new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});return fmt.format(new Date());}
 function downloadCheckinClosure(){
  const data=checkinClosedRows();
@@ -835,23 +838,44 @@ async function refreshCheckin(){if(!sb||!loginPin)return;await loadOnlineTrips()
 checkinRecords=[...(data||[]),...onlineLoaded];
 const archived=await sb.rpc('ct_checkin_closed_list_secure',{p_pin:loginPin});
 if(!archived.error)checkinClosedArchive=new Set((archived.data||[]).map(x=>String(x.trip_key)));
+try{const unloaded=await sb.rpc('ct_checkin_unloaded_list_secure',{p_pin:loginPin});if(unloaded.error){ctUnloadedReady=false;console.warn('[Descargados] Instala el archivo SQL:',unloaded.error.message);}else{ctUnloadedMap=new Map((unloaded.data||[]).map(r=>[r.trip_key,r]));ctUnloadedReady=true;}}catch(e){ctUnloadedReady=false;console.warn('[Descargados]',e);}
 renderCheckin()}
+function ctPendingUnloadRows(){return checkinRecords.filter(r=>r.checkin_estado!=='Realizado'&&!checkinClosedArchive.has(checkinKey(r)));}
+function ctRenderUnloadedPanel(open){
+ const unloaded=open.filter(r=>ctUnloadedMap.has(checkinKey(r)));
+ const setText=(id,n)=>{const el=$(id);if(el)el.textContent=String(n)};
+ setText('ctTotalToUnload',open.length);setText('ctTotalUnloaded',unloaded.length);setText('ctTotalAwaiting',open.length-unloaded.length);
+ const body=$('ctCheckinUnloadedRows');if(body)body.innerHTML=unloaded.map(r=>`<tr><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td>${esc(r.placa_fisica||'—')}</td></tr>`).join('')||'<tr><td colspan="4">Aún no hay vehículos marcados como descargados.</td></tr>';
+}
+async function saveCheckinUnloaded(id,value){
+ const allowed=canModule('checkin','edit')&&(permissions.is_admin||permissions.can_manage_checkin);
+ if(!allowed){toast('No tienes permiso para modificar CHECKIN.');await refreshCheckin();return;}
+ if(String(selectedCheckinId)!==String(id)){toast('Primero selecciona el transporte.');await refreshCheckin();return;}
+ if(!ctUnloadedReady){toast('Primero instala el SQL de Vehículos descargados en Supabase.');await refreshCheckin();return;}
+ const r=checkinRecords.find(x=>String(x.transport_id)===String(id));if(!r)return;
+ const {error}=await sb.rpc('ct_checkin_unloaded_set_secure',{p_pin:loginPin,p_trip_key:checkinKey(r),p_descargado:value==='si',p_transporte:String(r.transporte||''),p_viaje:String(r.viaje||''),p_placa:String(r.placa||''),p_placa_fisica:String(r.placa_fisica||'')});
+ if(error)toast('No se pudo guardar Descargado: '+error.message);else toast(value==='si'?'Vehículo registrado como descargado.':'Vehículo marcado como no descargado.');
+ await refreshCheckin();
+}
 function renderCheckin(){
  const rows=$('checkinRows');if(!rows)return;
- const open=checkinRecords.filter(r=>r.checkin_estado!=='Realizado'&&!checkinClosedArchive.has(checkinKey(r)));
+ const open=ctPendingUnloadRows();
  const closed=checkinClosedRows();const total=open.length+closed.length;
  const stats=$('ctCheckinStats');if(stats)stats.innerHTML=`<div class="ctCheckinNotebook"><span>📘</span><b>${total}</b><small>Total pendientes por CHECKIN</small></div><div class="ctCheckinNotebook"><span>📘</span><b>${closed.length}</b><small>Realizados</small></div><div class="ctCheckinNotebook red"><span>📕</span><b>${open.length}</b><small>Pendientes</small></div>`;
  const pendingBtn=$('ctCheckinPendingTab'),closedBtn=$('ctCheckinClosedTab');
- pendingBtn?.classList.toggle('active',checkinView==='pending');closedBtn?.classList.toggle('active',checkinView==='closed');
+ pendingBtn?.classList.toggle('active',checkinView==='pending');closedBtn?.classList.toggle('active',checkinView==='closed');$('ctCheckinUnloadedTab')?.classList.toggle('active',checkinView==='unloaded');
+ ctRenderUnloadedPanel(open);
+ const unloadedPanel=$('ctCheckinUnloadedPanel');if(unloadedPanel)unloadedPanel.classList.toggle('hidden',checkinView!=='unloaded');
  const standardPanel=$('ctCheckinStandardPanel'),closurePanel=$('ctCheckinClosurePanel');
  if(standardPanel)standardPanel.classList.toggle('hidden',checkinView!=='pending');
  if(closurePanel)closurePanel.classList.toggle('hidden',checkinView!=='closed');
+ if(checkinView==='unloaded')return;
  if(checkinView==='closed'){
   const body=$('ctCheckinClosureRows');if(body)body.innerHTML=closed.map(r=>`<tr><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td>${esc(r.placa)}</td><td>${esc(r.placa_fisica||'')}</td><td>${r.is_online||Number(r.transport_id)<0?'En línea':'Preventa'}</td><td>Realizado</td><td>${esc(r.checkin_novedad||'')}</td></tr>`).join('')||'<tr><td colspan="7">No hay transportes realizados pendientes de cierre.</td></tr>';
   $('ctCheckinClosureCount').textContent=closed.length+' transportes para cierre';return;
  }
  rows.innerHTML=open.map(r=>{const sel=String(selectedCheckinId)===String(r.transport_id);const canEdit=canModule('checkin','edit')&&(permissions.is_admin||permissions.can_manage_checkin);const cls=r.checkin_estado==='Pendiente'?'status-pendiente':'status-novedad';const beesStatus=getBeesStatus(r.transporte);const porteriaStatus=getPorteriaStatus(r.transporte);const beesClass=beesStatus==='REALIZADO'?'beesMatch':beesStatus==='N/A'?'beesMissing':'';
- return `<tr class="${sel?'checkinSelected':''}"><td><button type="button" class="${sel?'selectedTransportBtn':'secondary'}" onclick="selectCheckin(${r.transport_id})">${sel?'✓ Seleccionado':'Seleccionar'}</button></td><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td><input class="checkinPhysicalPlate" value="${esc(r.placa_fisica||'')}" readonly aria-label="Placa Física" /></td><td><span class="checkinLoadClass ${r.is_online||Number(r.transport_id)<0?'checkinLoadOnline':'checkinLoadPreventa'}">${r.is_online||Number(r.transport_id)<0?'En línea':'Preventa'}</span></td><td><select class="checkinStatus ${cls}" ${(!sel||!canEdit)?'disabled':''} onchange="saveCheckin(${r.transport_id},this.value,null)"><option value="Pendiente" ${r.checkin_estado==='Pendiente'?'selected':''}>Pendiente</option><option value="Realizado">Realizado</option><option value="Con novedad" ${r.checkin_estado==='Con novedad'?'selected':''}>Con novedad</option></select></td><td><input class="checkinNovelty" value="${esc(r.checkin_novedad||'')}" placeholder="Escribir novedad…" ${(!sel||!canEdit)?'disabled':''} onchange="saveCheckin(${r.transport_id},null,this.value)" /></td><td><span class="beesBadge ${beesClass}">${beesStatus}</span></td><td><span class="porteriaBadge ${porteriaStatus==='Con salida'?'porteriaYes':porteriaStatus==='Sin salida'?'porteriaNo':'porteriaUnknown'}">${porteriaStatus}</span></td></tr>`}).join('')||'<tr><td colspan="10">No hay transportes pendientes de CHECKIN.</td></tr>';
+ return `<tr class="${sel?'checkinSelected':''}"><td><button type="button" class="${sel?'selectedTransportBtn':'secondary'}" onclick="selectCheckin(${r.transport_id})">${sel?'✓ Seleccionado':'Seleccionar'}</button></td><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td><input class="checkinPhysicalPlate" value="${esc(r.placa_fisica||'')}" readonly aria-label="Placa Física" /></td><td><span class="checkinLoadClass ${r.is_online||Number(r.transport_id)<0?'checkinLoadOnline':'checkinLoadPreventa'}">${r.is_online||Number(r.transport_id)<0?'En línea':'Preventa'}</span></td><td><select class="checkinStatus ${cls}" ${(!sel||!canEdit)?'disabled':''} onchange="saveCheckin(${r.transport_id},this.value,null)"><option value="Pendiente" ${r.checkin_estado==='Pendiente'?'selected':''}>Pendiente</option><option value="Realizado">Realizado</option><option value="Con novedad" ${r.checkin_estado==='Con novedad'?'selected':''}>Con novedad</option></select></td><td><input class="checkinNovelty" value="${esc(r.checkin_novedad||'')}" placeholder="Escribir novedad…" ${(!sel||!canEdit)?'disabled':''} onchange="saveCheckin(${r.transport_id},null,this.value)" /></td><td><select aria-label="Descargado para transporte ${esc(r.transporte)}" class="ctUnloadChoice ${ctUnloadedMap.has(checkinKey(r))?'yes': 'no'}" ${(!sel||!canEdit||!ctUnloadedReady)?'disabled':''} onchange="saveCheckinUnloaded(${r.transport_id},this.value)"><option value="no" ${!ctUnloadedMap.has(checkinKey(r))?'selected':''}>No</option><option value="si" ${ctUnloadedMap.has(checkinKey(r))?'selected':''}>Sí</option></select></td><td><span class="beesBadge ${beesClass}">${beesStatus}</span></td><td><span class="porteriaBadge ${porteriaStatus==='Con salida'?'porteriaYes':porteriaStatus==='Sin salida'?'porteriaNo':'porteriaUnknown'}">${porteriaStatus}</span></td></tr>`}).join('')||'<tr><td colspan="11">No hay transportes pendientes de CHECKIN.</td></tr>';
 }
 function selectCheckin(id){selectedCheckinId=String(selectedCheckinId)===String(id)?null:String(id);const r=checkinRecords.find(x=>String(x.transport_id)===String(id));toast(selectedCheckinId?`Seleccionado: ${r?.transporte||""} · Viaje ${r?.viaje||""}`:"Selección cancelada");renderCheckin()}
 async function saveCheckin(id,status,novelty){if(!canModule("checkin","edit")){toast("Sin permiso de modificación en el módulo.");return}if(String(selectedCheckinId)!==String(id)){toast("Primero selecciona el transporte.");await refreshCheckin();return}if(!(permissions.is_admin||permissions.can_manage_checkin)){toast("No tienes permiso para modificar Checkin.");await refreshCheckin();return}const r=checkinRecords.find(x=>String(x.transport_id)===String(id));const isOnline=Number(id)<0;
