@@ -876,7 +876,7 @@ function normalizePorteriaHour(value){
 function getPorteriaStatus(transporte){
  if(porteriaTransportes===null)return 'Sin datos';
  const value=porteriaTransportes.get(normalizeTransport(transporte));
- return value===true?'Con salida':value===false?'Sin salida':'Sin datos';
+ return value===true?'Con salida':value===false?'Sin salida':'Sin datos'; // Sin datos = transporte ausente o hora vacía/no interpretable.
 }
 async function loadPorteriaExcel(){if(!canModule("checkin","edit")){toast("Sin permiso de modificación en el módulo.");return}
  const file=$("porteriaExcelFile")?.files?.[0];
@@ -910,9 +910,12 @@ async function loadPorteriaExcel(){if(!canModule("checkin","edit")){toast("Sin p
    await CTShared.save('porteria',file.name,[...ids].map(([transporte,salida])=>({transporte,salida})),{source_rows:rows.length,columna_h:'Hora Sal'});
    porteriaTransportes=ids;
    const coincidencias=checkinRecords.filter(r=>ids.has(normalizeTransport(r.transporte))).length;
+   const cargos=records.filter(r=>!r.is_online);
+   const cargoCoinciden=cargos.filter(r=>ids.has(normalizeTransport(r.transporte))).length;
+   const cargoNoEncontrados=cargos.length-cargoCoinciden;
    const salidas=[...ids.values()].filter(v=>v===true).length;
    const sinSalida=[...ids.values()].filter(v=>v===false).length;
-   $('porteriaSummary').textContent=`Archivo: ${file.name} · ${rows.length.toLocaleString('es-CO')} registros · ${ids.size.toLocaleString('es-CO')} transportes únicos · ${salidas} con salida · ${sinSalida} sin salida · ${coincidencias} coincidencias en CHECKIN. Cruce guardado en Supabase.`;
+   $('porteriaSummary').textContent=`Archivo: ${file.name} · ${rows.length.toLocaleString('es-CO')} registros · ${ids.size.toLocaleString('es-CO')} transportes únicos · ${salidas} con salida · ${sinSalida} sin salida · ${coincidencias} coincidencias en CHECKIN · ${cargoCoinciden} de ${cargos.length} transportes de Cargue y Despacho encontrados · ${cargoNoEncontrados} no encontrados (SIN DATOS). Cruce guardado en Supabase.`;
    renderCheckin();render();toast("Salidas por Portería cargadas correctamente.");
  }catch(err){console.error(err);$("porteriaSummary").textContent="Error: "+err.message;toast("No se pudo procesar Portería: "+err.message)}
 }
@@ -988,7 +991,7 @@ async function loadSharedCheckin(){
    if(typeof item==='string')return [normalizeTransport(item),null]; // Archivo anterior sin horas: no asumir salida.
    return [normalizeTransport(item.transporte),item.salida===true?true:item.salida===false?false:null];
   }).filter(([id])=>Boolean(id))):null;
-  if(port)$('porteriaSummary').textContent=`Archivo compartido: ${port.filename} · ${port.items.length.toLocaleString('es-CO')} transportes · Actualizado: ${new Date(port.saved_at).toLocaleString('es-CO')}`;
+  if(port){const cargoAll=records.filter(r=>!r.is_online);const matched=cargoAll.filter(r=>porteriaTransportes.has(normalizeTransport(r.transporte))).length;$('porteriaSummary').textContent=`Archivo compartido: ${port.filename} · ${port.items.length.toLocaleString('es-CO')} transportes · ${matched} de ${cargoAll.length} transportes de Cargue y Despacho encontrados · ${cargoAll.length-matched} no encontrados (SIN DATOS) · Actualizado: ${new Date(port.saved_at).toLocaleString('es-CO')}`;}
   else $('porteriaSummary').textContent='Sin archivo de portería guardado. El cruce permanecerá hasta pulsar Limpiar cruce.';
   beesCsvRows=bees?.items||[];
   if(bees){$('beesReportSummary').textContent=`BEES compartido: ${bees.filename} · ${beesCsvRows.length.toLocaleString('es-CO')} registros · Actualizado: ${new Date(bees.saved_at).toLocaleString('es-CO')}`;renderBeesSavedComparison();}
