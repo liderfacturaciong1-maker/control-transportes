@@ -894,17 +894,41 @@ function ctUpdateMultiOptions(rows){
   ctMultiCaption(id);
  }
 }
+function ctRenderActiveChips(){
+ const target=$('ctActiveFilterChips');if(!target)return;
+ const labels={ctFTransporte:'Transporte',ctFViaje:'Viaje',ctFPlaca:'Placa',ctFPlacaFisica:'Placa física',ctFClase:'Clase',ctFEstado:'Estado',ctFNovedad:'Novedad',ctFDescargado:'Descargado',ctFPorteria:'Salida'};
+ const chips=ctCheckinFilterIds.flatMap(id=>[...ctMultiSelections[id]].map(v=>`<button type="button" class="ctFilterChip" data-filter="${id}" data-value="${esc(v)}" title="Quitar filtro">${esc(labels[id])}: ${esc(v)} <span aria-hidden="true">×</span></button>`));
+ target.innerHTML=chips.length?'<span class="ctChipsLabel">Filtros activos:</span>'+chips.join(''):'';
+ $('ctCheckinFilterActive').textContent=String(ctCheckinFilterIds.filter(id=>ctMultiSelections[id].size).length);
+}
 function ctSetupCheckinFilters(){
+ let current=null;
+ const dismiss=(box,restore)=>{
+  if(!box)return;const id=box.id;
+  if(restore&&box._beforeSelection){ctMultiSelections[id]=new Set(box._beforeSelection)}
+  box.open=false;box._beforeSelection=null;ctMultiCaption(id);
+  if(restore)renderCheckin();
+ };
  for(const id of ctCheckinFilterIds){
   const box=$(id);if(!box)continue;
-  box.addEventListener('toggle',()=>{if(box.open)document.querySelectorAll('.ctMultiSelect[open]').forEach(other=>{if(other!==box)other.open=false;});});
+  box.addEventListener('toggle',()=>{
+   if(box.open){
+    document.querySelectorAll('.ctMultiSelect[open]').forEach(other=>{if(other!==box)dismiss(other,true)});
+    box._beforeSelection=new Set(ctMultiSelections[id]);current=box;
+    box.querySelectorAll('.ctMultiOption input').forEach(input=>input.checked=ctMultiSelections[id].has(input.value));
+    const search=box.querySelector('.ctMultiSearch');if(search){search.value='';box.querySelectorAll('.ctMultiOption').forEach(option=>option.hidden=false)}
+   }else if(current===box)current=null;
+  });
   box.querySelector('.ctMultiSearch')?.addEventListener('input',e=>{const needle=ctNormalizedFilter(e.target.value);box.querySelectorAll('.ctMultiOption').forEach(option=>option.hidden=!ctNormalizedFilter(option.textContent).includes(needle));});
-  box.querySelector('.ctMultiOptions')?.addEventListener('change',e=>{if(!e.target.matches('input[type="checkbox"]'))return;const value=e.target.value;if(e.target.checked)ctMultiSelections[id].add(value);else ctMultiSelections[id].delete(value);ctMultiCaption(id);if(checkinView==='pending')renderCheckin();});
-  box.querySelector('.ctMultiAll')?.addEventListener('click',()=>{box.querySelectorAll('.ctMultiOption:not([hidden]) input').forEach(input=>{input.checked=true;ctMultiSelections[id].add(input.value)});ctMultiCaption(id);renderCheckin();});
-  box.querySelector('.ctMultiNone')?.addEventListener('click',()=>{ctMultiSelections[id].clear();box.querySelectorAll('.ctMultiOption input').forEach(input=>input.checked=false);ctMultiCaption(id);renderCheckin();});
+  box.querySelector('.ctMultiOptions')?.addEventListener('change',e=>{if(!e.target.matches('input[type="checkbox"]'))return;const value=e.target.value;if(e.target.checked)ctMultiSelections[id].add(value);else ctMultiSelections[id].delete(value);ctMultiCaption(id);});
+  box.querySelector('.ctMultiAll')?.addEventListener('click',()=>{box.querySelectorAll('.ctMultiOption:not([hidden]) input').forEach(input=>{input.checked=true;ctMultiSelections[id].add(input.value)});ctMultiCaption(id);});
+  box.querySelector('.ctMultiNone')?.addEventListener('click',()=>{ctMultiSelections[id].clear();box.querySelectorAll('.ctMultiOption input').forEach(input=>input.checked=false);ctMultiCaption(id);});
+  box.querySelector('.ctMultiCancel')?.addEventListener('click',()=>dismiss(box,true));
+  box.querySelector('.ctMultiApply')?.addEventListener('click',()=>{dismiss(box,false);renderCheckin();});
  }
- document.addEventListener('click',e=>{if(!e.target.closest('.ctMultiSelect'))document.querySelectorAll('.ctMultiSelect[open]').forEach(box=>box.open=false);});
- $('ctCheckinFiltersClear')?.addEventListener('click',()=>{for(const id of ctCheckinFilterIds){ctMultiSelections[id].clear();const box=$(id);box?.querySelectorAll('.ctMultiOption input').forEach(input=>input.checked=false);if(box){box.open=false;const search=box.querySelector('.ctMultiSearch');if(search){search.value='';box.querySelectorAll('.ctMultiOption').forEach(option=>option.hidden=false)}}ctMultiCaption(id);}renderCheckin();});
+ document.addEventListener('click',e=>{if(!e.target.closest('.ctMultiSelect'))document.querySelectorAll('.ctMultiSelect[open]').forEach(box=>dismiss(box,true));});
+ $('ctActiveFilterChips')?.addEventListener('click',e=>{const chip=e.target.closest('.ctFilterChip');if(!chip)return;ctMultiSelections[chip.dataset.filter]?.delete(chip.dataset.value);ctMultiOptionsCache.delete(chip.dataset.filter);renderCheckin()});
+ $('ctCheckinFiltersClear')?.addEventListener('click',()=>{for(const id of ctCheckinFilterIds){ctMultiSelections[id].clear();const box=$(id);if(box){box.open=false;box._beforeSelection=null;const search=box.querySelector('.ctMultiSearch');if(search)search.value='';box.querySelectorAll('.ctMultiOption').forEach(option=>option.hidden=false)}ctMultiOptionsCache.delete(id);ctMultiCaption(id);}renderCheckin();});
 }
 function renderCheckin(){
  const rows=$('checkinRows');if(!rows)return;
@@ -924,7 +948,7 @@ function renderCheckin(){
   $('ctCheckinClosureCount').textContent=closed.length+' transportes para cierre';return;
  }
  ctUpdateMultiOptions(open);
- const filteredOpen=ctFilteredCheckinRows(open);if($('ctCheckinFilterCount'))$('ctCheckinFilterCount').textContent=`${filteredOpen.length} de ${open.length} transportes visibles`;
+ const filteredOpen=ctFilteredCheckinRows(open);if($('ctCheckinFilterCount'))$('ctCheckinFilterCount').textContent=`${filteredOpen.length} de ${open.length} visibles`;if($('ctCheckinFilterTotal'))$('ctCheckinFilterTotal').textContent=String(open.length);if($('ctCheckinFilterVisible'))$('ctCheckinFilterVisible').textContent=String(filteredOpen.length);ctRenderActiveChips();
  rows.innerHTML=filteredOpen.map(r=>{const sel=String(selectedCheckinId)===String(r.transport_id);const canEdit=canModule('checkin','edit')&&(permissions.is_admin||permissions.can_manage_checkin);const cls=r.checkin_estado==='Pendiente'?'status-pendiente':'status-novedad';const beesStatus=getBeesStatus(r.transporte);const porteriaStatus=getPorteriaStatus(r.transporte);const beesClass=beesStatus==='REALIZADO'?'beesMatch':beesStatus==='N/A'?'beesMissing':'';
  return `<tr class="${sel?'checkinSelected':''}"><td><button type="button" class="${sel?'selectedTransportBtn':'secondary'}" onclick="selectCheckin(${r.transport_id})">${sel?'✓ Seleccionado':'Seleccionar'}</button></td><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td><input class="checkinPhysicalPlate" value="${esc(r.placa_fisica||'')}" readonly aria-label="Placa Física" /></td><td><span class="checkinLoadClass ${r.is_online||Number(r.transport_id)<0?'checkinLoadOnline':'checkinLoadPreventa'}">${r.is_online||Number(r.transport_id)<0?'En línea':'Preventa'}</span></td><td><select class="checkinStatus ${cls}" ${(!sel||!canEdit)?'disabled':''} onchange="saveCheckin(${r.transport_id},this.value,null)"><option value="Pendiente" ${r.checkin_estado==='Pendiente'?'selected':''}>Pendiente</option><option value="Realizado">Realizado</option><option value="Con novedad" ${r.checkin_estado==='Con novedad'?'selected':''}>Con novedad</option></select></td><td><input class="checkinNovelty" value="${esc(r.checkin_novedad||'')}" placeholder="Escribir novedad…" ${(!sel||!canEdit)?'disabled':''} onchange="saveCheckin(${r.transport_id},null,this.value)" /></td><td><select aria-label="Descargado para transporte ${esc(r.transporte)}" class="ctUnloadChoice ${ctUnloadedMap.has(checkinKey(r))?'yes': 'no'}" ${(!sel||!canEdit||!ctUnloadedReady)?'disabled':''} onchange="saveCheckinUnloaded(${r.transport_id},this.value)"><option value="no" ${!ctUnloadedMap.has(checkinKey(r))?'selected':''}>No</option><option value="si" ${ctUnloadedMap.has(checkinKey(r))?'selected':''}>Sí</option></select></td><td><span class="beesBadge ${beesClass}">${beesStatus}</span></td><td><span class="porteriaBadge ${porteriaStatus==='Con salida'?'porteriaYes':porteriaStatus==='Sin salida'?'porteriaNo':'porteriaUnknown'}">${porteriaStatus}</span></td></tr>`}).join('')||'<tr><td colspan="11">No se encontraron transportes con los filtros actuales.</td></tr>';
 }
