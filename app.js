@@ -406,12 +406,12 @@ function normalizePhysicalPlate(value){let v=String(value||"").toLocaleUpperCase
 function vehicleClass(v){return v==="Bodega"?"vehicle-bodega":v==="Sobredimensionado"?"vehicle-sobredimensionado":v==="OK para utilizar"?"vehicle-ok":""}
 async function saveVehicleField(id,field,value){if(!canModule("cargo","edit")){toast("Sin permiso de modificación en el módulo.");return}if(field==="cambio_placa")value=normalizePhysicalPlate(value);if(field==="cambio_placa"&&String(value).length>8){toast("Placa Fisica: máximo 8 caracteres.");await refresh();return}const{error}=await sb.rpc("update_transport_vehicle_field_secure",{p_transport_id:id,p_field:field,p_value:value,p_pin:loginPin});if(error){toast("No se pudo guardar: "+error.message);await refresh();return}const r=records.find(x=>Number(x.id)===Number(id));if(r)r[field]=value;toast(field==="estado_vehiculo"?"Disponibilidad De Vehiculos guardada.":"Placa Fisica guardada.")}
 setInterval(()=>{if(loginPin&&sb&&!document.hidden)ctFetchActions()},15000);document.addEventListener("visibilitychange",()=>{if(!document.hidden&&loginPin&&sb)void ctFetchActions()});
-const CT_ACTION_BUILD='5.49-20261022';
+const CT_ACTION_BUILD='5.50-20261022';
 const ctActionDefaults={armado:false,contado:false,cargado:false};let ctActionFlags={...ctActionDefaults},ctActionCanManage=false,ctActionsLoaded=false;
 function ctNextAction(estado){const order=['Armado','Contado','Cargado'];const index=estado==='Pendiente'?-1:order.indexOf(estado);if(index===-1&&estado!=='Pendiente')return null;return order.slice(index+1).find(x=>ctActionFlags[x.toLowerCase()])||null}
 function ctActionAllowed(next){return permissions.is_admin||(next==='Armado'?permissions.can_arm:next==='Contado'?permissions.can_count:permissions.can_load)}
 function ctActionLabel(next){return next==='Armado'?'Armar':next==='Contado'?'Contar':next==='Cargado'?'Cargar':'Sin acción'}
-function ctUpdateActionUI(){const marker=$('ctActionBuildMarker');if(marker)marker.textContent='Versión acciones '+CT_ACTION_BUILD+' · Supabase: '+(ctActionsLoaded?('Armado '+ctActionFlags.armado+' / Contado '+ctActionFlags.contado+' / Cargado '+ctActionFlags.cargado):'Sin conexión de configuración');const b=$('ctActionConfigure');if(b)b.classList.toggle('hidden',!ctActionCanManage);const summary=$('ctActionSummary');if(summary)summary.textContent='Acciones habilitadas: '+Object.entries(ctActionFlags).filter(([,v])=>v).map(([k])=>k[0].toUpperCase()+k.slice(1)).join(' · ')||'Sin acciones habilitadas';render()}
+function ctUpdateActionUI(){const marker=$('ctActionBuildMarker');if(marker)marker.textContent='DIAGNÓSTICO '+CT_ACTION_BUILD+' · Supabase: '+(ctActionsLoaded?('Armado '+ctActionFlags.armado+' / Contado '+ctActionFlags.contado+' / Cargado '+ctActionFlags.cargado):'Sin conexión de configuración');const b=$('ctActionConfigure');if(b)b.classList.toggle('hidden',!ctActionCanManage);const summary=$('ctActionSummary');if(summary)summary.textContent='Acciones habilitadas: '+Object.entries(ctActionFlags).filter(([,v])=>v).map(([k])=>k[0].toUpperCase()+k.slice(1)).join(' · ')||'Sin acciones habilitadas';render()}
 function ctBoolean(value){return value===true||value===1||String(value).trim().toLowerCase()==='true'||String(value).trim()==='1'}
 async function ctFetchActions(){
  if(!sb||!loginPin)return false;
@@ -427,9 +427,9 @@ async function ctFetchActions(){
   ctUpdateActionUI();
   return true;
  }catch(e){
-  console.warn('Acciones de Cargue:',e.message);
+  console.warn('Acciones de Cargue:',e.message);const marker=$('ctActionBuildMarker');if(marker)marker.textContent='DIAGNÓSTICO '+CT_ACTION_BUILD+' · ERROR SUPABASE: '+String(e.message||e);
   ctActionFlags={...ctActionDefaults};ctActionCanManage=false;ctActionsLoaded=false;
-  ctUpdateActionUI();
+  ctUpdateActionUI();const markerError=$('ctActionBuildMarker');if(markerError)markerError.textContent='DIAGNÓSTICO '+CT_ACTION_BUILD+' · ERROR SUPABASE: '+String(e.message||e);
   const summary=$('ctActionSummary');if(summary)summary.textContent='No se pudo leer la configuración de Supabase. Acciones temporalmente deshabilitadas.';
   return false;
  }
