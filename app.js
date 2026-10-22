@@ -468,9 +468,8 @@ async function ctOpenPermissionEditor(id){
  modules.querySelectorAll('input[data-mode="view"]').forEach(ch=>ch.addEventListener('change',()=>{if(!ch.checked)modules.querySelector('input[data-module="'+ch.dataset.module+'"][data-mode="edit"]').checked=false}));
  const vr=$('ctEditorValidaciones');vr.replaceChildren();
   const actionResult=await sb.rpc('ct_cargo_action_admin_user_rights',{p_admin_pin:loginPin,p_user_id:id});
- const actionUnavailable=!!actionResult.error;
- const actionLabel=document.createElement('label'),actionCheck=document.createElement('input');actionCheck.type='checkbox';actionCheck.id='ctManageCargoActions';actionCheck.checked=actionResult.data===true;actionCheck.disabled=actionUnavailable;actionLabel.append(actionCheck,document.createTextNode(' Puede configurar acciones globales de Cargue y Despacho'));$('ctEditorGeneral').append(actionLabel);
- if(actionUnavailable){const warning=document.createElement('p');warning.className='status error';warning.textContent='Permiso de acciones no disponible en Supabase: '+actionResult.error.message+'. Puedes editar los demás permisos; esta opción se habilitará cuando se corrija la función SQL.';$('ctEditorGeneral').append(warning);}
+ if(actionResult.error){toast('Permiso configuración de acciones: '+actionResult.error.message);return;}
+ const actionLabel=document.createElement('label'),actionCheck=document.createElement('input');actionCheck.type='checkbox';actionCheck.id='ctManageCargoActions';actionCheck.checked=actionResult.data===true;actionLabel.append(actionCheck,document.createTextNode(' Puede configurar acciones globales de Cargue y Despacho'));$('ctEditorGeneral').append(actionLabel);
  const vresult=await sb.rpc('ct_validaciones_admin_user_rights',{p_admin_pin:loginPin,p_user_id:id});
  if(vresult.error){toast('No se pudo consultar Validaciones Operación: '+vresult.error.message);return;}
  const vwrap=document.createElement('div');vwrap.className='ctEditorModule';
@@ -503,7 +502,7 @@ async function ctSaveUserRights(){
   const modules=await sb.rpc('admin_set_module_permissions',{p_admin_pin:loginPin,p_user_id:u.id,p_rights:rights});if(modules.error)throw Error('Permisos generales guardados, pero falló el acceso a módulos: '+modules.error.message);
   const financeRights={};for(const tab of Object.keys(ctFinanceTabs))for(const mode of ['view','edit'])financeRights[tab+'_'+mode]=$('ctEditorFinance').querySelector('[data-finance-tab="'+tab+'"][data-finance-mode="'+mode+'"]').checked;
   const fresult=await sb.rpc('ct_finance_admin_set_user_rights',{p_admin_pin:loginPin,p_user_id:u.id,p_rights:financeRights});if(fresult.error)throw Error('Permisos generales guardados, pero falló Liquidación Financiera: '+fresult.error.message);
-  if(!$('ctManageCargoActions').disabled){const aresult=await sb.rpc('ct_cargo_action_admin_set_user_rights',{p_admin_pin:loginPin,p_user_id:u.id,p_enabled:$('ctManageCargoActions').checked});if(aresult.error)throw Error('No se pudo guardar permiso para configurar acciones: '+aresult.error.message);}
+  const aresult=await sb.rpc('ct_cargo_action_admin_set_user_rights',{p_admin_pin:loginPin,p_user_id:u.id,p_enabled:$('ctManageCargoActions').checked});if(aresult.error)throw Error('No se pudo guardar permiso para configurar acciones: '+aresult.error.message);
   const vresult=await sb.rpc('ct_validaciones_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctValidacionesView').checked});if(vresult.error)throw Error('No se pudo guardar Validaciones Operación: '+vresult.error.message);
   $('ctEditorStatus').textContent='Permisos guardados correctamente';toast('Permisos actualizados');await loadUsers();
  }catch(e){$('ctEditorStatus').textContent='No se pudo completar: '+e.message;toast(e.message)}finally{btn.disabled=false}
