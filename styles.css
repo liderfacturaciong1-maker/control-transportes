@@ -973,3 +973,5 @@ select.tapaState:focus-visible{outline:3px solid #f59e0b!important;outline-offse
 .ctEditorModule>strong{font-size:14px}
 .ctEditorChecks input,.ctEditorModules input{width:16px;height:16px;accent-color:#147ab5}
 @media(max-width:760px){#usersPanel .userForm{grid-template-columns:1fr}#usersPanel .userForm .permissionGrid{grid-column:span 1}.ctEditorChecks{grid-template-columns:1fr}.ctEditorModule{grid-template-columns:1fr 1fr}.ctEditorModule>strong{grid-column:1/-1}}
+
+.ctActionToolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:14px 0}.ctActionSettings{display:flex;flex-wrap:wrap;align-items:center;gap:13px;padding:17px;border:1px solid #bcd9ed;border-radius:13px;background:#f0f8ff;margin:12px 0}.ctActionSettings.hidden{display:none!important}.ctActionSettings>strong,.ctActionSettings>p{flex-basis:100%;margin:0}.ctActionSettings label{display:inline-flex;gap:6px;align-items:center;font-weight:700}
