@@ -399,7 +399,7 @@ $("progress"+name+"Count").textContent=count;
 $("progress"+name+"Pct").textContent=pct(count)+"%";
 $("progress"+name+"Bar").style.width=pct(count)+"%";
 }
-$("rows").innerHTML=list.map(r=>{const has=String(r.novedad||"").trim()!=="";const ev=r.estado_vehiculo||"";const selected=String(selectedTransportId)===String(r.id);const canAvailability=canModule("cargo","edit")&&(permissions.is_admin||permissions.can_edit_availability);const canPlate=canModule("cargo","edit")&&(permissions.is_admin||permissions.can_edit_physical_plate);const nextAction=ctNextAction(r.estado);const canAction=canModule("cargo","edit")&&!!nextAction&&ctActionAllowed(nextAction);return `<tr class="${has?"hasNovelty ":""}${selected?"transportSelected":""}"><td>${`<button type="button" class="${selected?"selectedTransportBtn":"secondary selectTransportBtn"}" onclick="selectTransport(${r.id})">${selected?"✓ Seleccionado":"Seleccionar"}</button>`}</td><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td>${has?`<span class="novelty">${esc(r.novedad)}</span>`:"—"}</td><td><select class="vehicleState ${vehicleClass(ev)}" aria-label="Disponibilidad De Vehiculos para ${esc(r.placa)}" ${(r.is_online||!selected||!canAvailability)?"disabled":""} onchange="saveVehicleField(${r.id},'estado_vehiculo',this.value)"><option value="">Seleccionar...</option><option ${ev==="Bodega"?"selected":""}>Bodega</option><option ${ev==="Sobredimensionado"?"selected":""}>Sobredimensionado</option><option ${ev==="OK para utilizar"?"selected":""}>OK para utilizar</option></select></td><td><input class="plateChange" aria-label="Placa Fisica para ${esc(r.placa)}" ${(r.is_online||!selected||!canPlate)?"disabled":""} maxlength="8" value="${esc(r.cambio_placa||"")}" placeholder="Máx. 8 caracteres" onchange="this.value=normalizePhysicalPlate(this.value);saveVehicleField(${r.id},'cambio_placa',this.value)" oninput="this.value=normalizePhysicalPlate(this.value)"></td><td><span class="badge ${r.estado}">${esc(r.estado)}</span></td><td><button onclick="advance(${r.id})" ${(!selected||!canAction||r.estado==="Cargado")?"disabled":""}>${nextAction?ctActionLabel(nextAction):"—"}</button></td><td>${r.is_online?"<b style=\"color:#047857\">En línea</b>":"—"}</td><td><span class="porteriaBadge ${getPorteriaStatus(r.transporte)==="Salida"?"porteriaYes":getPorteriaStatus(r.transporte)==="Sin salida"?"porteriaNo":"porteriaUnknown"}">${getPorteriaStatus(r.transporte)}</span></td></tr>`}).join("")||'<tr><td colspan="11">No hay registros con estos filtros.</td></tr>';const selectedRecord=allRecords.find(r=>String(r.id)===String(selectedTransportId));if(selectedTransportId&&!selectedRecord)selectedTransportId=null}
+$("rows").innerHTML=list.map(r=>{const has=String(r.novedad||"").trim()!=="";const ev=r.estado_vehiculo||"";const selected=String(selectedTransportId)===String(r.id);const canAvailability=canModule("cargo","edit")&&(permissions.is_admin||permissions.can_edit_availability);const canPlate=canModule("cargo","edit")&&(permissions.is_admin||permissions.can_edit_physical_plate);const nextAction=ctNextAction(r.estado);const canAction=canModule("cargo","edit")&&!!nextAction&&ctActionAllowed(nextAction);return `<tr class="${has?"hasNovelty ":""}${selected?"transportSelected":""}"><td>${`<button type="button" class="${selected?"selectedTransportBtn":"secondary selectTransportBtn"}" onclick="selectTransport(${r.id})">${selected?"✓ Seleccionado":"Seleccionar"}</button>`}</td><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td>${has?`<span class="novelty">${esc(r.novedad)}</span>`:"—"}</td><td><select class="vehicleState ${vehicleClass(ev)}" aria-label="Disponibilidad De Vehiculos para ${esc(r.placa)}" ${(r.is_online||!selected||!canAvailability)?"disabled":""} onchange="saveVehicleField(${r.id},'estado_vehiculo',this.value)"><option value="">Seleccionar...</option><option ${ev==="Bodega"?"selected":""}>Bodega</option><option ${ev==="Sobredimensionado"?"selected":""}>Sobredimensionado</option><option ${ev==="OK para utilizar"?"selected":""}>OK para utilizar</option></select></td><td><input class="plateChange" aria-label="Placa Fisica para ${esc(r.placa)}" ${(r.is_online||!selected||!canPlate)?"disabled":""} maxlength="8" value="${esc(r.cambio_placa||"")}" placeholder="Máx. 8 caracteres" onchange="this.value=normalizePhysicalPlate(this.value);saveVehicleField(${r.id},'cambio_placa',this.value)" oninput="this.value=normalizePhysicalPlate(this.value)"></td><td><span class="badge ${r.estado}">${esc(r.estado)}</span></td><td><button onclick="advance(${r.id})" ${(!selected||!canAction||r.estado==="Cargado")?"disabled":""}>${nextAction?ctActionLabel(nextAction):"—"}</button></td><td>${r.is_online?"<b style=\"color:#047857\">En línea</b>":"—"}</td><td><span class="porteriaBadge ${getPorteriaStatus(r.transporte)==="Con salida"?"porteriaYes":getPorteriaStatus(r.transporte)==="Sin salida"?"porteriaNo":"porteriaUnknown"}">${getPorteriaStatus(r.transporte)}</span></td></tr>`}).join("")||'<tr><td colspan="11">No hay registros con estos filtros.</td></tr>';const selectedRecord=allRecords.find(r=>String(r.id)===String(selectedTransportId));if(selectedTransportId&&!selectedRecord)selectedTransportId=null}
 function selectTransport(id){selectedTransportId=String(selectedTransportId)===String(id)?null:String(id);const r=Number(id)<0?onlineTrips.find(x=>String(-1000000-x.id)===String(id)):records.find(x=>String(x.id)===String(id));toast(selectedTransportId?`Transporte seleccionado: ${r?.transporte||""} · Viaje ${r?.viaje||""}. Ya puedes modificar los campos permitidos.`:"Selección cancelada.");render()}
 function openStatChart(key){const visible=window.currentCargoAllStatusRecords||[];const total=visible.length;const config={total:{label:"Total",rows:visible,color:"#1769aa"},pendientes:{label:"Pendientes por cargar",rows:visible.filter(r=>r.estado!=="Cargado"),color:"#dc2626"},armados:{label:"Armados",rows:visible.filter(r=>r.estado==="Armado"),color:"#f97316"},contados:{label:"Contados",rows:visible.filter(r=>r.estado==="Contado"),color:"#2563eb"},cargados:{label:"Cargados",rows:visible.filter(r=>r.estado==="Cargado"),color:"#22c55e"},novedades:{label:"Con novedad",rows:visible.filter(r=>String(r.novedad||"").trim()!==""),color:"#ef4444"}};const item=config[key];if(!item)return;const count=item.rows.length,percent=total?Math.round(count*100/total):0;$("statChartTitle").textContent="Avance: "+item.label;$("statChartCount").textContent=count.toLocaleString("es-CO");$("statChartPercent").textContent=percent+"% de los registros filtrados";$("statChartFill").style.width=percent+"%";$("statChartFill").style.background=item.color;$("statChartTruck").style.left=`calc(${Math.min(percent,96)}% - 4px)`;$("statChartTruck").setAttribute("aria-label",`Camión en ${percent} por ciento`);$("statChartTotal").textContent=`Total filtrado: ${total.toLocaleString("es-CO")} transportes`;$("statChartVehicleHeading").textContent=`Transportes en categoría: ${count}`;$("statChartVehicles").innerHTML=count?item.rows.map(r=>`<div class="statVehicleRow"><span class="statVehicleName">${esc(String(r.transporte??"Sin nombre").trim())} - ${esc(String(r.placa??"Sin placa").trim())}</span></div>`).join(""):'<p class="statVehicleEmpty">No hay transportes en esta categoría.</p>';$("statChartModal").classList.remove("hidden");$("statChartClose").focus()}function closeStatChart(){$("statChartModal")?.classList.add("hidden")}
 function normalizePhysicalPlate(value){let v=String(value||"").toLocaleUpperCase("es").replace(/\s+/g,"");if(v&&!v.startsWith("CO"))v="CO"+v;return v.slice(0,8)}
@@ -851,7 +851,7 @@ function renderCheckin(){
   $('ctCheckinClosureCount').textContent=closed.length+' transportes para cierre';return;
  }
  rows.innerHTML=open.map(r=>{const sel=String(selectedCheckinId)===String(r.transport_id);const canEdit=canModule('checkin','edit')&&(permissions.is_admin||permissions.can_manage_checkin);const cls=r.checkin_estado==='Pendiente'?'status-pendiente':'status-novedad';const beesStatus=getBeesStatus(r.transporte);const porteriaStatus=getPorteriaStatus(r.transporte);const beesClass=beesStatus==='REALIZADO'?'beesMatch':beesStatus==='N/A'?'beesMissing':'';
- return `<tr class="${sel?'checkinSelected':''}"><td><button type="button" class="${sel?'selectedTransportBtn':'secondary'}" onclick="selectCheckin(${r.transport_id})">${sel?'✓ Seleccionado':'Seleccionar'}</button></td><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td><input class="checkinPhysicalPlate" value="${esc(r.placa_fisica||'')}" readonly aria-label="Placa Física" /></td><td><span class="checkinLoadClass ${r.is_online||Number(r.transport_id)<0?'checkinLoadOnline':'checkinLoadPreventa'}">${r.is_online||Number(r.transport_id)<0?'En línea':'Preventa'}</span></td><td><select class="checkinStatus ${cls}" ${(!sel||!canEdit)?'disabled':''} onchange="saveCheckin(${r.transport_id},this.value,null)"><option value="Pendiente" ${r.checkin_estado==='Pendiente'?'selected':''}>Pendiente</option><option value="Realizado">Realizado</option><option value="Con novedad" ${r.checkin_estado==='Con novedad'?'selected':''}>Con novedad</option></select></td><td><input class="checkinNovelty" value="${esc(r.checkin_novedad||'')}" placeholder="Escribir novedad…" ${(!sel||!canEdit)?'disabled':''} onchange="saveCheckin(${r.transport_id},null,this.value)" /></td><td><span class="beesBadge ${beesClass}">${beesStatus}</span></td><td><span class="porteriaBadge ${porteriaStatus==='Salida'?'porteriaYes':porteriaStatus==='Sin salida'?'porteriaNo':'porteriaUnknown'}">${porteriaStatus}</span></td></tr>`}).join('')||'<tr><td colspan="10">No hay transportes pendientes de CHECKIN.</td></tr>';
+ return `<tr class="${sel?'checkinSelected':''}"><td><button type="button" class="${sel?'selectedTransportBtn':'secondary'}" onclick="selectCheckin(${r.transport_id})">${sel?'✓ Seleccionado':'Seleccionar'}</button></td><td>${esc(r.transporte)}</td><td>${esc(r.viaje)}</td><td><b>${esc(r.placa)}</b></td><td><input class="checkinPhysicalPlate" value="${esc(r.placa_fisica||'')}" readonly aria-label="Placa Física" /></td><td><span class="checkinLoadClass ${r.is_online||Number(r.transport_id)<0?'checkinLoadOnline':'checkinLoadPreventa'}">${r.is_online||Number(r.transport_id)<0?'En línea':'Preventa'}</span></td><td><select class="checkinStatus ${cls}" ${(!sel||!canEdit)?'disabled':''} onchange="saveCheckin(${r.transport_id},this.value,null)"><option value="Pendiente" ${r.checkin_estado==='Pendiente'?'selected':''}>Pendiente</option><option value="Realizado">Realizado</option><option value="Con novedad" ${r.checkin_estado==='Con novedad'?'selected':''}>Con novedad</option></select></td><td><input class="checkinNovelty" value="${esc(r.checkin_novedad||'')}" placeholder="Escribir novedad…" ${(!sel||!canEdit)?'disabled':''} onchange="saveCheckin(${r.transport_id},null,this.value)" /></td><td><span class="beesBadge ${beesClass}">${beesStatus}</span></td><td><span class="porteriaBadge ${porteriaStatus==='Con salida'?'porteriaYes':porteriaStatus==='Sin salida'?'porteriaNo':'porteriaUnknown'}">${porteriaStatus}</span></td></tr>`}).join('')||'<tr><td colspan="10">No hay transportes pendientes de CHECKIN.</td></tr>';
 }
 function selectCheckin(id){selectedCheckinId=String(selectedCheckinId)===String(id)?null:String(id);const r=checkinRecords.find(x=>String(x.transport_id)===String(id));toast(selectedCheckinId?`Seleccionado: ${r?.transporte||""} · Viaje ${r?.viaje||""}`:"Selección cancelada");renderCheckin()}
 async function saveCheckin(id,status,novelty){if(!canModule("checkin","edit")){toast("Sin permiso de modificación en el módulo.");return}if(String(selectedCheckinId)!==String(id)){toast("Primero selecciona el transporte.");await refreshCheckin();return}if(!(permissions.is_admin||permissions.can_manage_checkin)){toast("No tienes permiso para modificar Checkin.");await refreshCheckin();return}const r=checkinRecords.find(x=>String(x.transport_id)===String(id));const isOnline=Number(id)<0;
@@ -860,8 +860,24 @@ const args=isOnline?{p_id:-1000000-Number(id),p_status:status===null?r?.checkin_
 const{error}=await sb.rpc(rpc,args);if(error){toast(error.message);await refreshCheckin();return}toast("Check-in actualizado.");await refreshCheckin()}
 
 
-let porteriaTransportes=null; // null: no se ha cargado archivo
-function getPorteriaStatus(transporte){if(porteriaTransportes===null)return "Sin datos";return porteriaTransportes.has(normalizeTransport(transporte))?"Salida":"Sin salida"}
+let porteriaTransportes=null; // Map<transporte, estado> o null sin archivo
+function normalizePorteriaHour(value){
+ const raw=String(value??'').trim();
+ if(!raw)return null;
+ if(/^(?:0?0:0?0(?::0?0)?)(?:[.,]0+)?$/.test(raw)||/^(?:0+(?:[.,]0+)?)$/.test(raw))return false;
+ // Excel puede representar las horas como fracciones de día.
+ if(typeof value==='number')return value>0;
+ if(/^\d+(?:[.,]\d+)?$/.test(raw)){const number=Number(raw.replace(',','.'));return Number.isFinite(number)?number>0:null;}
+ const match=raw.match(/(?:^|\s)(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s|$)/);
+ if(match){const h=Number(match[1]),m=Number(match[2]),sec=Number(match[3]||0);return h<24&&m<60&&sec<60?(h!==0||m!==0||sec!==0):null;}
+ // Si Excel entrega fecha y hora juntas, aceptar una marca horaria inequívoca.
+ return null;
+}
+function getPorteriaStatus(transporte){
+ if(porteriaTransportes===null)return 'Sin datos';
+ const value=porteriaTransportes.get(normalizeTransport(transporte));
+ return value===true?'Con salida':value===false?'Sin salida':'Sin datos';
+}
 async function loadPorteriaExcel(){if(!canModule("checkin","edit")){toast("Sin permiso de modificación en el módulo.");return}
  const file=$("porteriaExcelFile")?.files?.[0];
  if(!file){toast("Selecciona el archivo Excel Salidas Por Portería.");return}
@@ -874,12 +890,29 @@ async function loadPorteriaExcel(){if(!canModule("checkin","edit")){toast("Sin p
    const normalizeHeader=t=>String(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase().replace(/\s+/g," ");
    const transportKey=Object.keys(rows[0]).find(k=>normalizeHeader(k)==="transporte");
    if(!transportKey)throw Error("No existe una columna llamada Transporte.");
-   const ids=new Set(rows.map(r=>normalizeTransport(r[transportKey])).filter(Boolean));
-   if(!ids.size)throw Error("La columna Transporte no contiene identificadores válidos.");
-   await CTShared.save('porteria',file.name,[...ids],{source_rows:rows.length});
+   // Columna H = Hora Sal, con independencia de cómo se llame el encabezado.
+   const arrayRows=XLSX.utils.sheet_to_json(sh,{header:1,defval:'',raw:false});
+   const headerIndex=Object.keys(rows[0]).indexOf(transportKey);
+   const columnNames=(arrayRows[0]||[]).map(normalizeHeader);
+   const transportColumn=columnNames.findIndex(name=>name==='transporte');
+   const ids=new Map();
+   for(const excelRow of arrayRows.slice(1)){
+     const id=normalizeTransport(excelRow[transportColumn>=0?transportColumn:headerIndex]);
+     if(!id)continue;
+     const hasDeparture=normalizePorteriaHour(excelRow[7]);
+     // Si el transporte figura varias veces, cualquier hora de salida válida prevalece.
+     const current=ids.get(id);
+     if(hasDeparture===true||!ids.has(id))ids.set(id,hasDeparture);
+     else if(current===null&&hasDeparture===false)ids.set(id,false);
+   }
+   if(!ids.size)throw Error('La columna Transporte no contiene identificadores válidos.');
+   // Guardar el estado por transporte, no solo su presencia en el archivo.
+   await CTShared.save('porteria',file.name,[...ids].map(([transporte,salida])=>({transporte,salida})),{source_rows:rows.length,columna_h:'Hora Sal'});
    porteriaTransportes=ids;
    const coincidencias=checkinRecords.filter(r=>ids.has(normalizeTransport(r.transporte))).length;
-   $("porteriaSummary").textContent=`Archivo: ${file.name} · ${rows.length.toLocaleString("es-CO")} registros · ${ids.size.toLocaleString("es-CO")} transportes únicos · ${coincidencias.toLocaleString("es-CO")} coincidencias en CHECKIN. Cruce guardado en Supabase para los usuarios autorizados.`;
+   const salidas=[...ids.values()].filter(v=>v===true).length;
+   const sinSalida=[...ids.values()].filter(v=>v===false).length;
+   $('porteriaSummary').textContent=`Archivo: ${file.name} · ${rows.length.toLocaleString('es-CO')} registros · ${ids.size.toLocaleString('es-CO')} transportes únicos · ${salidas} con salida · ${sinSalida} sin salida · ${coincidencias} coincidencias en CHECKIN. Cruce guardado en Supabase.`;
    renderCheckin();render();toast("Salidas por Portería cargadas correctamente.");
  }catch(err){console.error(err);$("porteriaSummary").textContent="Error: "+err.message;toast("No se pudo procesar Portería: "+err.message)}
 }
@@ -951,7 +984,10 @@ async function loadSharedCheckin(){
  if(!canModule('checkin','view')&&!canModule('cargo','view'))return;
  try{
   const [port,bees]=await Promise.all([CTShared.load('porteria'),canModule('checkin','view')?CTShared.load('bees'):Promise.resolve(null)]);
-  porteriaTransportes=port?new Set(port.items):null;
+  porteriaTransportes=port?new Map((port.items||[]).map(item=>{
+   if(typeof item==='string')return [normalizeTransport(item),null]; // Archivo anterior sin horas: no asumir salida.
+   return [normalizeTransport(item.transporte),item.salida===true?true:item.salida===false?false:null];
+  }).filter(([id])=>Boolean(id))):null;
   if(port)$('porteriaSummary').textContent=`Archivo compartido: ${port.filename} · ${port.items.length.toLocaleString('es-CO')} transportes · Actualizado: ${new Date(port.saved_at).toLocaleString('es-CO')}`;
   else $('porteriaSummary').textContent='Sin archivo de portería guardado. El cruce permanecerá hasta pulsar Limpiar cruce.';
   beesCsvRows=bees?.items||[];
