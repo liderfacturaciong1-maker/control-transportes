@@ -194,7 +194,7 @@ async function login(){
   if(dp.error||!dp.data?.length){console.error("Error permisos adicionales:",dp.error);msg.textContent="Tu PIN fue aceptado, pero no fue posible consultar los permisos adicionales. Contacta al administrador.";return;}
   user=data[0];loginPin=pin;permissions={...pr.data[0],...dp.data[0]};
   try{sessionStorage.setItem("transport_user",JSON.stringify(user));}catch(e){console.warn("SessionStorage:",e);}
-  await loadModuleRights();await ctLoadReturnsPermission();await showApp();await ctFetchActions();msg.textContent="";
+  await loadModuleRights();await ctLoadReturnsPermission();await ctFetchActions();await showApp();msg.textContent="";
  }catch(e){console.error("No se completó el inicio de sesión:",e);msg.textContent=e.message?.includes("Tiempo de espera")?e.message:"No se pudo completar el ingreso. Verifica tu conexión y vuelve a intentarlo.";}
  finally{button.disabled=false;}
 }
@@ -405,18 +405,41 @@ function openStatChart(key){const visible=window.currentCargoAllStatusRecords||[
 function normalizePhysicalPlate(value){let v=String(value||"").toLocaleUpperCase("es").replace(/\s+/g,"");if(v&&!v.startsWith("CO"))v="CO"+v;return v.slice(0,8)}
 function vehicleClass(v){return v==="Bodega"?"vehicle-bodega":v==="Sobredimensionado"?"vehicle-sobredimensionado":v==="OK para utilizar"?"vehicle-ok":""}
 async function saveVehicleField(id,field,value){if(!canModule("cargo","edit")){toast("Sin permiso de modificación en el módulo.");return}if(field==="cambio_placa")value=normalizePhysicalPlate(value);if(field==="cambio_placa"&&String(value).length>8){toast("Placa Fisica: máximo 8 caracteres.");await refresh();return}const{error}=await sb.rpc("update_transport_vehicle_field_secure",{p_transport_id:id,p_field:field,p_value:value,p_pin:loginPin});if(error){toast("No se pudo guardar: "+error.message);await refresh();return}const r=records.find(x=>Number(x.id)===Number(id));if(r)r[field]=value;toast(field==="estado_vehiculo"?"Disponibilidad De Vehiculos guardada.":"Placa Fisica guardada.")}
-setInterval(()=>{if(loginPin&&sb&&!document.hidden)ctFetchActions()},30000);
-const ctActionDefaults={armado:true,contado:false,cargado:true};let ctActionFlags={...ctActionDefaults},ctActionCanManage=false;
+setInterval(()=>{if(loginPin&&sb&&!document.hidden)ctFetchActions()},15000);document.addEventListener("visibilitychange",()=>{if(!document.hidden&&loginPin&&sb)void ctFetchActions()});
+const ctActionDefaults={armado:false,contado:false,cargado:false};let ctActionFlags={...ctActionDefaults},ctActionCanManage=false,ctActionsLoaded=false;
 function ctNextAction(estado){const order=['Armado','Contado','Cargado'];const index=estado==='Pendiente'?-1:order.indexOf(estado);if(index===-1&&estado!=='Pendiente')return null;return order.slice(index+1).find(x=>ctActionFlags[x.toLowerCase()])||null}
 function ctActionAllowed(next){return permissions.is_admin||(next==='Armado'?permissions.can_arm:next==='Contado'?permissions.can_count:permissions.can_load)}
 function ctActionLabel(next){return next==='Armado'?'Armar':next==='Contado'?'Contar':next==='Cargado'?'Cargar':'Sin acción'}
 function ctUpdateActionUI(){const b=$('ctActionConfigure');if(b)b.classList.toggle('hidden',!ctActionCanManage);const summary=$('ctActionSummary');if(summary)summary.textContent='Acciones habilitadas: '+Object.entries(ctActionFlags).filter(([,v])=>v).map(([k])=>k[0].toUpperCase()+k.slice(1)).join(' · ')||'Sin acciones habilitadas';render()}
-async function ctFetchActions(){if(!sb||!loginPin)return;try{const {data,error}=await sb.rpc('ct_cargo_action_config_get',{p_pin:loginPin});if(error)throw error;ctActionFlags={armado:data?.armado!==false,contado:data?.contado!==false,cargado:data?.cargado!==false};ctActionCanManage=!!data?.can_manage;ctUpdateActionUI()}catch(e){console.warn('Acciones de Cargue:',e.message);$('ctActionSummary').textContent='No fue posible consultar acciones; cambios deshabilitados';ctActionFlags={armado:false,contado:false,cargado:false};ctActionCanManage=false;ctUpdateActionUI()}}
+function ctBoolean(value){return value===true||value===1||String(value).trim().toLowerCase()==='true'||String(value).trim()==='1'}
+async function ctFetchActions(){
+ if(!sb||!loginPin)return false;
+ try{
+  const {data,error}=await sb.rpc('ct_cargo_action_config_get',{p_pin:loginPin});
+  if(error)throw error;
+  // PostgREST puede devolver una fila como objeto o un conjunto de filas como arreglo.
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row||typeof row!=='object'||!['armado','contado','cargado'].every(key=>Object.prototype.hasOwnProperty.call(row,key))){throw new Error('La consulta de configuración no devolvió armado, contado y cargado.');}
+  ctActionFlags={armado:ctBoolean(row.armado),contado:ctBoolean(row.contado),cargado:ctBoolean(row.cargado)};
+  ctActionCanManage=ctBoolean(row.can_manage);
+  ctActionsLoaded=true;
+  ctUpdateActionUI();
+  return true;
+ }catch(e){
+  console.warn('Acciones de Cargue:',e.message);
+  ctActionFlags={...ctActionDefaults};ctActionCanManage=false;ctActionsLoaded=false;
+  ctUpdateActionUI();
+  const summary=$('ctActionSummary');if(summary)summary.textContent='No se pudo leer la configuración de Supabase. Acciones temporalmente deshabilitadas.';
+  return false;
+ }
+}
 async function ctSaveActions(){if(!ctActionCanManage)return;const btn=$('ctActionSave');btn.disabled=true;try{const args={p_pin:loginPin,p_armado:$('ctActionArmado').checked,p_contado:$('ctActionContado').checked,p_cargado:$('ctActionCargado').checked};const {error}=await sb.rpc('ct_cargo_action_config_save',args);if(error)throw error;await ctFetchActions();$('ctActionSettings').classList.add('hidden');toast('Acciones actualizadas para todos los usuarios')}catch(e){$('ctActionSettingsStatus').textContent=e.message}finally{btn.disabled=false}}
 function ctSetupActionSettings(){const b=$('ctActionConfigure');if(!b)return;b.onclick=()=>{if(!ctActionCanManage)return;for(const key of ['Armado','Contado','Cargado'])$('ctAction'+key).checked=ctActionFlags[key.toLowerCase()];$('ctActionSettings').classList.toggle('hidden')};$('ctActionSave').onclick=ctSaveActions}
 async function advance(id){if(!canModule("cargo","edit")){toast("Sin permiso de modificación en el módulo.");return}const isOnline=Number(id)<0;
 const r=isOnline?onlineTrips.find(x=>Number(-1000000-x.id)===Number(id)):records.find(x=>Number(x.id)===Number(id));if(!r)return;
 if(String(selectedTransportId)!==String(id)){toast("Primero selecciona el transporte.");return}
+// Volver a consultar antes de cada cambio: nunca usar una configuración obsoleta.
+if(!await ctFetchActions()){toast('No fue posible verificar las acciones habilitadas.');return}
 const next=ctNextAction(r.estado);
 if(!next)return;
 const allowed=ctActionAllowed(next);
