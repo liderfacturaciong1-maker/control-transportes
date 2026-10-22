@@ -768,9 +768,22 @@ let ctUnloadedReady=false;
 
 let checkinHasExported=false;
 function checkinKey(row){return (row.is_online||Number(row.transport_id)<0?'online:':'normal:')+String(row.is_online ? -1000000-Number(row.transport_id) : row.transport_id);}
-function ctCheckinCompleted(r){return r.checkin_estado==='Realizado'&&ctUnloadedMap.has(checkinKey(r));}
+// CHECKIN v5.59: una unica clasificacion gobierna las tres tablas.
+const CT_CHECKIN_BUILD='5.59-20261022';
+function ctHasUnloadYes(r){
+ const key=checkinKey(r);
+ const saved=ctUnloadedMap.get(key);
+ // La tabla almacena solo los registros marcados como SI.
+ return !!saved;
+}
+function ctCheckinCompleted(r){return String(r.checkin_estado||'').trim().toLocaleLowerCase('es')==='realizado'&&ctHasUnloadYes(r);}
 function ctCheckinAvailableRows(){return checkinRecords.filter(r=>!checkinClosedArchive.has(checkinKey(r)));}
-function checkinClosedRows(){return ctCheckinAvailableRows().filter(ctCheckinCompleted);}
+function ctCheckinPartitions(){
+ const all=ctCheckinAvailableRows(),pending=[],done=[];
+ for(const r of all)(ctCheckinCompleted(r)?done:pending).push(r);
+ return {all,pending,done};
+}
+function checkinClosedRows(){return ctCheckinPartitions().done;}
 function showCheckinView(view){checkinView=['closed','unloaded'].includes(view)?view:'pending';renderCheckin();}
 function dateStamp(){const fmt=new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});return fmt.format(new Date());}
 function downloadCheckinClosure(){
@@ -842,7 +855,7 @@ const archived=await sb.rpc('ct_checkin_closed_list_secure',{p_pin:loginPin});
 if(!archived.error)checkinClosedArchive=new Set((archived.data||[]).map(x=>String(x.trip_key)));
 try{const unloaded=await sb.rpc('ct_checkin_unloaded_list_secure',{p_pin:loginPin});if(unloaded.error){ctUnloadedReady=false;console.warn('[Descargados] Instala el archivo SQL:',unloaded.error.message);}else{ctUnloadedMap=new Map((unloaded.data||[]).map(r=>[r.trip_key,r]));ctUnloadedReady=true;}}catch(e){ctUnloadedReady=false;console.warn('[Descargados]',e);}
 renderCheckin()}
-function ctPendingUnloadRows(){return ctCheckinAvailableRows().filter(r=>!ctCheckinCompleted(r));}
+function ctPendingUnloadRows(){return ctCheckinPartitions().pending;}
 function ctRenderUnloadedPanel(allRows){
  // El mismo filtro aplicado en Pendientes se utiliza para los tres indicadores.
  const visible=ctFilteredCheckinRows(allRows);
@@ -860,7 +873,7 @@ async function saveCheckinUnloaded(id,value){
  if(!ctUnloadedReady){toast('Primero instala el SQL de Vehículos descargados en Supabase.');await refreshCheckin();return;}
  const r=checkinRecords.find(x=>String(x.transport_id)===String(id));if(!r)return;
  const {error}=await sb.rpc('ct_checkin_unloaded_set_secure',{p_pin:loginPin,p_trip_key:checkinKey(r),p_descargado:value==='si',p_transporte:String(r.transporte||''),p_viaje:String(r.viaje||''),p_placa:String(r.placa||''),p_placa_fisica:String(r.placa_fisica||'')});
- if(error)toast('No se pudo guardar Descargado: '+error.message);else toast(value==='si'?'Vehículo registrado como descargado.':'Vehículo marcado como no descargado.');
+ if(error)toast('No se pudo guardar Descargado: '+error.message);else toast(value==='si'?'Descargado = Sí guardado. Pasará al Cierre cuando Acción también sea Realizado.':'Descargado = No guardado.');
  await refreshCheckin();
 }
 const ctCheckinFilterIds=['ctFTransporte','ctFViaje','ctFPlaca','ctFPlacaFisica','ctFClase','ctFEstado','ctFNovedad','ctFDescargado','ctFPorteria'];
@@ -938,12 +951,11 @@ function ctSetupCheckinFilters(){
 }
 function renderCheckin(){
  const rows=$('checkinRows');if(!rows)return;
- const allRows=ctCheckinAvailableRows();
- const open=ctPendingUnloadRows();
- const closed=checkinClosedRows();const total=allRows.length;
- const stats=$('ctCheckinStats');if(stats)stats.innerHTML=`<div class="ctCheckinNotebook"><span>📘</span><b>${total}</b><small>Total pendientes por CHECKIN</small></div><div class="ctCheckinNotebook"><span>📘</span><b>${closed.length}</b><small>Realizados</small></div><div class="ctCheckinNotebook red"><span>📕</span><b>${open.length}</b><small>Pendientes</small></div>`;
+ const {all:allRows,pending:open,done:closed}=ctCheckinPartitions();const total=allRows.length;
+ const stats=$('ctCheckinStats');if(stats)stats.innerHTML=`<div class="ctCheckinNotebook"><span>📘</span><b>${total}</b><small>Total para CHECKIN</small></div><div class="ctCheckinNotebook"><span>📘</span><b>${closed.length}</b><small>Realizados</small></div><div class="ctCheckinNotebook red"><span>📕</span><b>${open.length}</b><small>Pendientes</small></div>`;
  const pendingBtn=$('ctCheckinPendingTab'),closedBtn=$('ctCheckinClosedTab');
  pendingBtn?.classList.toggle('active',checkinView==='pending');closedBtn?.classList.toggle('active',checkinView==='closed');$('ctCheckinUnloadedTab')?.classList.toggle('active',checkinView==='unloaded');
+ if($('ctCheckinSeparationStatus'))$('ctCheckinSeparationStatus').textContent=`CHECKIN v${CT_CHECKIN_BUILD} · Pendientes ${open.length} · Finalizados ${closed.length} · Total ${total}`;
  ctRenderUnloadedPanel(allRows);
  const unloadedPanel=$('ctCheckinUnloadedPanel');if(unloadedPanel)unloadedPanel.classList.toggle('hidden',checkinView!=='unloaded');
  const standardPanel=$('ctCheckinStandardPanel'),closurePanel=$('ctCheckinClosurePanel');
