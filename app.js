@@ -769,7 +769,7 @@ let ctUnloadedReady=false;
 let checkinHasExported=false;
 function checkinKey(row){return (row.is_online||Number(row.transport_id)<0?'online:':'normal:')+String(row.is_online ? -1000000-Number(row.transport_id) : row.transport_id);}
 // CHECKIN v5.60: Acción define Cierre; Descargado define Vehículos descargados independientemente.
-const CT_CHECKIN_BUILD='5.60-20261022';
+const CT_CHECKIN_BUILD='5.61-20261022';
 function ctHasUnloadYes(r){
  const key=checkinKey(r);
  const saved=ctUnloadedMap.get(key);
@@ -959,6 +959,10 @@ function renderCheckin(){
  ctRenderUnloadedPanel(allRows);
  const unloadedPanel=$('ctCheckinUnloadedPanel');if(unloadedPanel)unloadedPanel.classList.toggle('hidden',checkinView!=='unloaded');
  const standardPanel=$('ctCheckinStandardPanel'),closurePanel=$('ctCheckinClosurePanel');
+ // La tabla de pendientes pertenecía al contenedor padre de las tres pestañas.
+ // Ubicarla dentro de Pendientes impide que se repita en Cierre y Descargados.
+ const pendingTable=rows.closest('.tableWrap');
+ if(standardPanel && pendingTable && !standardPanel.contains(pendingTable)) standardPanel.appendChild(pendingTable);
  if(standardPanel)standardPanel.classList.toggle('hidden',checkinView!=='pending');
  if(closurePanel)closurePanel.classList.toggle('hidden',checkinView!=='closed');
  if(checkinView==='unloaded')return;
