@@ -108,12 +108,12 @@
 .t1HeadingRow{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
 .t1SummaryButton{border:0;border-radius:13px;background:#1679b7;color:white;padding:12px 22px;font-weight:800;cursor:pointer;box-shadow:0 5px 12px #125c9330}
 .t1SummaryOverlay{position:fixed;inset:0;background:#0b2542b8;z-index:999999;display:flex;justify-content:center;align-items:center;padding:16px}
-.t1SummaryDialog{width:min(98vw,1020px);max-height:90vh;overflow:auto;border-radius:20px;background:white;padding:22px;color:#173955;box-shadow:0 20px 80px #091b3660}
+.t1SummaryDialog{width:min(98vw,1450px);max-height:90vh;overflow:auto;border-radius:20px;background:white;padding:22px;color:#173955;box-shadow:0 20px 80px #091b3660}
 .t1SummaryTop{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
 .t1SummaryTop h2{margin:0 0 4px}.t1SummaryTop p{margin:0;color:#53708b}
 .t1SummaryClose{border:1px solid #bcd4e9;border-radius:9px;background:#eef7ff;padding:8px 13px;cursor:pointer}
 .t1SummaryGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;margin:18px 0}
-.t1SummarySection{border:1px solid #c4dbea;border-radius:13px;overflow:auto;padding:12px}
+.t1SummarySection{border:1px solid #c4dbea;border-radius:13px;min-width:0;overflow:hidden;padding:12px}.t1SummaryScroll{max-height:min(60vh,620px);overflow:auto;overscroll-behavior:contain;border-radius:9px;border:1px solid #dce9f3}.t1SummaryScroll thead th{position:sticky;top:0;z-index:2}.t1SummaryScroll table{min-width:560px}
 .t1SummarySection h3{margin:3px 0 10px}.t1SummarySection table{width:100%;border-collapse:collapse;font-size:13px}
 .t1SummarySection th{background:#184e70;color:white;text-align:left;padding:9px 7px;white-space:nowrap}
 .t1SummarySection td{border-bottom:1px solid #dce9f3;padding:9px 7px}
