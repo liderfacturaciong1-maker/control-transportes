@@ -224,19 +224,30 @@ function t1ArrivalDate(value){
 }
 function t1BogotaToday(){const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const value=Object.fromEntries(parts.map(x=>[x.type,x.value]));return Date.UTC(+value.year,+value.month-1,+value.day);}
 
+function t1ArrivalDetails(kind,by,value){
+ const data=t1Cached[kind];if(!data?.rows)return;
+ const h=(data.headers||[]).map(x=>String(x??'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
+ const col=n=>h.indexOf(n);const groupCol=col(by==='entrega'?'NO ENTREGA':'FACTURA');
+ const matches=data.rows.filter(r=>String(r[groupCol]??'').trim()===value);
+ const format=new Intl.NumberFormat('es-CO',{maximumFractionDigits:3});
+ let modal=document.getElementById('t1DetailsOverlay');
+ if(!modal){modal=document.createElement('div');modal.id='t1DetailsOverlay';modal.className='t1DetailsOverlay';document.body.appendChild(modal);modal.addEventListener('click',e=>{if(e.target===modal||e.target.closest('[data-close-t1]'))modal.remove();});}
+ modal.innerHTML='<section class="t1DetailsCard" role="dialog" aria-modal="true" aria-label="Detalle de '+(by==='entrega'?'entrega':'factura')+'"><div class="t1DetailsHead"><div><small>SEGUIMIENTO T1 · '+t1Escape(kind.toUpperCase())+'</small><h2>Detalle de '+(by==='entrega'?'entrega':'factura')+': '+t1Escape(value)+'</h2><p>'+matches.length+' registros asociados</p></div><button type="button" data-close-t1 aria-label="Cerrar detalle">✕</button></div><div class="t1DetailsScroll"><table><thead><tr><th>MATERIAL</th><th>DESCRIPCIÓN</th><th>LOTE</th><th>CANTIDAD</th></tr></thead><tbody>'+matches.map(r=>'<tr><td>'+t1Escape(r[col('MATERIAL')])+'</td><td>'+t1Escape(r[col('DESCRIPCION')])+'</td><td>'+t1Escape(r[col('LOTE')])+'</td><td>'+format.format(t1Quantity(r[col('CANTIDAD')]))+'</td></tr>').join('')+'</tbody></table></div></section>';
+ modal.querySelector('[data-close-t1]').focus();
+}
 function t1ArrivalRender(kind,data){
  const panel=$(kind==='despachos'?'t1DespachosPending':'t1TransitosPending');if(!panel)return;
  if(!data?.rows?.length){panel.innerHTML='<p class="t1ArrivalHelp">Sin archivo cargado.</p>';return;}
  const headers=(data.headers||[]).map(x=>String(x??'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
- const cols=['MATERIAL','DESCRIPCION','PLACA','NO ENTREGA','FACTURA','ALM','ORIGEN','LOTE','CANTIDAD','FECHA S.M.'];
+ const cols=['PLACA','NO ENTREGA','FACTURA','ALM','ORIGEN','FECHA S.M.'];
  const ids=cols.map(c=>headers.indexOf(c));if(ids.some(i=>i<0)){panel.innerHTML='<p class="t1ArrivalHelp">Faltan columnas requeridas: '+t1Escape(cols.filter((c,i)=>ids[i]<0).join(', '))+'</p>';return;}
- const utcToday=t1BogotaToday();
- const fmt=new Intl.NumberFormat('es-CO',{maximumFractionDigits:3});let missing=0;
- const rows=data.rows.map(row=>{const dt=t1ArrivalDate(row[ids[9]]);if(!dt)missing++;
- const delay=dt?Math.max(0,Math.floor((utcToday-dt.getTime())/86400000)):null;
- return {vals:[0,1,2,3,4,5,6,7].map(i=>String(row[ids[i]]??'')),qty:t1Quantity(row[ids[8]]),delay};});
- rows.sort((a,b)=>(b.delay??-1)-(a.delay??-1));
- panel.innerHTML='<p class="t1ArrivalHelp">Días transcurridos desde FECHA S.M. hasta hoy. Este archivo no confirma llegada: valida el estado del vehículo antes de considerarlo pendiente real.</p><div class="t1ArrivalCount">'+rows.length+' registros para seguimiento'+(missing?' · '+missing+' sin fecha válida':'')+'</div><table><thead><tr>'+['MATERIAL','DESCRIPCIÓN','PLACA','NO ENTREGA','FACTURA','ALM','ORIGEN','LOTE','CANTIDAD','RETRASO'].map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.vals.map(x=>'<td>'+t1Escape(x)+'</td>').join('')+'<td>'+fmt.format(r.qty)+'</td><td>'+(r.delay===null?'Sin fecha':'<span class="t1DelayPill '+(r.delay===0?'t1DelayZero':'')+'">'+r.delay+' días</span>')+'</td></tr>').join('')+'</tbody></table>';
+ const utcToday=t1BogotaToday();let missing=0;
+ const rows=data.rows.map(row=>{const dt=t1ArrivalDate(row[ids[5]]);if(!dt)missing++;return {vals:ids.slice(0,5).map(i=>String(row[i]??'').trim()),delay:dt?Math.max(0,Math.floor((utcToday-dt.getTime())/86400000)):null};});
+ // Una fila por combinación de placa / entrega / factura / almacén / origen.
+ const seen=new Set();const distinct=rows.filter(r=>{const k=JSON.stringify(r.vals);if(seen.has(k))return false;seen.add(k);return true;});
+ distinct.sort((a,b)=>(b.delay??-1)-(a.delay??-1));
+ panel.innerHTML='<p class="t1ArrivalHelp">Antigüedad calculada desde FECHA S.M. hasta hoy (Colombia). La llegada real requiere validación.</p><div class="t1ArrivalCount">'+distinct.length+' registros únicos para seguimiento'+(missing?' · '+missing+' filas sin fecha válida':'')+'</div><table><thead><tr>'+['PLACA','ENTREGA','FACTURA','ALM','ORIGEN','RETRASO'].map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+distinct.map(r=>'<tr><td>'+t1Escape(r.vals[0])+'</td><td><button class="t1DetailLink" data-group="entrega" data-value="'+t1Escape(r.vals[1])+'" type="button">'+t1Escape(r.vals[1]||'—')+'</button></td><td><button class="t1DetailLink" data-group="factura" data-value="'+t1Escape(r.vals[2])+'" type="button">'+t1Escape(r.vals[2]||'—')+'</button></td><td>'+t1Escape(r.vals[3])+'</td><td>'+t1Escape(r.vals[4])+'</td><td>'+(r.delay===null?'Sin fecha':'<span class="t1DelayPill '+(r.delay===0?'t1DelayZero':'')+'">'+r.delay+' días</span>')+'</td></tr>').join('')+'</tbody></table>';
+ if(!panel.dataset.t1DetailBound){panel.dataset.t1DetailBound='1';panel.addEventListener('click',e=>{const button=e.target.closest('.t1DetailLink');if(button)t1ArrivalDetails(kind,button.dataset.group,button.dataset.value);});}
 }
 function t1Display(kind,data){const c=t1Settings[kind],e=$(c.info);if(!e)return;
  if(!data?.rows){e.textContent='Sin archivo cargado.';t1Recount(kind,null);t1ArrivalRender(kind,null);return;}
