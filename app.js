@@ -180,19 +180,16 @@ const t1Cached={};
 function t1Message(s,err=false){const e=$('t1FileStatus');if(e){e.textContent=s;e.style.color=err?'#ac2a2a':'#23516f';}}
 function t1Escape(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function t1Quantity(value){
- // En el reporte SAP la unidad se representa con tres decimales fijos:
- // 900000 -> 900; "1,260.000" -> 1260; "900.000" -> 900.
- const t=String(value??'').trim().replace(/\s/g,'');
- if(!t)return 0;
- let n;
- if(/^-?\d{1,3}(?:,\d{3})+\.\d{3}$/.test(t))n=Number(t.replace(/,/g,''));
- else if(/^-?\d+\.\d{3}$/.test(t))return Number(t.slice(0,-4));
- else if(/^-?\d{1,3}(?:,\d{3})+$/.test(t))n=Number(t.replace(/,/g,''));
- else if(/^-?\d+(?:\.\d+)?$/.test(t))n=Number(t);
- else return 0;
- if(!Number.isFinite(n))return 0;
- return n/1000;
+ // SAP: 900000 => 900; 1,260.000 => 1260; 6,912.000 => 6912.
+ const t=String(value??'').trim().replace(/\s/g,'');if(!t)return 0;
+ if(/^-?\d{1,3}(?:,\d{3})+\.\d{3}$/.test(t))return Number(t.replace(/,/g,'').replace(/\.\d{3}$/,''));
+ if(/^-?\d+\.\d{3}$/.test(t))return Number(t.slice(0,-4));
+ if(/^-?\d{1,3}(?:,\d{3})+$/.test(t))return Number(t.replace(/,/g,''))/1000;
+ if(/^-?\d+$/.test(t))return Number(t)/1000;
+ if(/^-?\d+\.\d+$/.test(t))return Number(t)/1000;
+ return 0;
 }
+
 function t1Recount(kind,data){
  const c=t1Settings[kind],preview=$(c.preview);if(!preview)return;
  if(!data?.rows?.length){preview.innerHTML='<p style="padding:14px;color:#607f95">Sin materiales cargados.</p>';return;}
@@ -211,21 +208,29 @@ function t1Recount(kind,data){
 }
 // Seguimiento de fecha S.M. por registros; no hay confirmacion de entrega en los Excel.
 function t1ArrivalDate(value){
+ if(value instanceof Date&&!isNaN(value))return new Date(Date.UTC(value.getFullYear(),value.getMonth(),value.getDate()));
  const v=String(value??'').trim();if(!v)return null;
- let y,m,d;
- let a=v.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})(?:\s|$)/);
- if(a){d=+a[1];m=+a[2];y=+a[3];}
- else {a=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s]|$)/);if(a){y=+a[1];m=+a[2];d=+a[3];}
- else if(/^\d{5}(?:\.\d+)?$/.test(v)){let dt=new Date(Date.UTC(1899,11,30)+Math.floor(+v)*86400000);y=dt.getUTCFullYear();m=dt.getUTCMonth()+1;d=dt.getUTCDate();}else return null;}
+ let y,m,d,match;
+ if((match=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s]|$)/))){y=+match[1];m=+match[2];d=+match[3];}
+ else if((match=v.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})(?:\s|$)/))){
+  const first=+match[1],second=+match[2];y=+match[3];if(y<100)y+=y>=70?1900:2000;
+  // El formato de Excel en estos archivos suele mostrar 10/19/26 (MM/DD/YY).
+  if(first>12){d=first;m=second;}else if(second>12){m=first;d=second;}
+  else {d=first;m=second;}
+ }
+ else if(/^\d{5}(?:\.\d+)?$/.test(v)){const n=Number(v);const dt=new Date(Date.UTC(1899,11,30)+Math.floor(n)*86400000);y=dt.getUTCFullYear();m=dt.getUTCMonth()+1;d=dt.getUTCDate();}
+ else return null;
  const date=new Date(Date.UTC(y,m-1,d));return date.getUTCFullYear()===y&&date.getUTCMonth()+1===m&&date.getUTCDate()===d?date:null;
 }
+function t1BogotaToday(){const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const value=Object.fromEntries(parts.map(x=>[x.type,x.value]));return Date.UTC(+value.year,+value.month-1,+value.day);}
+
 function t1ArrivalRender(kind,data){
  const panel=$(kind==='despachos'?'t1DespachosPending':'t1TransitosPending');if(!panel)return;
  if(!data?.rows?.length){panel.innerHTML='<p class="t1ArrivalHelp">Sin archivo cargado.</p>';return;}
  const headers=(data.headers||[]).map(x=>String(x??'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
  const cols=['MATERIAL','DESCRIPCION','PLACA','NO ENTREGA','FACTURA','ALM','ORIGEN','LOTE','CANTIDAD','FECHA S.M.'];
  const ids=cols.map(c=>headers.indexOf(c));if(ids.some(i=>i<0)){panel.innerHTML='<p class="t1ArrivalHelp">Faltan columnas requeridas: '+t1Escape(cols.filter((c,i)=>ids[i]<0).join(', '))+'</p>';return;}
- const today=new Date(),utcToday=Date.UTC(today.getFullYear(),today.getMonth(),today.getDate());
+ const utcToday=t1BogotaToday();
  const fmt=new Intl.NumberFormat('es-CO',{maximumFractionDigits:3});let missing=0;
  const rows=data.rows.map(row=>{const dt=t1ArrivalDate(row[ids[9]]);if(!dt)missing++;
  const delay=dt?Math.max(0,Math.floor((utcToday-dt.getTime())/86400000)):null;
@@ -238,6 +243,8 @@ function t1Display(kind,data){const c=t1Settings[kind],e=$(c.info);if(!e)return;
  e.textContent=`${data.filename||'Archivo'} · ${data.rows.length} filas cargadas · ${data.updated_at?new Date(data.updated_at).toLocaleString('es-CO'):''}`;
  t1Recount(kind,data);t1ArrivalRender(kind,data);
 }
+let t1LastDay=t1BogotaToday();
+window.addEventListener('focus',()=>{const today=t1BogotaToday();if(today!==t1LastDay){t1LastDay=today;for(const kind of Object.keys(t1Settings))if(t1Cached[kind])t1ArrivalRender(kind,t1Cached[kind]);}});
 async function t1LoadFiles(){if(!loginPin||!ctReturnsOpen)return;for(const kind of Object.keys(t1Settings)){
  try{const {data,error}=await sb.rpc('ct_t1_file_get',{p_pin:loginPin,p_kind:kind});if(error)throw error;t1Cached[kind]=data||null;t1Display(kind,data);}catch(e){$(t1Settings[kind].info).textContent='Error de consulta: '+e.message;t1Message('No se pudieron consultar los archivos T1. Instala INSTALAR_SEGUIMIENTO_T1_v571.sql en Supabase.',true);}
  }}
@@ -250,7 +257,12 @@ async function t1Upload(kind){const cfg=t1Settings[kind],input=$(cfg.file),file=
  if(!sheetName)throw Error(`El Excel debe incluir la hoja «${cfg.sheet}».`);
  const matrix=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:'',raw:false,blankrows:false});
  if(matrix.length<2)throw Error('El Excel debe incluir encabezados y al menos una fila de datos.');
- const headers=matrix[0].map(x=>String(x??''));const rows=matrix.slice(1).map(row=>headers.map((_,i)=>String(row[i]??'')));
+ const headers=matrix[0].map(x=>String(x??''));
+ const dateIndex=headers.findIndex(h=>String(h).trim().toUpperCase()==='FECHA S.M.');
+ const rows=matrix.slice(1).map(row=>headers.map((_,i)=>{
+  const v=row[i];if(i===dateIndex&&v instanceof Date&&!isNaN(v))return [v.getFullYear(),String(v.getMonth()+1).padStart(2,'0'),String(v.getDate()).padStart(2,'0')].join('-');
+  return String(v??'');
+ }));
  if(headers[0]?.trim().toUpperCase()!=='MATERIAL'||!['DESCRIPCION','CANTIDAD'].every(n=>headers.some(h=>h.trim().toUpperCase()===n)))throw Error('Se requieren MATERIAL, DESCRIPCION y Cantidad.');
  if(!confirm(`¿Guardar «${file.name}» (${rows.length} filas)? Reemplazará solamente el archivo de ${kind}.`))return;
  const {error}=await sb.rpc('ct_t1_file_save',{p_pin:loginPin,p_kind:kind,p_filename:file.name,p_headers:headers,p_rows:rows});if(error)throw error;
