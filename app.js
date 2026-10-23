@@ -226,43 +226,48 @@ function t1BogotaToday(){const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'
 
 
 const t1DestinationLimits={'IBA04':3,'IBA26':3,'ICEV1':3,'IUN01':1,'IBA02':3};
+
 function t1SummaryData(kind){
- const file=t1Cached[kind], tally=new Map(Object.keys(t1DestinationLimits).map(k=>[k,{total:0,delayed:0,unknown:0}]));
- if(!file?.rows?.length)return {tally,loaded:false};
+ const file=t1Cached[kind];
+ if(!file?.rows?.length)return {loaded:false,rows:[]};
  const headers=(file.headers||[]).map(x=>String(x??'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
- const destIndex=headers.indexOf('DESTINO'),dateIndex=headers.indexOf('FECHA S.M.');
- if(destIndex<0||dateIndex<0)return {tally,loaded:true,error:'Falta la columna DESTINO o FECHA S.M.'};
- const seen=new Set(), today=t1BogotaToday();
+ const column=(...names)=>names.map(n=>headers.indexOf(n)).find(i=>i>=0)??-1;
+ const indices={
+  destino:column('DESTINO'),fecha:column('FECHA S.M.','FECHA SM'),
+  placa:column('PLACA'),entrega:column('NO ENTREGA','N° ENTREGA','N ENTREGA'),
+  factura:column('FACTURA')
+ };
+ if(Object.values(indices).some(i=>i<0))return {loaded:true,error:'Faltan columnas necesarias: DESTINO, FECHA S.M., PLACA, No ENTREGA o FACTURA.',rows:[]};
+ const today=t1BogotaToday(), seen=new Set(), rows=[];
  for(const row of file.rows){
-  const dest=String(row[destIndex]??'').trim().toUpperCase();
-  if(!tally.has(dest))continue;
-  // Misma unidad de seguimiento que la tabla: combinación única de placa, entrega, factura, ALM y origen.
-  const keys=['PLACA','NO ENTREGA','FACTURA','ALM','ORIGEN'];
-  const values=keys.map(k=>{const i=headers.indexOf(k);return i<0?'':String(row[i]??'').trim();});
-  const unique=JSON.stringify([dest,...values]);if(seen.has(unique))continue;seen.add(unique);
-  const s=tally.get(dest);s.total++;
-  const date=t1ArrivalDate(row[dateIndex]);
-  if(!date){s.unknown++;continue;}
-  const days=Math.max(0,Math.floor((today-date.getTime())/86400000));
-  if(days>t1DestinationLimits[dest])s.delayed++;
+  const destino=String(row[indices.destino]??'').trim().toUpperCase();
+  if(!Object.hasOwn(t1DestinationLimits,destino))continue;
+  const date=t1ArrivalDate(row[indices.fecha]);if(!date)continue;
+  const delay=Math.max(0,Math.floor((today-date.getTime())/86400000));
+  if(delay<t1DestinationLimits[destino])continue;
+  const placa=String(row[indices.placa]??'').trim(),entrega=String(row[indices.entrega]??'').trim(),factura=String(row[indices.factura]??'').trim();
+  const key=JSON.stringify([destino,date.getTime(),placa,entrega,factura]);
+  if(seen.has(key))continue;
+  seen.add(key);
+  rows.push({fecha:new Intl.DateTimeFormat('es-CO',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric'}).format(date),placa,entrega,factura,retraso:delay,destino});
  }
- return {tally,loaded:true};
+ rows.sort((a,b)=>b.retraso-a.retraso||a.destino.localeCompare(b.destino)||a.entrega.localeCompare(b.entrega));
+ return {loaded:true,rows};
 }
 function t1ShowSummary(){
  let dialog=document.getElementById('t1SummaryOverlay');
- if(!dialog){dialog=document.createElement('div');dialog.id='t1SummaryOverlay';dialog.className='t1SummaryOverlay';document.body.appendChild(dialog);
- dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('[data-close-t1summary]'))dialog.remove();});}
+ if(!dialog){
+  dialog=document.createElement('div');dialog.id='t1SummaryOverlay';dialog.className='t1SummaryOverlay';document.body.appendChild(dialog);
+  dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('[data-close-t1summary]'))dialog.remove();});
+ }
  const sections=['despachos','transitos'].map(kind=>{
-  const data=t1SummaryData(kind);
-  const rows=Object.entries(t1DestinationLimits).map(([dest,limit])=>{
-   const x=data.tally.get(dest);return '<tr><td>'+dest+'</td><td>'+limit+' días</td><td>'+x.total+'</td><td class="bad">'+x.delayed+'</td><td class="good">'+Math.max(0,x.total-x.delayed-x.unknown)+'</td></tr>';
-  }).join('');
-  const delayed=[...data.tally.values()].reduce((a,x)=>a+x.delayed,0);
-  return '<section class="t1SummarySection"><h3>🚛 '+(kind==='despachos'?'Despachos':'Tránsitos')+'</h3>'+
-  (!data.loaded?'<p>Sin archivo cargado.</p>':data.error?'<p>'+t1Escape(data.error)+'</p>':
-  '<p><strong>'+delayed+' registros con retraso superior al límite</strong></p><table><thead><tr><th>Destino</th><th>Límite</th><th>Total</th><th>Fuera de plazo</th><th>Dentro del plazo</th></tr></thead><tbody>'+rows+'</tbody></table>')+'</section>';
+  const data=t1SummaryData(kind),label=kind==='despachos'?'Despachos':'Tránsitos';
+  if(!data.loaded)return '<section class="t1SummarySection"><h3>🚛 '+label+'</h3><p>Sin archivo cargado.</p></section>';
+  if(data.error)return '<section class="t1SummarySection"><h3>🚛 '+label+'</h3><p>'+t1Escape(data.error)+'</p></section>';
+  const rows=data.rows.map(r=>'<tr><td>'+t1Escape(r.fecha)+'</td><td>'+t1Escape(r.placa)+'</td><td>'+t1Escape(r.entrega)+'</td><td>'+t1Escape(r.factura)+'</td><td class="bad">'+r.retraso+' días</td></tr>').join('');
+  return '<section class="t1SummarySection"><h3>🚛 '+label+'</h3><p><strong>'+data.rows.length+' registros con retraso igual o superior al límite</strong> · Desliza para consultar todos los registros</p><div class="t1SummaryScroll"><table><thead><tr><th>FECHA S.M.</th><th>PLACA</th><th>ENTREGA</th><th>FACTURA</th><th>RETRASO</th></tr></thead><tbody>'+ (rows||'<tr><td colspan="5">Sin registros que cumplan los límites.</td></tr>')+'</tbody></table></div></section>';
  }).join('');
- dialog.innerHTML='<div class="t1SummaryDialog" role="dialog" aria-modal="true" aria-label="Resumen de retrasos"><div class="t1SummaryTop"><div><h2>📊 Resumen de retrasos · Seguimiento T1</h2><p>Fecha de Colombia: '+new Intl.DateTimeFormat('es-CO',{dateStyle:'long',timeZone:'America/Bogota'}).format(new Date())+'</p></div><button class="t1SummaryClose" data-close-t1summary type="button">Cerrar ✕</button></div><div class="t1SummaryGrid">'+sections+'</div><p class="t1SummaryFoot">El retraso es la cantidad de días calendario desde FECHA S.M. Se cuenta como fuera de plazo cuando supera el límite establecido para el destino (no cuando lo iguala). La información indica antigüedad y no confirma por sí sola la llegada efectiva del vehículo. Solo se resumen los cinco destinos configurados.</p></div>';
+ dialog.innerHTML='<div class="t1SummaryDialog" role="dialog" aria-modal="true" aria-label="Resumen de retrasos"><div class="t1SummaryTop"><div><h2>📊 Resumen de retrasos · Seguimiento T1</h2><p>Fecha de Colombia: '+new Intl.DateTimeFormat('es-CO',{dateStyle:'long',timeZone:'America/Bogota'}).format(new Date())+'</p></div><button class="t1SummaryClose" data-close-t1summary type="button">Cerrar ✕</button></div><div class="t1SummaryGrid">'+sections+'</div><p class="t1SummaryFoot">Se incluyen registros cuyo retraso es igual o superior al límite de su destino: IBA04 (3 días), IBA26 (3), ICEV1 (3), IUN01 (1) e IBA02 (3). Se muestra una fila por combinación de destino, fecha, placa, entrega y factura, sin repetir materiales. Los días transcurridos no confirman por sí solos que un vehículo siga en tránsito.</p></div>';
  dialog.querySelector('[data-close-t1summary]')?.focus();
 }
 
