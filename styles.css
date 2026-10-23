@@ -1019,3 +1019,5 @@ select.tapaState:focus-visible{outline:3px solid #f59e0b!important;outline-offse
 .ctPlateFind{display:block;font-size:12px;margin-bottom:9px;color:#345}
 .ctPlateFind input{display:block;width:100%;padding:8px 10px;border:1px solid #ccdfec;border-radius:9px;background:#fff}
 @media(max-width:760px){.ctPlateSplit{grid-template-columns:1fr}}
+
+.ctPlateManualActions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}.ctPlateManualActions button{flex:1;min-width:160px}.ctPlateManualHelp{margin-top:14px;padding:10px 14px;background:#f0f7fc;border-radius:10px;border:1px solid #d4e7f6}
