@@ -468,7 +468,7 @@ async function ctPlateLoad(){
  ctPlateSent=ctPlateUnique(Array.isArray(sentResult.data)?sentResult.data:[]);
  ctPlateRenderSent();
  ctPlateAllPending=Array.isArray(data)?data:[];ctPlatePending=ctPlateUnique(ctPlateAllPending);ctPlatePreparedIds=[];
- $("ctPlateConfirm").disabled=true;
+
  $("ctPlateRows").innerHTML=ctPlatePending.map(r=>`<tr><td>${esc(r.transporte)}</td><td>${esc(r.placa)}</td><td><b>${esc(r.placa_fisica)}</b></td></tr>`).join("")||'<tr><td colspan="3">Sin cambios de placa pendientes de envío.</td></tr>';
  $("ctPlatePendingCount").textContent=String(ctPlatePending.length);
  status.textContent=`${ctPlatePending.length} pendientes · ${ctPlateSent.length} enviados. Sin duplicados por transporte.`;
@@ -479,28 +479,49 @@ function ctPlateRenderSent(){
  $("ctPlateSentRows").innerHTML=visible.map(r=>`<tr><td>${esc(r.transporte)}</td><td>${esc(r.placa)}</td><td><b>${esc(r.placa_fisica)}</b></td></tr>`).join("")||'<tr><td colspan="3">Sin registros para la búsqueda.</td></tr>';
  $("ctPlateSentCount").textContent=String(ctPlateSent.length);
 }
-async function ctPlateSend(){
- if(!canModule("cargo","view"))return;
- const button=$("ctPlateSend");button.disabled=true;
+function ctPlateTableHtml(rows){
+ const cells=rows.map(r=>`<tr><td style="border:1px solid #cbd5e1;padding:7px">${esc(r.transporte)}</td><td style="border:1px solid #cbd5e1;padding:7px">${esc(r.placa)}</td><td style="border:1px solid #cbd5e1;padding:7px">${esc(r.placa_fisica)}</td></tr>`).join("");
+ return `<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px"><thead><tr style="background:#17496d;color:#fff"><th style="padding:9px;border:1px solid #cbd5e1">Transporte</th><th style="padding:9px;border:1px solid #cbd5e1">Placa</th><th style="padding:9px;border:1px solid #cbd5e1">Placa física</th></tr></thead><tbody>${cells}</tbody></table>`;
+}
+async function ctPlateCopy(){
+ const button=$("ctPlateCopy"),status=$("ctPlateCopyStatus");button.disabled=true;
  try{
-  await ctPlateLoad();
-  if(!ctPlatePending.length){toast("No hay cambios pendientes para enviar.");return;}
-  const to=$("ctPlateTo").value.split(/[,;]/).map(v=>v.trim()).filter(Boolean);
-  if(!to.length||to.length>20||!to.every(v=>/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(v))){toast("Introduce de 1 a 20 destinatarios válidos.");return;}
-  const subject=$("ctPlateSubject").value.trim()||"CD Girardota | Reporte de cambios de placa";
-  const description=$("ctPlateDescription").value.trim();
-  const ids=ctPlatePending.map(r=>Number(r.id));
-  if(!confirm(`Se enviará un informe HTML con ${ids.length} cambios de placa a ${to.join(", ")}. ¿Enviar ahora?`))return;
-  const {data,error}=await sb.functions.invoke("ct-plate-report-email",{body:{pin:loginPin,to,subject,description,ids}});
-  if(error||!data?.ok){const msg=data?.error||error?.message||"No se recibió confirmación del servidor";throw new Error(msg)}
-  toast(`Correo aceptado por el proveedor: ${data.count} cambio(s).`);
-  await ctPlateLoad();
-  $("ctPlateStatus").textContent=`Informe HTML enviado para ${data.count} cambios. Referencia: ${data.email_id||"—"}.`;
- }catch(err){toast("El informe no se pudo confirmar: "+(err?.message||err));$("ctPlateStatus").textContent="Error al enviar: "+(err?.message||err)+". Los registros no se retiraron automáticamente.";}
+  if(!ctPlatePending.length){toast("No hay cambios pendientes para copiar.");return;}
+  const textData=["Transporte\tPlaca\tPlaca física",...ctPlatePending.map(r=>[r.transporte,r.placa,r.placa_fisica].join("\t"))].join("\n");
+  const htmlData=ctPlateTableHtml(ctPlatePending);
+  if(navigator.clipboard?.write && window.ClipboardItem){
+   const item=new ClipboardItem({"text/html":new Blob([htmlData],{type:"text/html"}),"text/plain":new Blob([textData],{type:"text/plain"})});
+   await navigator.clipboard.write([item]);
+   status.textContent=`Se copiaron ${ctPlatePending.length} cambios con formato de tabla. Pégalos en el correo.`;
+  }else if(navigator.clipboard?.writeText){
+   await navigator.clipboard.writeText(textData);
+   status.textContent=`Se copiaron ${ctPlatePending.length} cambios en columnas de texto.`;
+  }else{
+   const ta=document.createElement("textarea");ta.value=textData;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();const ok=document.execCommand("copy");ta.remove();if(!ok)throw Error("El navegador bloqueó el portapapeles");
+   status.textContent=`Se copiaron ${ctPlatePending.length} cambios en texto.`;
+  }
+  toast("Tabla copiada. Pégala en tu correo y envíala antes de marcarla como enviada.");
+ }catch(err){status.textContent="No se pudo copiar: "+(err?.message||err)+". Revisa el permiso del portapapeles.";toast(status.textContent);}
  finally{button.disabled=false;}
 }
-async function ctPlateConfirm(){if(!ctPlatePreparedIds.length)return;if(!confirm("Confirma solo si el correo se ENVIÓ realmente. Se retirarán "+ctPlatePreparedIds.length+" cambio(s) del listado compartido, sin modificar placas físicas."))return;const {data,error}=await sb.rpc("ct_plate_changes_mark_sent_secure",{p_pin:loginPin,p_ids:ctPlatePreparedIds});if(error){toast("No se pudo confirmar el envío: "+error.message);return;}toast((data??0)+" cambio(s) retirado(s) de pendientes.");await ctPlateLoad();}
-function ctPlateSetup(){const b=$("ctPlateChangesTab");if(!b)return;b.addEventListener("click",()=>switchModule("platechanges"));$("ctPlateReload")?.addEventListener("click",ctPlateLoad);$("ctPlateSend")?.addEventListener("click",ctPlateSend);$("ctPlateConfirm")?.addEventListener("click",ctPlateConfirm);$("ctPlateSentSearch")?.addEventListener("input",ctPlateRenderSent);}
+async function ctPlateMarkSent(){
+ if(!canModule("cargo","view")||!sb||!loginPin)return;
+ const button=$("ctPlateMarkSent");button.disabled=true;
+ try{
+  // Volver a consultar para incluir solo pendientes vigentes y evitar reenvíos duplicados.
+  await ctPlateLoad();
+  const ids=[...new Set(ctPlatePending.map(r=>Number(r.id)).filter(Number.isSafeInteger))];
+  if(!ids.length){toast("No hay cambios pendientes para marcar.");return;}
+  if(!confirm(`¿Confirmas que YA ENVIASTE MANUALMENTE el correo con ${ids.length} cambio(s) de placa?\n\nSe moverán al historial y desaparecerán de Pendientes de enviar. Esta operación no envía ningún correo.`))return;
+  const {data,error}=await sb.rpc("ct_plate_changes_mark_sent_secure",{p_pin:loginPin,p_ids:ids});
+  if(error)throw error;
+  await ctPlateLoad();
+  $("ctPlateCopyStatus").textContent=`Se confirmó el envío manual. ${ids.length} cambio(s) procesados; revisa el historial.`;
+  toast("Cambios trasladados al historial de enviados.");
+ }catch(err){toast("No se pudieron marcar como enviados: "+(err?.message||err));}
+ finally{button.disabled=false;}
+}
+function ctPlateSetup(){const b=$("ctPlateChangesTab");if(!b)return;b.addEventListener("click",()=>switchModule("platechanges"));$("ctPlateReload")?.addEventListener("click",ctPlateLoad);$("ctPlateCopy")?.addEventListener("click",ctPlateCopy);$("ctPlateMarkSent")?.addEventListener("click",ctPlateMarkSent);$("ctPlateSentSearch")?.addEventListener("input",ctPlateRenderSent);}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",ctPlateSetup);else ctPlateSetup();
 function normalizePhysicalPlate(value){let v=String(value||"").toLocaleUpperCase("es").replace(/\s+/g,"");if(v&&!v.startsWith("CO"))v="CO"+v;return v.slice(0,8)}
 function vehicleClass(v){return v==="Bodega"?"vehicle-bodega":v==="Sobredimensionado"?"vehicle-sobredimensionado":v==="OK para utilizar"?"vehicle-ok":""}
