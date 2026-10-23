@@ -1004,3 +1004,6 @@ select.tapaState:focus-visible{outline:3px solid #f59e0b!important;outline-offse
 
 /* Indicador para confirmar que Vercel sirve el nuevo código */
 .ctCheckinSeparationStatus{font-size:12px;color:#416079;margin:8px 0 12px;padding:6px 10px;background:#edf6fc;border:1px solid #c7e0f2;border-radius:8px;}
+
+/* Cambios de placa v5.64 */
+.ctPlateCard{max-width:1200px;margin:16px auto;padding:22px}.ctPlateHeading{display:flex;justify-content:space-between;align-items:center;gap:16px}.ctPlateMail{display:grid;gap:12px;margin-top:20px;border-top:1px solid #c9dded;padding-top:18px}.ctPlateMail label{display:grid;gap:6px;color:#163b59;font-weight:700}.ctPlateMail input,.ctPlateMail textarea{width:100%;box-sizing:border-box;max-width:100%;border:1px solid #b8cfe1;border-radius:10px;padding:11px;background:white;color:#123}.ctPlateButtons{display:flex;gap:12px;flex-wrap:wrap}.ctPlateButtons button:disabled{opacity:.5;cursor:not-allowed}
