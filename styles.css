@@ -1007,3 +1007,15 @@ select.tapaState:focus-visible{outline:3px solid #f59e0b!important;outline-offse
 
 /* Cambios de placa v5.64 */
 .ctPlateCard{max-width:1200px;margin:16px auto;padding:22px}.ctPlateHeading{display:flex;justify-content:space-between;align-items:center;gap:16px}.ctPlateMail{display:grid;gap:12px;margin-top:20px;border-top:1px solid #c9dded;padding-top:18px}.ctPlateMail label{display:grid;gap:6px;color:#163b59;font-weight:700}.ctPlateMail input,.ctPlateMail textarea{width:100%;box-sizing:border-box;max-width:100%;border:1px solid #b8cfe1;border-radius:10px;padding:11px;background:white;color:#123}.ctPlateButtons{display:flex;gap:12px;flex-wrap:wrap}.ctPlateButtons button:disabled{opacity:.5;cursor:not-allowed}
+
+/* v5.66 Cambios de placa: dos paneles compactos */
+.ctPlateSplit{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:14px;align-items:start}
+.ctPlatePanel{border:1px solid #d7e3f0;border-radius:14px;padding:12px;min-width:0;background:#fbfdff}
+.ctPlatePanel h3{font-size:16px;margin:0 0 12px;color:#103d61;display:flex;align-items:center;gap:8px}
+.ctPlatePanel h3 span{font-size:12px;border-radius:25px;padding:3px 8px;background:#e1f0ff}
+.ctPlatePanel .tableWrap{max-height:370px;overflow:auto}
+.ctPlatePanel table{width:100%;table-layout:fixed;font-size:12px;border-collapse:collapse}
+.ctPlatePanel th,.ctPlatePanel td{padding:7px 6px;overflow-wrap:anywhere}
+.ctPlateFind{display:block;font-size:12px;margin-bottom:9px;color:#345}
+.ctPlateFind input{display:block;width:100%;padding:8px 10px;border:1px solid #ccdfec;border-radius:9px;background:#fff}
+@media(max-width:760px){.ctPlateSplit{grid-template-columns:1fr}}
