@@ -224,6 +224,48 @@ function t1ArrivalDate(value){
 }
 function t1BogotaToday(){const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const value=Object.fromEntries(parts.map(x=>[x.type,x.value]));return Date.UTC(+value.year,+value.month-1,+value.day);}
 
+
+const t1DestinationLimits={'IBA04':3,'IBA26':3,'ICEV1':3,'IUN01':1,'IBA02':3};
+function t1SummaryData(kind){
+ const file=t1Cached[kind], tally=new Map(Object.keys(t1DestinationLimits).map(k=>[k,{total:0,delayed:0,unknown:0}]));
+ if(!file?.rows?.length)return {tally,loaded:false};
+ const headers=(file.headers||[]).map(x=>String(x??'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
+ const destIndex=headers.indexOf('DESTINO'),dateIndex=headers.indexOf('FECHA S.M.');
+ if(destIndex<0||dateIndex<0)return {tally,loaded:true,error:'Falta la columna DESTINO o FECHA S.M.'};
+ const seen=new Set(), today=t1BogotaToday();
+ for(const row of file.rows){
+  const dest=String(row[destIndex]??'').trim().toUpperCase();
+  if(!tally.has(dest))continue;
+  // Misma unidad de seguimiento que la tabla: combinación única de placa, entrega, factura, ALM y origen.
+  const keys=['PLACA','NO ENTREGA','FACTURA','ALM','ORIGEN'];
+  const values=keys.map(k=>{const i=headers.indexOf(k);return i<0?'':String(row[i]??'').trim();});
+  const unique=JSON.stringify([dest,...values]);if(seen.has(unique))continue;seen.add(unique);
+  const s=tally.get(dest);s.total++;
+  const date=t1ArrivalDate(row[dateIndex]);
+  if(!date){s.unknown++;continue;}
+  const days=Math.max(0,Math.floor((today-date.getTime())/86400000));
+  if(days>t1DestinationLimits[dest])s.delayed++;
+ }
+ return {tally,loaded:true};
+}
+function t1ShowSummary(){
+ let dialog=document.getElementById('t1SummaryOverlay');
+ if(!dialog){dialog=document.createElement('div');dialog.id='t1SummaryOverlay';dialog.className='t1SummaryOverlay';document.body.appendChild(dialog);
+ dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('[data-close-t1summary]'))dialog.remove();});}
+ const sections=['despachos','transitos'].map(kind=>{
+  const data=t1SummaryData(kind);
+  const rows=Object.entries(t1DestinationLimits).map(([dest,limit])=>{
+   const x=data.tally.get(dest);return '<tr><td>'+dest+'</td><td>'+limit+' días</td><td>'+x.total+'</td><td class="bad">'+x.delayed+'</td><td class="good">'+Math.max(0,x.total-x.delayed-x.unknown)+'</td></tr>';
+  }).join('');
+  const delayed=[...data.tally.values()].reduce((a,x)=>a+x.delayed,0);
+  return '<section class="t1SummarySection"><h3>🚛 '+(kind==='despachos'?'Despachos':'Tránsitos')+'</h3>'+
+  (!data.loaded?'<p>Sin archivo cargado.</p>':data.error?'<p>'+t1Escape(data.error)+'</p>':
+  '<p><strong>'+delayed+' registros con retraso superior al límite</strong></p><table><thead><tr><th>Destino</th><th>Límite</th><th>Total</th><th>Fuera de plazo</th><th>Dentro del plazo</th></tr></thead><tbody>'+rows+'</tbody></table>')+'</section>';
+ }).join('');
+ dialog.innerHTML='<div class="t1SummaryDialog" role="dialog" aria-modal="true" aria-label="Resumen de retrasos"><div class="t1SummaryTop"><div><h2>📊 Resumen de retrasos · Seguimiento T1</h2><p>Fecha de Colombia: '+new Intl.DateTimeFormat('es-CO',{dateStyle:'long',timeZone:'America/Bogota'}).format(new Date())+'</p></div><button class="t1SummaryClose" data-close-t1summary type="button">Cerrar ✕</button></div><div class="t1SummaryGrid">'+sections+'</div><p class="t1SummaryFoot">El retraso es la cantidad de días calendario desde FECHA S.M. Se cuenta como fuera de plazo cuando supera el límite establecido para el destino (no cuando lo iguala). La información indica antigüedad y no confirma por sí sola la llegada efectiva del vehículo. Solo se resumen los cinco destinos configurados.</p></div>';
+ dialog.querySelector('[data-close-t1summary]')?.focus();
+}
+
 function t1ArrivalDetails(kind,by,value){
  const data=t1Cached[kind];if(!data?.rows)return;
  const h=(data.headers||[]).map(x=>String(x??'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
@@ -283,6 +325,7 @@ async function t1Delete(kind){const cfg=t1Settings[kind],cur=t1Cached[kind];if(!
  if(!confirm(`¿BORRAR el archivo ${cur.filename||kind} de Supabase? Este proceso no se puede deshacer.`))return;
  const btn=$(cfg.remove);btn.disabled=true;try{const {error}=await sb.rpc('ct_t1_file_delete',{p_pin:loginPin,p_kind:kind});if(error)throw error;await t1LoadFiles();t1Message('Archivo '+kind+' eliminado correctamente.');}catch(e){t1Message('No se pudo borrar: '+e.message,true);}finally{btn.disabled=false;}}
 
+document.addEventListener('click',e=>{if(e.target.closest('#t1SummaryOpen'))t1ShowSummary();});
 async function init(){for(const [kind,c] of Object.entries(t1Settings)){$(c.button).addEventListener("click",()=>void t1Upload(kind));$(c.remove).addEventListener("click",()=>void t1Delete(kind));const toggle=$(kind==="despachos"?"t1DespachosRecountToggle":"t1TransitosRecountToggle");toggle.addEventListener("click",()=>{const panel=$(c.preview);panel.hidden=!panel.hidden;toggle.classList.toggle("active",!panel.hidden);});const pt=$(kind==="despachos"?"t1DespachosPendingToggle":"t1TransitosPendingToggle");pt.addEventListener("click",()=>{const panel=$(kind==="despachos"?"t1DespachosPending":"t1TransitosPending");panel.hidden=!panel.hidden;pt.classList.toggle("active",!panel.hidden);if(!panel.hidden)t1ArrivalRender(kind,t1Cached[kind]);});}if(!configured()){$("loginMsg").innerHTML="Falta configurar <b>config.js</b>. Revisa README.";return}if(!window.supabase?.createClient){$("loginMsg").textContent="No cargó el servicio de inicio de sesión. Verifica internet y recarga la página.";return;}sb=supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);$("mainModuleBtn").onclick=()=>switchModule("main");$("tapaModuleBtn").onclick=()=>switchModule("tapa");$("cargoPrimaryBtn").onclick=()=>switchModule(activeTopModule==="cargo"?(activeModule==="tapa"?"tapa":"main"):"main");$("checkinPrimaryBtn").onclick=()=>switchModule("checkin");$("brujulaPrimaryBtn").onclick=()=>switchModule("brujula");$("syncPrimaryBtn").onclick=()=>switchModule("sync");$("tapaFamilyFilter").onchange=renderTapa;$("tapaClientFilter").onchange=renderTapa;$("tapaSearch").oninput=renderTapa;$("loginBtn").onclick=login;$("pin").onkeydown=e=>e.key==="Enter"&&login();$("logout").onclick=logout;$("ctReturnsEntry").onclick=ctOpenReturns;$("ctFinanceEntry").onclick=ctOpenFinance;$("ctValidacionesEntry").onclick=ctOpenValidaciones;$("ctReturnsBack").onclick=ctCloseReturns;$("users").addEventListener("click",e=>{const finance=e.target.closest('.ctFinanceUserToggle');if(finance){void ctChangeFinancePermission(finance.dataset.user,finance.dataset.enabled!=='true');return;}const b=e.target.closest('.ctReturnsUserToggle');if(!b)return;void ctChangeReturnsPermission(b.dataset.user,b.dataset.enabled!=='true');});$("ctManualRefresh")?.addEventListener("click",()=>{void ctManualRefreshAll()});for(const id of ["smartPlate","smartTransport","smartStatus"])$(id).addEventListener(id==="smartStatus"?"change":"input",renderSmartSearch);$("smartClear").onclick=()=>{for(const id of ["smartPlate","smartTransport","smartStatus"])$(id).value="";renderSmartSearch()};$("smartResults").addEventListener("click",e=>{const b=e.target.closest(".smartGoTo");if(b)openSmartResult(b.dataset.category,b.dataset.transporte)});$("openPorteriaPending").onclick=openPorteriaPending;$("closePorteriaPending").onclick=closePorteriaPending;$("porteriaPendingModal").addEventListener("click",e=>{if(e.target.id==="porteriaPendingModal")closePorteriaPending()});document.addEventListener("keydown",e=>{if(e.key==="Escape")closePorteriaPending()});function updateCategoryTabs(){document.querySelectorAll(".categoryTab[data-category]").forEach(btn=>{const on=categoryMultiMode?selectedCategories.includes(btn.dataset.category):btn.dataset.category===activeCategory;btn.classList.toggle("active",on);btn.setAttribute("aria-selected",String(on))});$("clearCategorySelection").style.display=categoryMultiMode?"inline-block":"none";$("categorySelectionHint").textContent=categoryMultiMode?"Selección múltiple activa: haz clic en las demás pestañas para agregarlas o quitarlas.":"Para combinar pestañas, haz doble clic en la primera pestaña y luego haz clic en las demás."}document.querySelectorAll(".categoryTab[data-category]").forEach(btn=>{btn.addEventListener("dblclick",e=>{e.preventDefault();const cat=btn.dataset.category;if(cat==="Todos"){categoryMultiMode=false;selectedCategories=[];activeCategory="Todos";toast("La pestaña Todos ya reúne todas las categorías.");}else{categoryMultiMode=true;selectedCategories=[cat];activeCategory="__MULTI__";toast("Selección múltiple activada. Ahora elige las demás pestañas.");}updateCategoryTabs();ctUpdateOnlineClearButton();render()});btn.addEventListener("click",()=>{const cat=btn.dataset.category;if(categoryMultiMode){if(cat==="Todos"){categoryMultiMode=false;selectedCategories=[];activeCategory="Todos"}else{selectedCategories=selectedCategories.includes(cat)?selectedCategories.filter(x=>x!==cat):[...selectedCategories,cat];if(!selectedCategories.length){categoryMultiMode=false;activeCategory="Viajes HYM y URBAN"}}}else{activeCategory=cat;selectedCategories=[]}updateCategoryTabs();ctUpdateOnlineClearButton();render()})});$("clearCategorySelection").addEventListener("click",()=>{categoryMultiMode=false;selectedCategories=[];activeCategory="Viajes HYM y URBAN";updateCategoryTabs();ctUpdateOnlineClearButton();render()});updateCategoryTabs();setupCategoryHoverPreview();$("ctClearOnlineTrips").onclick=ctClearOnlineTrips;$("importBtn").onclick=prepareImport;$("confirmImportBtn").onclick=confirmImport;$("cancelImportBtn").onclick=cancelImport;$("previewClose").onclick=cancelImport;$("downloadBtn").onclick=downloadExcel;$("beesCompareBtn").onclick=compareBeesCsv;$("beesClearBtn").onclick=clearBeesReport;$("porteriaUploadBtn").onclick=loadPorteriaExcel;$("porteriaClearBtn").onclick=clearPorteria;$("addUser").onclick=addUser;$("saveModulePermissions").onclick=saveModulePermissionEdits;$("cancelModulePermissions").onclick=()=>$("modulePermissionEditor").classList.add("hidden");$("newRole").onchange=updateRoleOptions;$("deleteAllBtn").onclick=deleteAllTransports;$("cancelDeleteBtn").onclick=closeDeleteModal;$("confirmDeleteBtn").onclick=confirmDeleteAll;$("deleteConfirmModal").addEventListener("click",e=>{if(e.target.id==="deleteConfirmModal")closeDeleteModal()});document.querySelectorAll(".statCard").forEach(card=>{card.addEventListener("click",()=>openStatChart(card.dataset.stat));card.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openStatChart(card.dataset.stat)}})});$("statChartClose").onclick=closeStatChart;$("statChartModal").addEventListener("click",e=>{if(e.target.id==="statChartModal")closeStatChart()});document.addEventListener("keydown",e=>{if(e.key==="Escape")closeStatChart()})}
 async function login(){
  const msg=$("loginMsg"),button=$("loginBtn"),pin=$("pin").value.trim();
