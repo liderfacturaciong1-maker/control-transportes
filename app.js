@@ -809,6 +809,14 @@ async function ctOpenPermissionEditor(id){
  modules.querySelectorAll('input[data-mode="edit"]').forEach(ch=>ch.addEventListener('change',()=>{if(ch.checked)modules.querySelector('input[data-module="'+ch.dataset.module+'"][data-mode="view"]').checked=true}));
  modules.querySelectorAll('input[data-mode="view"]').forEach(ch=>ch.addEventListener('change',()=>{if(!ch.checked)modules.querySelector('input[data-module="'+ch.dataset.module+'"][data-mode="edit"]').checked=false}));
  const vr=$('ctEditorValidaciones');vr.replaceChildren();
+ const gate=document.createElement('div');gate.className='ctEditorModule ctMainSubmoduleGate';
+ const gateTitle=document.createElement('strong');gateTitle.textContent='🔐 Visibilidad de submódulos en pantalla principal';
+ const gateHelp=document.createElement('small');gateHelp.textContent='Sin autorización, el botón no aparecerá al ingresar. Cada permiso es independiente.';
+ gate.append(gateTitle,gateHelp);
+ const gateOptions=[['finance','💵 Liquidación Financiera'],['validaciones','✅ Validaciones Operación'],['returns','📦 Seguimiento T1'],['billing','👕 Facturación - Portería']];
+ for(const [key,title] of gateOptions){const lab=document.createElement('label'),ck=document.createElement('input');ck.type='checkbox';ck.id='ctSubGate_'+key;lab.append(ck,document.createTextNode(' '+title));gate.append(lab);}
+ vr.append(gate);
+
   const actionResult=await sb.rpc('ct_cargo_action_admin_user_rights',{p_admin_pin:loginPin,p_user_id:id});
  if(actionResult.error){toast('Permiso configuración de acciones: '+actionResult.error.message);return;}
  const actionLabel=document.createElement('label'),actionCheck=document.createElement('input');actionCheck.type='checkbox';actionCheck.id='ctManageCargoActions';actionCheck.checked=actionResult.data===true;actionLabel.append(actionCheck,document.createTextNode(' Puede configurar acciones globales de Cargue y Despacho'));$('ctEditorGeneral').append(actionLabel);
@@ -817,7 +825,7 @@ async function ctOpenPermissionEditor(id){
  const vwrap=document.createElement('div');vwrap.className='ctEditorModule';
  const vtitle=document.createElement('strong');vtitle.textContent='Validaciones Operación';
  const vlabel=document.createElement('label'),vcheck=document.createElement('input');vcheck.type='checkbox';vcheck.id='ctValidacionesView';vcheck.checked=vresult.data===true;
- vlabel.append(vcheck,document.createTextNode(' Permitir ingresar'));vwrap.append(vtitle,vlabel);vr.append(vwrap);
+ vlabel.append(vcheck,document.createTextNode(' Permitir ingresar'));vwrap.append(vtitle,vlabel);vr.append(vwrap);$('ctSubGate_validaciones').checked=vcheck.checked;vcheck.addEventListener('change',()=>{$('ctSubGate_validaciones').checked=vcheck.checked});$('ctSubGate_validaciones').addEventListener('change',()=>{vcheck.checked=$('ctSubGate_validaciones').checked});
  const billResult=await sb.rpc('ct_billing_porteria_admin_user_rights',{p_admin_pin:loginPin,p_user_id:id});
  if(billResult.error){toast('No se pudo consultar Facturación - Portería: '+billResult.error.message);return;}
  const billWrap=document.createElement('div');billWrap.className='ctEditorModule';
@@ -836,7 +844,13 @@ async function ctOpenPermissionEditor(id){
  }
  billWrap.append(group);
  }
- vr.append(billWrap);
+ vr.append(billWrap);$('ctSubGate_billing').checked=!!(tabRes.data?.rotation||tabRes.data?.handover);$('ctSubGate_billing').addEventListener('change',()=>{const on=$('ctSubGate_billing').checked;$('ctBillingPorteriaView').checked=on;if(!on){for(const k of ['rotation','handover']){$('ctBillTab_'+k).checked=false;$('ctBillTab_'+k+'_edit').checked=false}}else if(!$('ctBillTab_rotation').checked&&!$('ctBillTab_handover').checked){$('ctBillTab_rotation').checked=true}});
+ const retGateResult=await sb.rpc('ct_devoluciones_admin_list',{p_admin_pin:loginPin});
+ if(retGateResult.error){toast('No se pudo consultar Seguimiento T1: '+retGateResult.error.message);return;}
+ $('ctSubGate_returns').checked=!!retGateResult.data?.some(r=>String(r.user_id)===String(id)&&r.can_view===true);
+ const finGateResult=await sb.rpc('ct_finance_admin_list',{p_admin_pin:loginPin});
+ if(finGateResult.error){toast('No se pudo consultar Liquidación Financiera: '+finGateResult.error.message);return;}
+ $('ctSubGate_finance').checked=!!finGateResult.data?.some(r=>String(r.user_id)===String(id)&&r.can_view===true);
  const financeRoot=$('ctEditorFinance');financeRoot.replaceChildren();
  const fresult=await sb.rpc('ct_finance_admin_user_rights',{p_admin_pin:loginPin,p_user_id:id});
  if(fresult.error){toast('No se pudieron consultar permisos financieros: '+fresult.error.message);return;}
@@ -857,14 +871,24 @@ async function ctSaveUserRights(){
  if(role==='Administrador'&&!confirm('Convertir a este usuario en administrador le concederá permisos elevados. ¿Continuar?'))return;
  const args={p_admin_pin:loginPin,p_user_id:u.id,p_role:role,p_can_upload:flag('can_upload'),p_can_create_users:flag('can_create_users'),p_can_delete_all_transports:flag('can_delete_all_transports'),p_can_arm:flag('can_arm'),p_can_count:flag('can_count'),p_can_load:flag('can_load'),p_can_edit_availability:flag('can_edit_availability'),p_can_edit_physical_plate:flag('can_edit_physical_plate'),p_can_manage_checkin:flag('can_manage_checkin')};
  const rights={};for(const mod of Object.keys(ctModuleLabels))for(const mode of ['view','edit'])rights[mod+'_'+mode]=$('ctEditorModules').querySelector('[data-module="'+mod+'"][data-mode="'+mode+'"]').checked;
+ // Mantener sincronizados permisos existentes con la visibilidad del menú principal.
+ $('ctValidacionesView').checked=$('ctSubGate_validaciones').checked;
+ const isBillingVisible=$('ctSubGate_billing').checked;
+ $('ctBillingPorteriaView').checked=isBillingVisible;
+ if(!isBillingVisible)for(const k of ['rotation','handover']){$('ctBillTab_'+k).checked=false;$('ctBillTab_'+k+'_edit').checked=false;}
  const btn=$('ctEditorSave');btn.disabled=true;$('ctEditorStatus').textContent='Guardando permisos…';
  try{
   const general=await sb.rpc('admin_set_user_all_permissions_secure',args);if(general.error)throw general.error;
   const modules=await sb.rpc('admin_set_module_permissions',{p_admin_pin:loginPin,p_user_id:u.id,p_rights:rights});if(modules.error)throw Error('Permisos generales guardados, pero falló el acceso a módulos: '+modules.error.message);
   const financeRights={};for(const tab of Object.keys(ctFinanceTabs))for(const mode of ['view','edit'])financeRights[tab+'_'+mode]=$('ctEditorFinance').querySelector('[data-finance-tab="'+tab+'"][data-finance-mode="'+mode+'"]').checked;
+  if(!$('ctSubGate_finance').checked){for(const key of Object.keys(financeRights))financeRights[key]=false;}
   const fresult=await sb.rpc('ct_finance_admin_set_user_rights',{p_admin_pin:loginPin,p_user_id:u.id,p_rights:financeRights});if(fresult.error)throw Error('Permisos generales guardados, pero falló Liquidación Financiera: '+fresult.error.message);
   const aresult=await sb.rpc('ct_cargo_action_admin_set_user_rights',{p_admin_pin:loginPin,p_user_id:u.id,p_enabled:$('ctManageCargoActions').checked});if(aresult.error)throw Error('No se pudo guardar permiso para configurar acciones: '+aresult.error.message);
-  const vresult=await sb.rpc('ct_validaciones_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctValidacionesView').checked});if(vresult.error)throw Error('No se pudo guardar Validaciones Operación: '+vresult.error.message);
+    const retGate=await sb.rpc('ct_devoluciones_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctSubGate_returns').checked});
+  if(retGate.error)throw Error('No se pudo guardar visibilidad de Seguimiento T1: '+retGate.error.message);
+  const finGate=await sb.rpc('ct_finance_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctSubGate_finance').checked});
+  if(finGate.error)throw Error('No se pudo guardar visibilidad de Liquidación Financiera: '+finGate.error.message);
+const vresult=await sb.rpc('ct_validaciones_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctValidacionesView').checked});if(vresult.error)throw Error('No se pudo guardar Validaciones Operación: '+vresult.error.message);
   const bresult=await sb.rpc('ct_billing_porteria_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctBillingPorteriaView').checked});if(bresult.error)throw Error('No se pudo guardar Facturación - Portería: '+bresult.error.message);
   const tabResult=await sb.rpc('ct_billing_porteria_admin_tabs_set',{p_admin_pin:loginPin,p_user_id:u.id,p_rotation:$('ctBillTab_rotation').checked,p_handover:$('ctBillTab_handover').checked,p_rotation_edit:$('ctBillTab_rotation_edit').checked,p_handover_edit:$('ctBillTab_handover_edit').checked});
   if(tabResult.error)throw Error('No se pudieron guardar permisos de pestañas: '+tabResult.error.message);
