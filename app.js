@@ -407,9 +407,11 @@ async function ctBillingCheckAccess(){
  $('ctPorteriaBillingEntry')?.classList.toggle('hidden',!ctBillingAllowed || ctBillingOpen);
  return ctBillingAllowed;
 }
+window.ctRotationApi=async(name,args={})=>{if(!sb||!loginPin||!ctBillingAllowed)throw Error('Acceso no autorizado');const {data,error}=await sb.rpc(name,{p_pin:loginPin,...args});if(error)throw Error(error.message);return data;};
+window.ctRotationIsAdmin=()=>!!permissions?.is_admin;
 async function ctBillingOpenModule(){
  if(!await ctBillingCheckAccess()){toast('No tienes permiso para Facturación - Portería');return;}
- ctBillingOpen=true;$('app').classList.add('hidden');$('ctReturnsModule').classList.add('hidden');$('ctPorteriaBillingModule').classList.remove('hidden');$('ctReturnsBack').classList.remove('hidden');$('ctPorteriaBillingEntry').classList.add('hidden');$('ctReturnsEntry').classList.add('hidden');$('ctManualRefresh')?.classList.add('hidden');window.scrollTo({top:0,behavior:'smooth'});
+ ctBillingOpen=true;window.dispatchEvent(new Event('ct-billing-opened'));$('app').classList.add('hidden');$('ctReturnsModule').classList.add('hidden');$('ctPorteriaBillingModule').classList.remove('hidden');$('ctReturnsBack').classList.remove('hidden');$('ctPorteriaBillingEntry').classList.add('hidden');$('ctReturnsEntry').classList.add('hidden');$('ctManualRefresh')?.classList.add('hidden');window.scrollTo({top:0,behavior:'smooth'});
 }
 function ctBillingCloseModule(){
  ctBillingOpen=false;$('ctPorteriaBillingModule').classList.add('hidden');$('app').classList.remove('hidden');$('ctReturnsBack').classList.add('hidden');$('ctPorteriaBillingEntry').classList.toggle('hidden',!ctBillingAllowed);$('ctReturnsEntry').classList.toggle('hidden',!ctReturnsAllowed);$('ctManualRefresh')?.classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});
