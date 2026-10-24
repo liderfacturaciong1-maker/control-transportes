@@ -41,10 +41,35 @@ function history(){
    rows.push('<tr class="rotHistoryDay"><td>'+fmt(date)+'</td><td>'+day(date)+'</td>'+cells+'</tr>');
   }
  }
+ const picker=$('rotPhotoWeek');if(picker){const previous=picker.value;picker.innerHTML=list.map(w=>'<option value="'+esc(w.week_start)+'">'+fmt(w.week_start)+' — '+fmt(add(w.week_start,6))+'</option>').join('');if(list.some(w=>w.week_start===previous))picker.value=previous;}
+ $('rotShowHistory').disabled=!list.length;
  $('rotHistoryBody').innerHTML=rows.join('')||'<tr><td colspan="'+(count+2)+'">Aún no hay turnos asignados en semanas confirmadas.</td></tr>';
  $('rotHistoryBody').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{start=b.dataset.edit;const w=saved.find(x=>x.week_start===start);if(w){conf.shifts=[...w.shifts];draft=structuredClone(w.schedule||{});editor('shifts');render();status('Editando semana histórica '+fmt(start)+'. Guarda para confirmar los cambios.')}});
  $('rotHistoryBody').querySelectorAll('[data-delete]').forEach(b=>b.onclick=async()=>{const week=b.dataset.delete;if(!confirm('¿Eliminar de forma permanente toda la semana '+fmt(week)+'?'))return;try{await api('ct_rotation_week_delete',{p_week_start:week});await loadWeek();status('Semana eliminada.')}catch(e){status('No se pudo eliminar: '+e.message)}});
 }
+
+
+function showPhoto(weekStart){
+ const modal=$('rotPhotoModal'),w=saved.find(x=>x.week_start===weekStart);
+ if(!modal||!w)return;
+ $('rotPhotoPeriod').textContent='Semana del '+fmt(w.week_start)+' al '+fmt(add(w.week_start,6));
+ const shifts=w.shifts||[],count=Math.max(4,shifts.length);
+ let html='<table class="rotPhotoTable"><thead><tr><th>FECHA</th><th>DÍA</th>'+Array.from({length:count},(_,j)=>'<th>Turno '+(j+1)+'</th>').join('')+'</tr></thead><tbody>';
+ html+='<tr class="rotPhotoShiftRow"><td colspan="2">TURNOS ASIGNADOS</td>'+Array.from({length:count},(_,j)=>'<td>'+esc(shifts[j]||'—')+'</td>').join('')+'</tr>';
+ for(let i=0;i<(w.schedule?.[add(w.week_start,7)]?8:7);i++){
+  const date=add(w.week_start,i);html+='<tr><td class="rotPhotoDate">'+fmt(date)+'</td><td class="rotPhotoDate">'+day(date)+'</td>';
+  for(let j=0;j<count;j++){
+   const v=slotInfo(w.schedule?.[date]?.[String(j)]),shift=shifts[j]||'';
+   if(!v.name){html+='<td class="rotPhotoEmpty">—</td>';continue;}
+   const t=v.shift||shiftDefault(shift),cls=v.rest?' rotPhotoRest':!hasStandardTime(t)?' rotPhotoSpecial':'';
+   html+='<td><div class="rotPhotoCell'+cls+'"><b>'+esc(v.name)+'</b><span>'+esc(t)+'</span><small>'+(v.rest?'DESCANSA':'TRABAJA')+'</small></div></td>';
+  }
+  html+='</tr>';
+ }
+ $('rotPhotoContent').innerHTML=html+'</tbody></table>';
+ $('rotPhotoWeek').value=w.week_start;modal.hidden=false;document.body.style.overflow='hidden';$('rotPhotoClose').focus();
+}
+function closePhoto(){const m=$('rotPhotoModal');if(m)m.hidden=true;document.body.style.overflow='';}
 
 async function saveWeek(){if(!admin())return;if(!confirm('¿Confirmar y guardar la programación del '+fmt(start)+' al '+fmt(add(start,6))+'?'))return;try{await api('ct_rotation_week_save',{p_week_start:start,p_shifts:conf.shifts,p_schedule:draft});await loadWeek();status('✅ Programación semanal guardada en el acumulado.')}catch(e){status('No se pudo guardar: '+e.message)}}
 async function copyHistory(){
@@ -66,6 +91,6 @@ async function copyHistory(){
  try{await navigator.clipboard.writeText(lines.join('\n'));status('Resumen horizontal copiado. Puedes pegarlo en Excel o Outlook.')}catch(e){status('No fue posible copiar: '+e.message)}
 }
 
-function init(){if(!$('rotTbody'))return;start=saturday(iso(new Date()));$('rotTbody').addEventListener('change',e=>{const el=e.target.closest('[data-date][data-slot]');if(!el)return;const row=(draft[el.dataset.date]??={});const existing=slotInfo(row[el.dataset.slot]);if(el.dataset.type==='person')existing.name=el.value;else if(el.dataset.type==='work')existing.rest=el.value==='descansa';else if(el.dataset.type==='shift')existing.shift=el.value;row[el.dataset.slot]=existing;render();});$('rotPrev').onclick=()=>{start=add(start,-7);loadWeek()};$('rotNext').onclick=()=>{start=add(start,7);loadWeek()};$('rotWeekDate').onchange=e=>{if(!e.target.value)return;start=saturday(e.target.value);loadWeek()};$('rotPeopleToggle').onclick=()=>{$('rotPeopleEditor').hidden=!$('rotPeopleEditor').hidden};$('rotShiftsToggle').onclick=()=>{$('rotShiftsEditor').hidden=!$('rotShiftsEditor').hidden};$('rotVariationsToggle').onclick=()=>{$('rotVariationsEditor').hidden=!$('rotVariationsEditor').hidden};$('rotAddPerson').onclick=()=>{conf.people.push('');editor('people')};$('rotAddShift').onclick=()=>{if(conf.shifts.length>=8)return alert('Máximo 8 turnos.');conf.shifts.push('');editor('shifts')};$('rotAddVariation').onclick=()=>{conf.variations.push('');editor('variations')};$('rotQuickAddVariation').disabled=!admin();$('rotQuickAddVariation').onclick=()=>{if(!admin())return;$('rotVariationsEditor').hidden=false;conf.variations.push('');editor('variations');const fields=$('rotVariationRows').querySelectorAll('input');const last=fields[fields.length-1];last?.focus();last?.scrollIntoView({behavior:'smooth',block:'center'});status('Escribe el nuevo horario (por ejemplo 08:00 - 16:00) y presiona Guardar horarios para incluirlo en las listas.');};$('rotSaveVariations').onclick=saveConfig;$('rotSavePeople').onclick=saveConfig;$('rotSaveShifts').onclick=saveConfig;$('rotSave').onclick=saveWeek;$('rotRefreshHistory').onclick=loadWeek;$('rotCopyHistory').onclick=copyHistory;document.getElementById('portFacturacionSubTab')?.addEventListener('click',()=>{loadConfig().then(loadWeek)});window.addEventListener('ct-billing-opened',()=>{loadConfig().then(loadWeek)});render();}
+function init(){if(!$('rotTbody'))return;start=saturday(iso(new Date()));$('rotTbody').addEventListener('change',e=>{const el=e.target.closest('[data-date][data-slot]');if(!el)return;const row=(draft[el.dataset.date]??={});const existing=slotInfo(row[el.dataset.slot]);if(el.dataset.type==='person')existing.name=el.value;else if(el.dataset.type==='work')existing.rest=el.value==='descansa';else if(el.dataset.type==='shift')existing.shift=el.value;row[el.dataset.slot]=existing;render();});$('rotPrev').onclick=()=>{start=add(start,-7);loadWeek()};$('rotNext').onclick=()=>{start=add(start,7);loadWeek()};$('rotWeekDate').onchange=e=>{if(!e.target.value)return;start=saturday(e.target.value);loadWeek()};$('rotPeopleToggle').onclick=()=>{$('rotPeopleEditor').hidden=!$('rotPeopleEditor').hidden};$('rotShiftsToggle').onclick=()=>{$('rotShiftsEditor').hidden=!$('rotShiftsEditor').hidden};$('rotVariationsToggle').onclick=()=>{$('rotVariationsEditor').hidden=!$('rotVariationsEditor').hidden};$('rotAddPerson').onclick=()=>{conf.people.push('');editor('people')};$('rotAddShift').onclick=()=>{if(conf.shifts.length>=8)return alert('Máximo 8 turnos.');conf.shifts.push('');editor('shifts')};$('rotAddVariation').onclick=()=>{conf.variations.push('');editor('variations')};$('rotQuickAddVariation').disabled=!admin();$('rotQuickAddVariation').onclick=()=>{if(!admin())return;$('rotVariationsEditor').hidden=false;conf.variations.push('');editor('variations');const fields=$('rotVariationRows').querySelectorAll('input');const last=fields[fields.length-1];last?.focus();last?.scrollIntoView({behavior:'smooth',block:'center'});status('Escribe el nuevo horario (por ejemplo 08:00 - 16:00) y presiona Guardar horarios para incluirlo en las listas.');};$('rotSaveVariations').onclick=saveConfig;$('rotSavePeople').onclick=saveConfig;$('rotSaveShifts').onclick=saveConfig;$('rotSave').onclick=saveWeek;$('rotRefreshHistory').onclick=loadWeek;$('rotCopyHistory').onclick=copyHistory;$('rotShowHistory').onclick=()=>{if(saved.length)showPhoto($('rotPhotoWeek').value||saved.slice().sort((a,b)=>b.week_start.localeCompare(a.week_start))[0].week_start)};$('rotPhotoClose').onclick=closePhoto;$('rotPhotoWeek').onchange=e=>showPhoto(e.target.value);$('rotPhotoModal').addEventListener('click',e=>{if(e.target===$('rotPhotoModal'))closePhoto()});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('rotPhotoModal').hidden)closePhoto()});document.getElementById('portFacturacionSubTab')?.addEventListener('click',()=>{loadConfig().then(loadWeek)});window.addEventListener('ct-billing-opened',()=>{loadConfig().then(loadWeek)});render();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
