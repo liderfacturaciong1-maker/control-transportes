@@ -400,13 +400,13 @@ async function ctOpenValidaciones(){
  if(!ctValidacionesAllowed){toast('Sin permiso para Validaciones Operación');return;}
  window.open('validaciones-operacion/index.html','_blank','noopener,noreferrer');
 }
-let ctBillingAllowed=false,ctBillingOpen=false,ctBillingTabs={rotation:false,handover:false};
+let ctBillingAllowed=false,ctBillingOpen=false,ctBillingTabs={rotation:false,handover:false,rotation_edit:false,handover_edit:false};
 async function ctBillingLoadTabs(){
- ctBillingTabs={rotation:false,handover:false};
+ ctBillingTabs={rotation:false,handover:false,rotation_edit:false,handover_edit:false};
  if(!loginPin||!sb)return ctBillingTabs;
  const {data,error}=await sb.rpc('ct_billing_porteria_tabs_get',{p_pin:loginPin});
  if(error){console.warn('Permisos por pestaña:',error.message);return ctBillingTabs;}
- ctBillingTabs={rotation:data?.rotation===true,handover:data?.handover===true};
+ ctBillingTabs={rotation:data?.rotation===true,handover:data?.handover===true,rotation_edit:data?.rotation_edit===true,handover_edit:data?.handover_edit===true};
  return ctBillingTabs;
 }
 function ctBillingApplyTabs(){
@@ -422,6 +422,7 @@ function ctBillingApplyTabs(){
  if(!enabled.handover){$('portHandoverPanel').hidden=true;$('portRotationPanel').hidden=false;}
 }
 window.ctBillingTabGranted=key=>!!ctBillingTabs[key]||!!permissions?.is_admin;
+window.ctBillingTabCanEdit=key=>!!ctBillingTabs[key+'_edit']||!!permissions?.is_admin;
 
 async function ctBillingCheckAccess(){
  ctBillingAllowed=false;
@@ -430,7 +431,7 @@ async function ctBillingCheckAccess(){
  return ctBillingAllowed;
 }
 window.ctRotationApi=async(name,args={})=>{if(!sb||!loginPin||!ctBillingAllowed)throw Error('Acceso no autorizado');const {data,error}=await sb.rpc(name,{p_pin:loginPin,...args});if(error)throw Error(error.message);return data;};
-window.ctRotationIsAdmin=()=>!!permissions?.is_admin;
+window.ctRotationIsAdmin=()=>window.ctBillingTabCanEdit('rotation');
 async function ctBillingOpenModule(){
  if(!await ctBillingCheckAccess()){toast('No tienes permiso para Facturación - Portería');return;}
  ctBillingOpen=true;ctBillingApplyTabs();window.dispatchEvent(new Event('ct-billing-opened'));$('app').classList.add('hidden');$('ctReturnsModule').classList.add('hidden');$('ctPorteriaBillingModule').classList.remove('hidden');$('ctReturnsBack').classList.remove('hidden');$('ctPorteriaBillingEntry').classList.add('hidden');$('ctReturnsEntry').classList.add('hidden');$('ctManualRefresh')?.classList.add('hidden');window.scrollTo({top:0,behavior:'smooth'});
@@ -826,8 +827,14 @@ async function ctOpenPermissionEditor(id){
  const tabRes=await sb.rpc('ct_billing_porteria_admin_tabs_get',{p_admin_pin:loginPin,p_user_id:id});
  if(tabRes.error){toast('Permisos de pestañas: '+tabRes.error.message);return;}
  for(const [key,label] of [['rotation','📅 Rotación de turnos'],['handover','📋 Entrega de turno']]){
- const lab=document.createElement('label'),ch=document.createElement('input');ch.type='checkbox';ch.id='ctBillTab_'+key;ch.checked=tabRes.data?.[key]===true;
- lab.append(ch,document.createTextNode(' '+label));billWrap.append(lab);
+ const group=document.createElement('div');group.className='ctBillingRightsGroup';
+ const heading=document.createElement('strong');heading.textContent=label;group.append(heading);
+ for(const [suffix,title] of [['','👁 Solo visualizar'],['_edit','✏️ Modificar']]){
+  const lab=document.createElement('label'),ch=document.createElement('input');ch.type='checkbox';ch.id='ctBillTab_'+key+suffix;ch.checked=tabRes.data?.[key+suffix]===true;
+  lab.append(ch,document.createTextNode(' '+title));group.append(lab);
+  ch.addEventListener('change',()=>{if(suffix==='_edit'&&ch.checked)$('ctBillTab_'+key).checked=true;if(suffix===''&&!ch.checked)$('ctBillTab_'+key+'_edit').checked=false});
+ }
+ billWrap.append(group);
  }
  vr.append(billWrap);
  const financeRoot=$('ctEditorFinance');financeRoot.replaceChildren();
@@ -859,7 +866,7 @@ async function ctSaveUserRights(){
   const aresult=await sb.rpc('ct_cargo_action_admin_set_user_rights',{p_admin_pin:loginPin,p_user_id:u.id,p_enabled:$('ctManageCargoActions').checked});if(aresult.error)throw Error('No se pudo guardar permiso para configurar acciones: '+aresult.error.message);
   const vresult=await sb.rpc('ct_validaciones_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctValidacionesView').checked});if(vresult.error)throw Error('No se pudo guardar Validaciones Operación: '+vresult.error.message);
   const bresult=await sb.rpc('ct_billing_porteria_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctBillingPorteriaView').checked});if(bresult.error)throw Error('No se pudo guardar Facturación - Portería: '+bresult.error.message);
-  const tabResult=await sb.rpc('ct_billing_porteria_admin_tabs_set',{p_admin_pin:loginPin,p_user_id:u.id,p_rotation:$('ctBillTab_rotation').checked,p_handover:$('ctBillTab_handover').checked});
+  const tabResult=await sb.rpc('ct_billing_porteria_admin_tabs_set',{p_admin_pin:loginPin,p_user_id:u.id,p_rotation:$('ctBillTab_rotation').checked,p_handover:$('ctBillTab_handover').checked,p_rotation_edit:$('ctBillTab_rotation_edit').checked,p_handover_edit:$('ctBillTab_handover_edit').checked});
   if(tabResult.error)throw Error('No se pudieron guardar permisos de pestañas: '+tabResult.error.message);
   $('ctEditorStatus').textContent='Permisos guardados correctamente';toast('Permisos actualizados');await loadUsers();
  }catch(e){$('ctEditorStatus').textContent='No se pudo completar: '+e.message;toast(e.message)}finally{btn.disabled=false}
