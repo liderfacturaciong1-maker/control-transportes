@@ -52,13 +52,15 @@ function history(){
 function fitPhotoToScreen(){
  const viewport=$('rotPhotoModal')?.querySelector('.rotPhotoViewport'),sheet=$('rotPhotoSheet');
  if(!viewport||!sheet||$('rotPhotoModal').hidden)return;
- sheet.style.transform='none';
+ // El transform CSS reduce la imagen, pero no su altura de diseño. Ubicarla
+ // absolutamente evita que la fila viernes sea recortada por esa altura fantasma.
+ sheet.style.transform='none';sheet.style.left='0px';sheet.style.top='0px';
  const maxW=Math.max(1,viewport.clientWidth-8),maxH=Math.max(1,viewport.clientHeight-8);
  const naturalW=sheet.offsetWidth,naturalH=sheet.scrollHeight;
  const scale=Math.min(1,maxW/naturalW,maxH/naturalH);
  sheet.style.transform='scale('+scale+')';
- sheet.style.marginLeft=Math.max(0,(maxW-naturalW*scale)/2)+'px';
- sheet.style.marginTop=Math.max(0,(maxH-naturalH*scale)/2)+'px';
+ sheet.style.left=Math.max(0,(viewport.clientWidth-naturalW*scale)/2)+'px';
+ sheet.style.top=Math.max(0,(viewport.clientHeight-naturalH*scale)/2)+'px';
 }
 function showPhoto(weekStart){
  const modal=$('rotPhotoModal'),w=saved.find(x=>x.week_start===weekStart);
@@ -78,7 +80,7 @@ function showPhoto(weekStart){
   html+='</tr>';
  }
  $('rotPhotoContent').innerHTML=html+'</tbody></table>';
- $('rotPhotoWeek').value=w.week_start;modal.hidden=false;document.body.style.overflow='hidden';fitPhotoToScreen();requestAnimationFrame(fitPhotoToScreen);$('rotPhotoClose').focus();
+ $('rotPhotoWeek').value=w.week_start;modal.hidden=false;document.body.style.overflow='hidden';fitPhotoToScreen();requestAnimationFrame(()=>requestAnimationFrame(fitPhotoToScreen));$('rotPhotoClose').focus();
 }
 function closePhoto(){const m=$('rotPhotoModal');if(m)m.hidden=true;document.body.style.overflow='';}
 
