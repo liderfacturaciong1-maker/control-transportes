@@ -16,25 +16,56 @@ async function loadConfig(){try{const x=await api('ct_rotation_config_get');if(x
 async function saveConfig(){if(!admin())return;const people=[...new Set(conf.people.map(x=>x.trim()).filter(Boolean))];const shifts=conf.shifts.map(x=>x.trim()).filter(Boolean);const variations=[...new Set(conf.variations.map(x=>x.trim()).filter(Boolean))];if(!people.length||!shifts.length||shifts.length>8){alert('Debe existir al menos una persona y un turno (máximo 8).');return}if(!variations.length)return alert('Agrega al menos una variación de horario.');conf={people,shifts,variations};try{await api('ct_rotation_config_save',{p_data:conf});editor('people');editor('shifts');editor('variations');render();status('Configuración guardada en Supabase.')}catch(e){status('Error al guardar configuración: '+e.message)}}
 async function loadWeek(){draft={};editing=false;try{const x=await api('ct_rotation_weeks_get');saved=Array.isArray(x)?x:[];const one=saved.find(w=>w.week_start===start);if(one){draft=structuredClone(one.schedule||{});status('Semana guardada. Los cambios requieren Confirmar y guardar.');}else status('Semana sin confirmar: selecciona las personas y presiona Confirmar y guardar.');history();render()}catch(e){status('No fue posible consultar Supabase: '+e.message)}}
 function history(){
- const list=saved.slice().sort((a,b)=>b.week_start.localeCompare(a.week_start));let rows=[];
+ const list=saved.slice().sort((a,b)=>b.week_start.localeCompare(a.week_start));
+ const count=Math.max(4,...list.map(w=>(w.shifts||[]).length));
+ const head=$('rotHistoryHead');
+ if(head)head.innerHTML='<tr><th>Fecha</th><th>Día</th>'+Array.from({length:count},(_,j)=>'<th>Turno '+(j+1)+'</th>').join('')+'</tr>';
+ const rows=[];
  for(const w of list){
+  const shifts=w.shifts||[];
+  const buttons=admin()?'<button type="button" class="rotAction" data-edit="'+esc(w.week_start)+'">Editar semana</button> <button type="button" class="rotAction rotDanger" data-delete="'+esc(w.week_start)+'">Eliminar semana</button>':'';
+  rows.push('<tr class="rotHistoryWeek"><td colspan="'+(count+2)+'"><div class="rotHistoryWeekTitle"><strong>Semana '+fmt(w.week_start)+' — '+fmt(add(w.week_start,6))+'</strong><span>'+buttons+'</span></div></td></tr>');
+  rows.push('<tr class="rotHistoryShiftLabels"><td colspan="2">TURNOS ASIGNADOS</td>'+Array.from({length:count},(_,j)=>'<td>'+esc(shifts[j]||'—')+'</td>').join('')+'</tr>');
   for(let i=0;i<(w.schedule?.[add(w.week_start,7)]?8:7);i++){
    const date=add(w.week_start,i);
-   for(let j=0;j<(w.shifts||[]).length;j++){
-    const shift=w.shifts[j],assignment=slotInfo(w.schedule?.[date]?.[String(j)]);
-    if(!assignment.name)continue;
-    const displayShift=assignment.shift||shift;
-    rows.push('<tr><td>'+fmt(w.week_start)+'</td><td>'+fmt(date)+'</td><td>'+day(date)+'</td><td>'+esc(displayShift)+'</td><td>'+esc(assignment.name)+'</td><td><span class="rotHistoryState '+(assignment.rest?'rest':'work')+'">'+(assignment.rest?'DESCANSA':'TRABAJA')+'</span></td><td>'+(admin()?'<button type="button" class="rotAction" data-edit="'+esc(w.week_start)+'">Editar</button><button type="button" class="rotAction rotDanger" data-delete="'+esc(w.week_start)+'">Eliminar semana</button>':'—')+'</td></tr>');
+   let cells='';
+   for(let j=0;j<count;j++){
+    const v=slotInfo(w.schedule?.[date]?.[String(j)]);
+    const shift=shifts[j]||'';
+    if(!v.name){cells+='<td class="rotHistoryEmpty">—</td>';continue;}
+    const worktime=v.shift||shiftDefault(shift);
+    const special=!v.rest&&!hasStandardTime(worktime);
+    const cls=v.rest?'rotHistoryRest':special?'rotHistorySpecial':'rotHistoryNormal';
+    cells+='<td><div class="rotHistoryAssignment '+cls+'"><strong>'+esc(v.name)+'</strong><span>'+esc(worktime)+'</span><small>'+(v.rest?'DESCANSA':'TRABAJA')+'</small></div></td>';
    }
+   rows.push('<tr class="rotHistoryDay"><td>'+fmt(date)+'</td><td>'+day(date)+'</td>'+cells+'</tr>');
   }
  }
- $('rotHistoryBody').innerHTML=rows.join('')||'<tr><td colspan="7">Aún no hay turnos asignados en semanas confirmadas.</td></tr>';
+ $('rotHistoryBody').innerHTML=rows.join('')||'<tr><td colspan="'+(count+2)+'">Aún no hay turnos asignados en semanas confirmadas.</td></tr>';
  $('rotHistoryBody').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{start=b.dataset.edit;const w=saved.find(x=>x.week_start===start);if(w){conf.shifts=[...w.shifts];draft=structuredClone(w.schedule||{});editor('shifts');render();status('Editando semana histórica '+fmt(start)+'. Guarda para confirmar los cambios.')}});
  $('rotHistoryBody').querySelectorAll('[data-delete]').forEach(b=>b.onclick=async()=>{const week=b.dataset.delete;if(!confirm('¿Eliminar de forma permanente toda la semana '+fmt(week)+'?'))return;try{await api('ct_rotation_week_delete',{p_week_start:week});await loadWeek();status('Semana eliminada.')}catch(e){status('No se pudo eliminar: '+e.message)}});
 }
 
 async function saveWeek(){if(!admin())return;if(!confirm('¿Confirmar y guardar la programación del '+fmt(start)+' al '+fmt(add(start,6))+'?'))return;try{await api('ct_rotation_week_save',{p_week_start:start,p_shifts:conf.shifts,p_schedule:draft});await loadWeek();status('✅ Programación semanal guardada en el acumulado.')}catch(e){status('No se pudo guardar: '+e.message)}}
-async function copyHistory(){let lines=['Semana\tFecha\tDía\tTurno\tPersona\tEstado'];for(const w of saved.slice().sort((a,b)=>a.week_start.localeCompare(b.week_start))){for(let i=0;i<(w.schedule?.[add(w.week_start,7)]?8:7);i++){const date=add(w.week_start,i);(w.shifts||[]).forEach((s,j)=>{const v=slotInfo(w.schedule?.[date]?.[String(j)]);if(v.name)lines.push([fmt(w.week_start),fmt(date),day(date),v.shift||s,v.name,v.rest?'Descansa':'Trabaja'].join('\t'))})}}try{await navigator.clipboard.writeText(lines.join('\n'));status('Tabla acumulada copiada. Puedes pegarla en Outlook o Excel.')}catch(e){status('No fue posible copiar: '+e.message)}}
+async function copyHistory(){
+ const lines=[];
+ for(const w of saved.slice().sort((a,b)=>a.week_start.localeCompare(b.week_start))){
+  const shifts=w.shifts||[];
+  lines.push('Semana del '+fmt(w.week_start)+' al '+fmt(add(w.week_start,6)));
+  lines.push(['Fecha','Día',...shifts].join('\t'));
+  for(let i=0;i<(w.schedule?.[add(w.week_start,7)]?8:7);i++){
+   const date=add(w.week_start,i);
+   lines.push([fmt(date),day(date),...shifts.map((s,j)=>{
+    const v=slotInfo(w.schedule?.[date]?.[String(j)]);
+    if(!v.name)return '';
+    return [v.name,v.shift||shiftDefault(s),v.rest?'DESCANSA':'TRABAJA'].join(' | ');
+   })].join('\t'));
+  }
+  lines.push('');
+ }
+ try{await navigator.clipboard.writeText(lines.join('\n'));status('Resumen horizontal copiado. Puedes pegarlo en Excel o Outlook.')}catch(e){status('No fue posible copiar: '+e.message)}
+}
+
 function init(){if(!$('rotTbody'))return;start=saturday(iso(new Date()));$('rotTbody').addEventListener('change',e=>{const el=e.target.closest('[data-date][data-slot]');if(!el)return;const row=(draft[el.dataset.date]??={});const existing=slotInfo(row[el.dataset.slot]);if(el.dataset.type==='person')existing.name=el.value;else if(el.dataset.type==='work')existing.rest=el.value==='descansa';else if(el.dataset.type==='shift')existing.shift=el.value;row[el.dataset.slot]=existing;render();});$('rotPrev').onclick=()=>{start=add(start,-7);loadWeek()};$('rotNext').onclick=()=>{start=add(start,7);loadWeek()};$('rotWeekDate').onchange=e=>{if(!e.target.value)return;start=saturday(e.target.value);loadWeek()};$('rotPeopleToggle').onclick=()=>{$('rotPeopleEditor').hidden=!$('rotPeopleEditor').hidden};$('rotShiftsToggle').onclick=()=>{$('rotShiftsEditor').hidden=!$('rotShiftsEditor').hidden};$('rotVariationsToggle').onclick=()=>{$('rotVariationsEditor').hidden=!$('rotVariationsEditor').hidden};$('rotAddPerson').onclick=()=>{conf.people.push('');editor('people')};$('rotAddShift').onclick=()=>{if(conf.shifts.length>=8)return alert('Máximo 8 turnos.');conf.shifts.push('');editor('shifts')};$('rotAddVariation').onclick=()=>{conf.variations.push('');editor('variations')};$('rotQuickAddVariation').disabled=!admin();$('rotQuickAddVariation').onclick=()=>{if(!admin())return;$('rotVariationsEditor').hidden=false;conf.variations.push('');editor('variations');const fields=$('rotVariationRows').querySelectorAll('input');const last=fields[fields.length-1];last?.focus();last?.scrollIntoView({behavior:'smooth',block:'center'});status('Escribe el nuevo horario (por ejemplo 08:00 - 16:00) y presiona Guardar horarios para incluirlo en las listas.');};$('rotSaveVariations').onclick=saveConfig;$('rotSavePeople').onclick=saveConfig;$('rotSaveShifts').onclick=saveConfig;$('rotSave').onclick=saveWeek;$('rotRefreshHistory').onclick=loadWeek;$('rotCopyHistory').onclick=copyHistory;document.getElementById('portFacturacionSubTab')?.addEventListener('click',()=>{loadConfig().then(loadWeek)});window.addEventListener('ct-billing-opened',()=>{loadConfig().then(loadWeek)});render();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
