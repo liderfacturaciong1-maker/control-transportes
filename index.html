@@ -179,6 +179,13 @@
 .rotPhotoSheet{width:1100px!important;min-width:1100px!important;max-width:none!important;flex:none!important;transform-origin:top left;box-sizing:border-box;box-shadow:none!important}
 .rotPhotoHelp{font-size:10px!important;flex:0 0 auto;line-height:1.1;margin:0!important}
 @media(max-width:700px){.rotPhotoSheet{width:1100px!important;min-width:1100px!important}.rotPhotoModal{place-items:stretch center!important}}
+</style><style id="rotPhotoFix596">
+/* Visor independiente del tamaño del documento y del alto original escalado. */
+.rotPhotoModal{height:100dvh!important;max-height:100dvh!important;box-sizing:border-box!important;overflow:hidden!important}
+.rotPhotoDialog{height:100%!important;max-height:100%!important;min-height:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}
+.rotPhotoViewport{height:0!important;min-height:0!important;flex:1 1 0!important;position:relative!important;overflow:hidden!important;display:block!important}
+.rotPhotoSheet{position:absolute!important;margin:0!important;top:0;left:0;transform-origin:top left!important}
+.rotPhotoHelp,.rotPhotoTools{flex-shrink:0!important}
 </style></head><body><!-- PORTADA v5.36 | Sin logos superpuestos; botones activos -->
 <section aria-label="Bienvenida a Control de Transportes" class="ctWelcome" id="welcomeScreen">
 <div aria-label="Portada futurista de operación logística conectada en movimiento" class="ctWelcomeStage" role="img">
