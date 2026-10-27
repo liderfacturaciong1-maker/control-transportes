@@ -30,15 +30,60 @@ function scannedCode(raw){
  if(candidateCount<2)return false;
  $('ctKeysPlate').value=plate;stopCamera();msg('Placa '+plate+' identificada. Verifica la operación y presiona Registrar.');$('ctKeysApply').focus();return true;
 }
-function loadZxing(){return new Promise((resolve,reject)=>{if(window.ZXingBrowser)return resolve(window.ZXingBrowser);const tag=document.createElement('script');tag.src='https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/zxing-browser.min.js';tag.onload=()=>window.ZXingBrowser?resolve(window.ZXingBrowser):reject(Error('No se pudo inicializar el lector alternativo'));tag.onerror=()=>reject(Error('No se pudo cargar el lector de cámara alternativo. Comprueba la conexión a internet.'));document.head.appendChild(tag)})}
-async function openCamera(){if(scanning)return;if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)return msg('La cámara requiere HTTPS y permisos del navegador. Usa el lector físico o escribe la placa.',true);if(!editable())return msg('No tienes permiso para registrar movimientos de llaves',true);scanning=true;$('ctKeysCamera').hidden=false;cameraNote('Solicitando permiso de cámara…');try{
- const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080},resizeMode:'none'}});if(!scanning){stream.getTracks().forEach(t=>t.stop());return}scanStream=stream;const video=$('ctKeysVideo');video.srcObject=stream;await video.play();const caps=stream.getVideoTracks()[0]?.getCapabilities?.()||{};$('ctKeysTorch').hidden=!caps.torch;await setZoom();cameraNote('Código de 3 cm: prueba zoom 1,5× o 2×, evita reflejos y espera que enfoque.');
- if('BarcodeDetector' in window){const scanner=new BarcodeDetector({formats:['code_128']});const loop=async()=>{if(!scanning)return;try{let values=await scanner.detect(video);
- if(values?.length&&values.some(v=>v.format==='code_128'&&scannedCode(v.rawValue)))return;
- // Amplificación central: escanea la región donde se enfoca la etiqueta pequeña.
- if(scanCtx&&video.videoWidth&&video.videoHeight){const w=video.videoWidth,h=video.videoHeight;const cw=Math.floor(w*.66),ch=Math.floor(h*.36);scanCanvas.width=Math.min(1600,cw);scanCanvas.height=Math.round(scanCanvas.width*ch/cw);scanCtx.imageSmoothingEnabled=true;scanCtx.imageSmoothingQuality='high';scanCtx.drawImage(video,(w-cw)/2,(h-ch)/2,cw,ch,0,0,scanCanvas.width,scanCanvas.height);values=await scanner.detect(scanCanvas);if(values?.length&&values.some(v=>v.format==='code_128'&&scannedCode(v.rawValue)))return;}}catch(_){}if(scanning)scanTimer=setTimeout(loop,140)};loop();}
- else{cameraNote('Activando lector compatible con este dispositivo…');try{const ZX=await loadZxing();if(!scanning)return;scanStream?.getTracks().forEach(t=>t.stop());scanStream=null;video.srcObject=null;zxingReader=new ZX.BrowserMultiFormatReader();zxingControls=await zxingReader.decodeFromVideoDevice(undefined,video,(result)=>{if(result)scannedCode(result.getText())});cameraNote('Enfoca las barras para leer la placa.')}catch(e){stopCamera();msg('Este navegador no pudo activar el escáner: '+e.message+' Usa el lector Bluetooth o el ingreso manual.',true)}}
- }catch(e){stopCamera();msg('No fue posible abrir la cámara: '+e.message,true)}}
+function loadZxing(){return new Promise((resolve,reject)=>{if(window.ZXingBrowser)return resolve(window.ZXingBrowser);const tag=document.createElement('script');tag.src='https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/umd/zxing-browser.min.js';tag.onload=()=>window.ZXingBrowser?resolve(window.ZXingBrowser):reject(Error('No se pudo inicializar el lector alternativo'));tag.onerror=()=>reject(Error('No se descargó el lector alternativo; comprueba internet.'));document.head.appendChild(tag)})}
+async function useZxing(video){
+ cameraNote('Activando lector alternativo Code 128…');
+ try{
+  const ZX=await loadZxing();if(!scanning)return;
+  scanStream?.getTracks().forEach(t=>t.stop());scanStream=null;video.srcObject=null;
+  const hints=new Map();
+  // Code 128 primero; evitamos interpretar códigos EAN o numéricos.
+  if(window.ZXing?.DecodeHintType&&window.ZXing?.BarcodeFormat){
+   hints.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS,[window.ZXing.BarcodeFormat.CODE_128]);
+   hints.set(window.ZXing.DecodeHintType.TRY_HARDER,true);
+  }
+  zxingReader=new ZX.BrowserMultiFormatReader(hints);
+  zxingControls=await zxingReader.decodeFromVideoDevice(undefined,video,(result)=>{if(result)scannedCode(result.getText())});
+  cameraNote('Lector alternativo activo. Coloca el código a 10–15 cm y aléjalo/acércalo hasta verlo nítido.');
+ }catch(e){stopCamera();msg('No se activó lector alternativo: '+e.message+'. Usa lector Bluetooth o placa manual.',true)}
+}
+async function openCamera(){
+ if(scanning)return;
+ if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)return msg('La cámara requiere HTTPS y permisos del navegador.',true);
+ if(!editable())return msg('No tienes permiso para registrar movimientos de llaves',true);
+ scanning=true;$('ctKeysCamera').hidden=false;cameraNote('Solicitando permiso de cámara…');
+ try{
+  const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}});
+  if(!scanning){stream.getTracks().forEach(t=>t.stop());return}
+  scanStream=stream;const video=$('ctKeysVideo');video.srcObject=stream;await video.play();
+  const caps=stream.getVideoTracks()[0]?.getCapabilities?.()||{};$('ctKeysTorch').hidden=!caps.torch;await setZoom();
+  cameraNote('Buscando Code 128… Si no lo detecta, cambiará automáticamente al lector alternativo.');
+  let nativeReady=false;
+  if(typeof BarcodeDetector==='function'){
+   try{const formats=await BarcodeDetector.getSupportedFormats();nativeReady=formats.includes('code_128')}catch(_){nativeReady=false}
+  }
+  if(!nativeReady){await useZxing(video);return}
+  let scanner;
+  try{scanner=new BarcodeDetector({formats:['code_128']})}catch(_){await useZxing(video);return}
+  const nativeStarted=Date.now();
+  const loop=async()=>{
+   if(!scanning)return;
+   if(Date.now()-nativeStarted>7000){await useZxing(video);return}
+   try{
+    let values=await scanner.detect(video);
+    if(values?.some(v=>v.format==='code_128'&&scannedCode(v.rawValue)))return;
+    if(scanCtx&&video.videoWidth&&video.videoHeight){
+     const w=video.videoWidth,h=video.videoHeight,cw=Math.floor(w*.7),ch=Math.floor(h*.38);
+     scanCanvas.width=cw;scanCanvas.height=ch;scanCtx.drawImage(video,(w-cw)/2,(h-ch)/2,cw,ch,0,0,cw,ch);
+     values=await scanner.detect(scanCanvas);
+     if(values?.some(v=>v.format==='code_128'&&scannedCode(v.rawValue)))return;
+    }
+   }catch(_){/* continuar al lector alternativo */}
+   if(scanning)scanTimer=setTimeout(loop,220);
+  };
+  loop();
+ }catch(e){stopCamera();msg('No fue posible abrir la cámara: '+e.message,true)}
+}
 // Préstamos históricos: cada evento se conserva incluso al registrar una devolución.
 async function loadSummary(){
  try{const list=await rpc('ct_keys_t2_loans_get');const items=Array.isArray(list)?list:[];
