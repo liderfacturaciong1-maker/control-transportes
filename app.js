@@ -832,6 +832,11 @@ async function ctOpenPermissionEditor(id){
  for(const [key,label] of [['upload','📂 Cargar archivos de Validaciones'],['delete','🗑 Eliminar archivo activo'],['purge','⚠️ Eliminar todos los registros de facturas']]){
  const lab=document.createElement('label'),ck=document.createElement('input');ck.type='checkbox';ck.id='ctValidaciones_'+key;ck.checked=viRights.data?.[key]===true;lab.append(ck,document.createTextNode(' '+label));vwrap.append(lab);
  }
+ const editResult=await sb.rpc('ct_validation_module_admin_edit_get',{p_admin_pin:loginPin,p_user_id:id});
+ if(editResult.error){toast('Permiso de edición de Validaciones: '+editResult.error.message);return;}
+ const editLabel=document.createElement('label'),editCheck=document.createElement('input');editCheck.type='checkbox';editCheck.id='ctValidacionesEdit';editCheck.checked=editResult.data===true;
+ editLabel.append(editCheck,document.createTextNode(' ✏️ Puede modificar facturas y registrar movimientos de llaves'));vwrap.append(editLabel);
+ vcheck.addEventListener('change',()=>{if(!vcheck.checked)editCheck.checked=false});editCheck.addEventListener('change',()=>{if(editCheck.checked){vcheck.checked=true;$('ctSubGate_validaciones').checked=true}});
  const billResult=await sb.rpc('ct_billing_porteria_admin_user_rights',{p_admin_pin:loginPin,p_user_id:id});
  if(billResult.error){toast('No se pudo consultar Facturación - Portería: '+billResult.error.message);return;}
  const billWrap=document.createElement('div');billWrap.className='ctEditorModule';
@@ -895,6 +900,8 @@ async function ctSaveUserRights(){
   const finGate=await sb.rpc('ct_finance_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctSubGate_finance').checked});
   if(finGate.error)throw Error('No se pudo guardar visibilidad de Liquidación Financiera: '+finGate.error.message);
 const vresult=await sb.rpc('ct_validaciones_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctValidacionesView').checked});if(vresult.error)throw Error('No se pudo guardar Validaciones Operación: '+vresult.error.message);
+  const editSave=await sb.rpc('ct_validation_module_admin_edit_set',{p_admin_pin:loginPin,p_user_id:u.id,p_can_edit:$('ctValidacionesView').checked&&$('ctValidacionesEdit').checked});
+  if(editSave.error)throw Error('No se pudo guardar permiso de modificación de Validaciones: '+editSave.error.message);
   const viSave=await sb.rpc('ct_validation_invoice_admin_rights_set',{p_admin_pin:loginPin,p_user_id:u.id,p_upload:$('ctValidaciones_upload').checked,p_delete:$('ctValidaciones_delete').checked,p_purge:$('ctValidaciones_purge').checked});
  if(viSave.error)throw Error('No se pudieron guardar permisos de Facturas: '+viSave.error.message);
  const bresult=await sb.rpc('ct_billing_porteria_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctBillingPorteriaView').checked});if(bresult.error)throw Error('No se pudo guardar Facturación - Portería: '+bresult.error.message);
