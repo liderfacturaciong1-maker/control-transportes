@@ -36,7 +36,7 @@ try{
 }
 try{canPurge=(await rpc('ct_validation_invoice_can_purge'))===true;}
 catch(err){rightsWarning+=(rightsWarning?' | ':'')+'No se pudo consultar permiso de borrado total: '+err.message;}
-$('purgeAll').hidden=!canPurge;$('workspace').hidden=false;$('authState').textContent=write?'Administrador · Puede modificar':'Autorizado · Solo visualizar';$('pin').value='';['excel','fileLabel'].forEach(id=>{$(id).disabled=!canUpload;if(id==='fileLabel')$(id).style.display=canUpload?'':'none'});$('clear').disabled=!canDelete;$('clear').hidden=!canDelete;$('complete').disabled=!write;await load();if(rightsWarning)alertStatus('Ingreso permitido. '+rightsWarning,true);}catch(e){alertStatus('No se pudo iniciar sesión: '+e.message,true)}}
+window.ctValidationKeysRpc=rpc;window.ctValidationKeysCanEdit=()=>write;document.getElementById('ctValidKeysPanel').hidden=false;window.dispatchEvent(new Event('ct-validation-keys-ready'));$('purgeAll').hidden=!canPurge;$('workspace').hidden=false;$('authState').textContent=write?'Administrador · Puede modificar':'Autorizado · Solo visualizar';$('pin').value='';['excel','fileLabel'].forEach(id=>{$(id).disabled=!canUpload;if(id==='fileLabel')$(id).style.display=canUpload?'':'none'});$('clear').disabled=!canDelete;$('clear').hidden=!canDelete;$('complete').disabled=!write;await load();if(rightsWarning)alertStatus('Ingreso permitido. '+rightsWarning,true);}catch(e){alertStatus('No se pudo iniciar sesión: '+e.message,true)}}
 async function purgeAll(){
  if(!canPurge)return alertStatus('No tienes autorización para eliminar todos los datos.',true);
  const total=rows.length;
