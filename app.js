@@ -826,6 +826,11 @@ async function ctOpenPermissionEditor(id){
  const vtitle=document.createElement('strong');vtitle.textContent='Validaciones Operación';
  const vlabel=document.createElement('label'),vcheck=document.createElement('input');vcheck.type='checkbox';vcheck.id='ctValidacionesView';vcheck.checked=vresult.data===true;
  vlabel.append(vcheck,document.createTextNode(' Permitir ingresar'));vwrap.append(vtitle,vlabel);vr.append(vwrap);$('ctSubGate_validaciones').checked=vcheck.checked;vcheck.addEventListener('change',()=>{$('ctSubGate_validaciones').checked=vcheck.checked});$('ctSubGate_validaciones').addEventListener('change',()=>{vcheck.checked=$('ctSubGate_validaciones').checked});
+ const viRights=await sb.rpc('ct_validation_invoice_admin_rights_get',{p_admin_pin:loginPin,p_user_id:id});
+ if(viRights.error){toast('Permisos de facturas: '+viRights.error.message);return;}
+ for(const [key,label] of [['upload','📂 Cargar archivos de Validaciones'],['delete','🗑 Eliminar archivo activo'],['purge','⚠️ Eliminar todos los registros de facturas']]){
+ const lab=document.createElement('label'),ck=document.createElement('input');ck.type='checkbox';ck.id='ctValidaciones_'+key;ck.checked=viRights.data?.[key]===true;lab.append(ck,document.createTextNode(' '+label));vwrap.append(lab);
+ }
  const billResult=await sb.rpc('ct_billing_porteria_admin_user_rights',{p_admin_pin:loginPin,p_user_id:id});
  if(billResult.error){toast('No se pudo consultar Facturación - Portería: '+billResult.error.message);return;}
  const billWrap=document.createElement('div');billWrap.className='ctEditorModule';
@@ -889,7 +894,9 @@ async function ctSaveUserRights(){
   const finGate=await sb.rpc('ct_finance_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctSubGate_finance').checked});
   if(finGate.error)throw Error('No se pudo guardar visibilidad de Liquidación Financiera: '+finGate.error.message);
 const vresult=await sb.rpc('ct_validaciones_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctValidacionesView').checked});if(vresult.error)throw Error('No se pudo guardar Validaciones Operación: '+vresult.error.message);
-  const bresult=await sb.rpc('ct_billing_porteria_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctBillingPorteriaView').checked});if(bresult.error)throw Error('No se pudo guardar Facturación - Portería: '+bresult.error.message);
+  const viSave=await sb.rpc('ct_validation_invoice_admin_rights_set',{p_admin_pin:loginPin,p_user_id:u.id,p_upload:$('ctValidaciones_upload').checked,p_delete:$('ctValidaciones_delete').checked,p_purge:$('ctValidaciones_purge').checked});
+ if(viSave.error)throw Error('No se pudieron guardar permisos de Facturas: '+viSave.error.message);
+ const bresult=await sb.rpc('ct_billing_porteria_admin_set_access',{p_admin_pin:loginPin,p_user_id:u.id,p_can_view:$('ctBillingPorteriaView').checked});if(bresult.error)throw Error('No se pudo guardar Facturación - Portería: '+bresult.error.message);
   const tabResult=await sb.rpc('ct_billing_porteria_admin_tabs_set',{p_admin_pin:loginPin,p_user_id:u.id,p_rotation:$('ctBillTab_rotation').checked,p_handover:$('ctBillTab_handover').checked,p_rotation_edit:$('ctBillTab_rotation_edit').checked,p_handover_edit:$('ctBillTab_handover_edit').checked});
   if(tabResult.error)throw Error('No se pudieron guardar permisos de pestañas: '+tabResult.error.message);
   $('ctEditorStatus').textContent='Permisos guardados correctamente';toast('Permisos actualizados');await loadUsers();
