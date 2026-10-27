@@ -12,25 +12,25 @@ async function load(){try{const rows=await rpc('ct_keys_t2_get');render(rows||[]
 async function apply(){if(busy)return;const placa=normalizePlate($('ctKeysPlate').value);const persona=$('ctKeysPerson').value.trim();if(!PLATE_PATTERN.test(placa))return msg('La lectura no corresponde a una placa. Vuelve a escanear (ej. COJTX912 o LWL645).',true);if(mode==='LLAVE PRESTADA'&&!persona)return msg('Escribe el nombre de quien recibe la llave',true);if(!editable())return msg('Tu usuario no tiene permiso de modificar Entrega de turno',true);busy=true;$('ctKeysApply').disabled=true;try{const result=await rpc('ct_keys_t2_set',{p_plate:placa,p_state:mode,p_borrower:mode==='LLAVE PRESTADA'?persona:null});msg(`${placa}: ${mode}. Transporte(s): ${result?.transportes||'Sin asignación en Facturas'}`);$('ctKeysPlate').value='';if(mode==='LLAVE PRESTADA')$('ctKeysPerson').value='';await load();$('ctKeysPlate').focus()}catch(e){msg('No se guardó: '+e.message,true)}finally{busy=false;$('ctKeysApply').disabled=!editable()}}
 
 // Cámara móvil: API nativa BarcodeDetector, con alternativa ZXing cuando no está disponible.
-let scanning=false, scanStream=null,scanTimer=null,zxingReader=null,zxingControls=null,torch=false,lastCandidate='',candidateCount=0;
+let scanning=false, scanStream=null,scanTimer=null,zxingReader=null,zxingControls=null,torch=false,lastCandidate='',candidateCount=0,lastCandidateTime=0;
 const scanCanvas=document.createElement('canvas');const scanCtx=scanCanvas.getContext('2d',{willReadFrequently:true});
 async function setZoom(){const tr=scanStream?.getVideoTracks()?.[0];if(!tr)return;const target=Number($('ctKeysZoom')?.value||1);const caps=tr.getCapabilities?.()||{};if(caps.zoom){try{await tr.applyConstraints({advanced:[{zoom:Math.max(caps.zoom.min,Math.min(caps.zoom.max,target))}]});return}catch(_){}} // Visual zoom only when hardware zoom unavailable
 const video=$('ctKeysVideo');video.style.transform=`scale(${Math.min(target,2)})`;video.style.transformOrigin='center center';}
 async function toggleTorch(){const tr=scanStream?.getVideoTracks()?.[0],caps=tr?.getCapabilities?.()||{};if(!caps.torch)return;try{torch=!torch;await tr.applyConstraints({advanced:[{torch}]});$('ctKeysTorch').textContent=torch?'🔦 Apagar luz':'🔦 Encender luz'}catch(_){}}
 
 function cameraNote(t){$('ctKeysCameraMsg').textContent=t}
-function stopCamera(){scanning=false;lastCandidate='';candidateCount=0;if(scanTimer){clearTimeout(scanTimer);scanTimer=null}try{zxingControls?.stop()}catch(_){}zxingControls=null;try{zxingReader?.reset?.()}catch(_){}zxingReader=null;if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}const video=$('ctKeysVideo');try{video.pause()}catch(_){}video.srcObject=null;video.style.transform='';torch=false;$('ctKeysTorch').hidden=true;$('ctKeysCamera').hidden=true}
+function stopCamera(){scanning=false;lastCandidate='';candidateCount=0;lastCandidateTime=0;if(scanTimer){clearTimeout(scanTimer);scanTimer=null}try{zxingControls?.stop()}catch(_){}zxingControls=null;try{zxingReader?.reset?.()}catch(_){}zxingReader=null;if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}const video=$('ctKeysVideo');try{video.pause()}catch(_){}video.srcObject=null;video.style.transform='';torch=false;$('ctKeysTorch').hidden=true;$('ctKeysCamera').hidden=true}
 function scannedCode(raw){
  const plate=normalizePlate(raw);
  if(!PLATE_PATTERN.test(plate)){
   cameraNote('Lectura descartada: '+plate.slice(0,24)+'. El código debe contener la placa, no únicamente números.');return false;
  }
- if(lastCandidate!==plate){lastCandidate=plate;candidateCount=1;cameraNote('Placa '+plate+' detectada. Mantén el código estable para confirmar.');return false;}
- candidateCount++;
+ if(lastCandidate!==plate||Date.now()-lastCandidateTime>3000){lastCandidate=plate;candidateCount=1;lastCandidateTime=Date.now();cameraNote('Placa '+plate+' detectada. Mantén el código estable para confirmar.');return false;}
+ candidateCount++;lastCandidateTime=Date.now();
  if(candidateCount<2)return false;
  $('ctKeysPlate').value=plate;stopCamera();msg('Placa '+plate+' identificada. Verifica la operación y presiona Registrar.');$('ctKeysApply').focus();return true;
 }
-function loadZxing(){return new Promise((resolve,reject)=>{if(window.ZXingBrowser)return resolve(window.ZXingBrowser);const tag=document.createElement('script');tag.src='https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/umd/zxing-browser.min.js';tag.onload=()=>window.ZXingBrowser?resolve(window.ZXingBrowser):reject(Error('No se pudo inicializar el lector alternativo'));tag.onerror=()=>reject(Error('No se descargó el lector alternativo; comprueba internet.'));document.head.appendChild(tag)})}
+function loadZxing(){return new Promise((resolve,reject)=>{if(window.ZXingBrowser)return resolve(window.ZXingBrowser);const tag=document.createElement('script');tag.src='https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/umd/zxing-browser.min.js';tag.onload=()=>window.ZXingBrowser?resolve(window.ZXingBrowser):reject(Error('No se pudo inicializar el lector alternativo'));tag.onerror=()=>reject(Error('No se pudo cargar ZXing desde la red. Comprueba internet o prueba otro navegador (Chrome en Android).'));document.head.appendChild(tag)})}
 async function useZxing(video){
  cameraNote('Activando lector alternativo Code 128…');
  try{
@@ -44,7 +44,7 @@ async function useZxing(video){
   }
   zxingReader=new ZX.BrowserMultiFormatReader(hints);
   zxingControls=await zxingReader.decodeFromVideoDevice(undefined,video,(result)=>{if(result)scannedCode(result.getText())});
-  cameraNote('Lector alternativo activo. Coloca el código a 10–15 cm y aléjalo/acércalo hasta verlo nítido.');
+  cameraNote('Lector alternativo activo. Mantén todo el código y sus márgenes blancos dentro de la cámara, sin brillos.');
  }catch(e){stopCamera();msg('No se activó lector alternativo: '+e.message+'. Usa lector Bluetooth o placa manual.',true)}
 }
 async function openCamera(){
@@ -53,11 +53,11 @@ async function openCamera(){
  if(!editable())return msg('No tienes permiso para registrar movimientos de llaves',true);
  scanning=true;$('ctKeysCamera').hidden=false;cameraNote('Solicitando permiso de cámara…');
  try{
-  const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}});
+  const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:2560},height:{ideal:1440}}});
   if(!scanning){stream.getTracks().forEach(t=>t.stop());return}
-  scanStream=stream;const video=$('ctKeysVideo');video.srcObject=stream;await video.play();
+  scanStream=stream;try{const track=stream.getVideoTracks()[0],caps=track.getCapabilities?.()||{};const settings={advanced:[]};if((caps.focusMode||[]).includes('continuous'))settings.advanced.push({focusMode:'continuous'});if((caps.exposureMode||[]).includes('continuous'))settings.advanced.push({exposureMode:'continuous'});if(settings.advanced.length)await track.applyConstraints(settings)}catch(_){}const video=$('ctKeysVideo');video.srcObject=stream;await video.play();
   const caps=stream.getVideoTracks()[0]?.getCapabilities?.()||{};$('ctKeysTorch').hidden=!caps.torch;await setZoom();
-  cameraNote('Buscando Code 128… Si no lo detecta, cambiará automáticamente al lector alternativo.');
+  cameraNote('Buscando Code 128… Mantén las barras horizontales, con luz uniforme; mueve el celular lentamente hasta que enfoquen. Si no se detecta en 15 s, se intentará el lector alternativo.');
   let nativeReady=false;
   if(typeof BarcodeDetector==='function'){
    try{const formats=await BarcodeDetector.getSupportedFormats();nativeReady=formats.includes('code_128')}catch(_){nativeReady=false}
@@ -68,12 +68,12 @@ async function openCamera(){
   const nativeStarted=Date.now();
   const loop=async()=>{
    if(!scanning)return;
-   if(Date.now()-nativeStarted>7000){await useZxing(video);return}
+   if(Date.now()-nativeStarted>15000){await useZxing(video);return}
    try{
     let values=await scanner.detect(video);
     if(values?.some(v=>v.format==='code_128'&&scannedCode(v.rawValue)))return;
     if(scanCtx&&video.videoWidth&&video.videoHeight){
-     const w=video.videoWidth,h=video.videoHeight,cw=Math.floor(w*.7),ch=Math.floor(h*.38);
+     const w=video.videoWidth,h=video.videoHeight,cw=Math.floor(w*.86),ch=Math.floor(h*.50);
      scanCanvas.width=cw;scanCanvas.height=ch;scanCtx.drawImage(video,(w-cw)/2,(h-ch)/2,cw,ch,0,0,cw,ch);
      values=await scanner.detect(scanCanvas);
      if(values?.some(v=>v.format==='code_128'&&scannedCode(v.rawValue)))return;
