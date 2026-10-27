@@ -26,8 +26,6 @@ async function purgeAll(){
  if(!canPurge)return alertStatus('No tienes autorización para eliminar todos los datos.',true);
  const total=rows.length;
  if(!confirm(`ADVERTENCIA: se eliminarán definitivamente ${total} registros de Validaciones Operación, incluidos pendientes, restringidos y entregados. ¿Continuar?`))return;
- const confirmation=prompt('Esta acción es IRREVERSIBLE. Escribe ELIMINAR TODO para confirmar:');
- if(confirmation!=='ELIMINAR TODO')return alertStatus('Eliminación cancelada.');
  try{
   const deleted=await rpc('ct_validation_invoices_purge',{p_confirmation:'ELIMINAR TODO'});
   $('meta').textContent='Base reiniciada · Sin archivo activo';
