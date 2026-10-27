@@ -23,7 +23,7 @@ function stopCamera(){scanning=false;lastCandidate='';candidateCount=0;lastCandi
 function scannedCode(raw){
  const plate=normalizePlate(raw);
  if(!PLATE_PATTERN.test(plate)){
-  cameraNote('Lectura descartada: '+plate.slice(0,24)+'. El código debe contener la placa, no únicamente números.');return false;
+  cameraNote('Lectura descartada: '+plate.slice(0,24)+'. El QR debe contener exactamente la placa, por ejemplo COTMX037-1.');return false;
  }
  if(lastCandidate!==plate||Date.now()-lastCandidateTime>3000){lastCandidate=plate;candidateCount=1;lastCandidateTime=Date.now();cameraNote('Placa '+plate+' detectada. Mantén el código estable para confirmar.');return false;}
  candidateCount++;lastCandidateTime=Date.now();
@@ -32,19 +32,19 @@ function scannedCode(raw){
 }
 function loadZxing(){return new Promise((resolve,reject)=>{if(window.ZXingBrowser)return resolve(window.ZXingBrowser);const tag=document.createElement('script');tag.src='https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.1/umd/zxing-browser.min.js';tag.onload=()=>window.ZXingBrowser?resolve(window.ZXingBrowser):reject(Error('No se pudo inicializar el lector alternativo'));tag.onerror=()=>reject(Error('No se pudo cargar ZXing desde la red. Comprueba internet o prueba otro navegador (Chrome en Android).'));document.head.appendChild(tag)})}
 async function useZxing(video){
- cameraNote('Activando lector alternativo Code 128…');
+ cameraNote('Activando lector alternativo QR y Code 128…');
  try{
   const ZX=await loadZxing();if(!scanning)return;
   scanStream?.getTracks().forEach(t=>t.stop());scanStream=null;video.srcObject=null;
   const hints=new Map();
   // Code 128 primero; evitamos interpretar códigos EAN o numéricos.
   if(window.ZXing?.DecodeHintType&&window.ZXing?.BarcodeFormat){
-   hints.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS,[window.ZXing.BarcodeFormat.CODE_128]);
+   hints.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS,[window.ZXing.BarcodeFormat.QR_CODE,window.ZXing.BarcodeFormat.CODE_128]);
    hints.set(window.ZXing.DecodeHintType.TRY_HARDER,true);
   }
   zxingReader=new ZX.BrowserMultiFormatReader(hints);
   zxingControls=await zxingReader.decodeFromVideoDevice(undefined,video,(result)=>{if(result)scannedCode(result.getText())});
-  cameraNote('Lector alternativo activo. Mantén todo el código y sus márgenes blancos dentro de la cámara, sin brillos.');
+  cameraNote('Lector QR activo. Mantén el cuadrado QR completo dentro de la cámara, sin brillos.');
  }catch(e){stopCamera();msg('No se activó lector alternativo: '+e.message+'. Usa lector Bluetooth o placa manual.',true)}
 }
 async function openCamera(){
@@ -57,26 +57,26 @@ async function openCamera(){
   if(!scanning){stream.getTracks().forEach(t=>t.stop());return}
   scanStream=stream;try{const track=stream.getVideoTracks()[0],caps=track.getCapabilities?.()||{};const settings={advanced:[]};if((caps.focusMode||[]).includes('continuous'))settings.advanced.push({focusMode:'continuous'});if((caps.exposureMode||[]).includes('continuous'))settings.advanced.push({exposureMode:'continuous'});if(settings.advanced.length)await track.applyConstraints(settings)}catch(_){}const video=$('ctKeysVideo');video.srcObject=stream;await video.play();
   const caps=stream.getVideoTracks()[0]?.getCapabilities?.()||{};$('ctKeysTorch').hidden=!caps.torch;await setZoom();
-  cameraNote('Buscando Code 128… Mantén las barras horizontales, con luz uniforme; mueve el celular lentamente hasta que enfoquen. Si no se detecta en 15 s, se intentará el lector alternativo.');
-  let nativeReady=false;
+  cameraNote('Buscando QR de placa (también Code 128)… Centra el QR completo en la cámara, con luz uniforme; mueve el celular lentamente hasta que enfoque. Si no se detecta en 15 s, se intentará el lector alternativo.');
+  let nativeReady=false;let supportedFormats=[];
   if(typeof BarcodeDetector==='function'){
-   try{const formats=await BarcodeDetector.getSupportedFormats();nativeReady=formats.includes('code_128')}catch(_){nativeReady=false}
+   try{const formats=await BarcodeDetector.getSupportedFormats();supportedFormats=formats;nativeReady=formats.includes('qr_code')||formats.includes('code_128')}catch(_){nativeReady=false}
   }
   if(!nativeReady){await useZxing(video);return}
   let scanner;
-  try{scanner=new BarcodeDetector({formats:['code_128']})}catch(_){await useZxing(video);return}
+  try{scanner=new BarcodeDetector({formats:['qr_code','code_128'].filter(f=>supportedFormats.includes(f))})}catch(_){await useZxing(video);return}
   const nativeStarted=Date.now();
   const loop=async()=>{
    if(!scanning)return;
    if(Date.now()-nativeStarted>15000){await useZxing(video);return}
    try{
     let values=await scanner.detect(video);
-    if(values?.some(v=>v.format==='code_128'&&scannedCode(v.rawValue)))return;
+    if(values?.some(v=>(v.format==='qr_code'||v.format==='code_128')&&scannedCode(v.rawValue)))return;
     if(scanCtx&&video.videoWidth&&video.videoHeight){
      const w=video.videoWidth,h=video.videoHeight,cw=Math.floor(w*.86),ch=Math.floor(h*.50);
      scanCanvas.width=cw;scanCanvas.height=ch;scanCtx.drawImage(video,(w-cw)/2,(h-ch)/2,cw,ch,0,0,cw,ch);
      values=await scanner.detect(scanCanvas);
-     if(values?.some(v=>v.format==='code_128'&&scannedCode(v.rawValue)))return;
+     if(values?.some(v=>(v.format==='qr_code'||v.format==='code_128')&&scannedCode(v.rawValue)))return;
     }
    }catch(_){/* continuar al lector alternativo */}
    if(scanning)scanTimer=setTimeout(loop,220);
