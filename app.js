@@ -1132,7 +1132,7 @@ async function ctManualRefreshAll(){
   await attempt('Vista rápida de despacho',async()=>{window.loadBrujulaReport?.();});
   if(permissions.is_admin)await attempt('Historial',loadHistory);
   window.dispatchEvent(new CustomEvent('ct-refresh-all',{detail:{source:'manual'}}));
-  try{localStorage.setItem('ct_refresh_signal_v629',String(Date.now()))}catch(_){}
+  window.ctSyncNotify?.('all');
   ctLiveLast=Date.now();
   if(errors.length)toast('Actualización parcial. No se pudo consultar: '+errors.join(', '));
   else {toast('Datos refrescados en todas las pestañas.');ctLiveStatus('Sincronizado manualmente');}
@@ -1152,6 +1152,7 @@ function subscribe(){
   .subscribe(status=>{if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')ctLiveStatus('Verificando cambios automáticamente…',false)});
  // Fallback para bases sin publicaciones Realtime y cambios hechos por RPC.
  ctLivePoll=setInterval(()=>{if(document.hidden||!loginPin)return;void ctLiveUpdate()},8000);
+ window.addEventListener('ct-external-change',()=>{if(loginPin)ctLiveSchedule()});
  window.addEventListener('focus',()=>{if(loginPin)ctLiveSchedule()});
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&loginPin)ctLiveSchedule()});
  document.addEventListener('focusout',()=>{if(ctLiveQueued&&loginPin)setTimeout(()=>{if(!ctLiveEditing())void ctLiveUpdate(true)},500)},true);
