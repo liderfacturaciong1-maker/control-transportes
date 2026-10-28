@@ -1113,6 +1113,8 @@ async function ctManualRefreshAll(){
   await attempt('Sincronización',async()=>{window.loadSyncStatReport?.();window.renderSyncReport?.();});
   await attempt('Vista rápida de despacho',async()=>{window.loadBrujulaReport?.();});
   if(permissions.is_admin)await attempt('Historial',loadHistory);
+  window.dispatchEvent(new CustomEvent('ct-refresh-all',{detail:{source:'manual'}}));
+  try{localStorage.setItem('ct_refresh_signal_v629',String(Date.now()))}catch(_){}
   ctLiveLast=Date.now();
   if(errors.length)toast('Actualización parcial. No se pudo consultar: '+errors.join(', '));
   else {toast('Datos refrescados en todas las pestañas.');ctLiveStatus('Sincronizado manualmente');}
@@ -1127,9 +1129,11 @@ function subscribe(){
   .on('postgres_changes',{event:'*',schema:'public',table:'transportes'},ctLiveSchedule)
   .on('postgres_changes',{event:'*',schema:'public',table:'ct_viajes_en_linea'},ctLiveSchedule)
   .on('postgres_changes',{event:'*',schema:'public',table:'ct_checkin_archived'},ctLiveSchedule)
+  .on('postgres_changes',{event:'*',schema:'public',table:'ct_validation_invoices'},ctLiveSchedule)
+  .on('postgres_changes',{event:'*',schema:'public',table:'ct_keys_t2'},ctLiveSchedule)
   .subscribe(status=>{if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')ctLiveStatus('Verificando cambios automáticamente…',false)});
  // Fallback para bases sin publicaciones Realtime y cambios hechos por RPC.
- ctLivePoll=setInterval(()=>{if(document.hidden||!loginPin)return;void ctLiveUpdate()},12000);
+ ctLivePoll=setInterval(()=>{if(document.hidden||!loginPin)return;void ctLiveUpdate()},8000);
  window.addEventListener('focus',()=>{if(loginPin)ctLiveSchedule()});
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&loginPin)ctLiveSchedule()});
  document.addEventListener('focusout',()=>{if(ctLiveQueued&&loginPin)setTimeout(()=>{if(!ctLiveEditing())void ctLiveUpdate(true)},500)},true);
@@ -1542,3 +1546,23 @@ function closePorteriaPending(){
   modal.classList.add('hidden');
   document.getElementById('openPorteriaPending')?.focus();
 }
+
+/* v6.29: botón de refresco por pestaña y sincronización cruzada */
+(()=>{'use strict';
+ const excluded=new Set(['ctManualRefresh','ctT2SummaryRefresh']);
+ function addButtons(){
+  const selectors='button[role="tab"],button[data-handover-tab],button[data-rotation-tab],.categoryTab[data-category],.ctBillingSubTab';
+  document.querySelectorAll(selectors).forEach(tab=>{
+   if(tab.dataset.ctRefreshAttached||excluded.has(tab.id)||!tab.parentElement)return;
+   tab.dataset.ctRefreshAttached='1';
+   // Botón pequeño separado: conserva la función original de la pestaña.
+   const btn=document.createElement('button');btn.type='button';btn.className='ctTabRefreshV629';btn.textContent='⟳';btn.title='Refrescar información de esta pestaña';btn.setAttribute('aria-label','Refrescar pestaña '+(tab.textContent||'').trim());
+   btn.addEventListener('click',async ev=>{ev.preventDefault();ev.stopPropagation();btn.disabled=true;
+    try{if(typeof ctManualRefreshAll==='function')await ctManualRefreshAll();else document.getElementById('ctManualRefresh')?.click()}finally{btn.disabled=false}
+   });tab.insertAdjacentElement('afterend',btn);
+  });
+ }
+ const run=()=>{addButtons();};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run);else run();
+ document.addEventListener('click',ev=>{if(ev.target.closest('button[role="tab"],button[data-handover-tab],button[data-rotation-tab]'))setTimeout(run,0)});
+ window.addEventListener('storage',ev=>{if(ev.key==='ct_refresh_signal_v629'&&document.visibilityState==='visible')window.dispatchEvent(new CustomEvent('ct-refresh-all',{detail:{source:'other-window'}}))});
+})();
