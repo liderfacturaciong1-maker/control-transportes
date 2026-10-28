@@ -1,5 +1,5 @@
 (()=>{'use strict';const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));let sb,pin='',rows=[],restrictions=[],keyStates={},write=false,canUpload=false,canDelete=false,canPurge=false,restrictionsOk=false;const normalize=s=>String(s??'').trim().toUpperCase();const clean=s=>normalize(s).replace(/[^A-Z0-9]/g,'');const alertStatus=(m,bad=false)=>{$('message').textContent=m;$('message').classList.toggle('error',bad)};
-async function rpc(name,params={}){const {data,error}=await sb.rpc(name,{p_pin:pin,...params});if(error)throw Error(error.message);return data}
+async function rpc(name,params={}){const {data,error}=await sb.rpc(name,{p_pin:pin,...params});if(error)throw Error(error.message);if(/^(ct_validation_invoices_import|ct_validation_invoice_status|ct_validation_invoices_clear|ct_validation_invoices_purge|ct_validation_keys_set|ct_validation_keys_history_clear|ct_validation_key_receivers_modify)$/.test(name))window.ctSyncNotify?.('validation');return data}
 function groupRestricted(row){
  if(row.entregada||row.recibido!==true)return false;
  const plate=clean(row.placa),transport=clean(row.transporte);
@@ -55,7 +55,7 @@ function init(){if(new URLSearchParams(location.search).get('embedded')==='t2'&&
   // v6.29: actualización activa sin interrumpir formularios en edición.
   const safeReload=()=>{const el=document.activeElement;if(document.hidden||!pin||!sb||['INPUT','TEXTAREA','SELECT'].includes(el?.tagName))return;load().catch(e=>console.warn('Actualización automática:',e.message));};
   setInterval(safeReload,10000);window.addEventListener('focus',safeReload);
-  window.addEventListener('storage',e=>{if(e.key==='ct_refresh_signal_v629')safeReload()});
+  window.addEventListener('storage',e=>{if(e.key==='ct_refresh_signal_v629')safeReload()});window.addEventListener('ct-external-change',safeReload);
   window.addEventListener('message',e=>{if(e.origin===location.origin&&e.data?.type==='CT_SYNC_REFRESH')safeReload()});
   document.getElementById('ctValidationRefreshV629')?.addEventListener('click',()=>load().catch(e=>alertStatus(e.message,true)));
   const cfg=window.APP_CONFIG||{};
