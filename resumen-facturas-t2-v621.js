@@ -13,3 +13,4 @@ async function refresh(){if(busy||!$('ctT2SummaryPending'))return;if(!window.ctR
 window.addEventListener('ct-refresh-all',()=>{if(document.querySelector('[data-handover-pane="T2"]')?.hidden===false)void refresh()});
 function init(){if(!$('ctT2SummaryPending'))return;$('ctT2SummaryRefresh').onclick=refresh;document.querySelector('[data-handover-tab="T2"]')?.addEventListener('click',refresh);window.addEventListener('ct-billing-opened',()=>{if(document.querySelector('[data-handover-pane="T2"]')?.hidden===false)refresh()});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.querySelector('[data-handover-pane="T2"]')?.hidden===false)refresh()});}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();})();
+window.addEventListener('ct-external-change',()=>window.dispatchEvent(new Event('ct-refresh-all')));
