@@ -1,4 +1,4 @@
-/* Tapa Códigos KA - importación independiente y resumen de diez clientes, solo familia LATA. */
+/* Tapa Códigos KA - importación independiente y resumen de diez clientes, solo 36 SKU seleccionados. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const CUSTOMERS=new Map(Object.entries({
@@ -8,6 +8,7 @@ const CUSTOMERS=new Map(Object.entries({
  '10564408':'Exito Bello Centro','14156330':'Exito Gardel',
  '14156331':'Exito Puerto Berrio','10564327':'Exito Robledo'
 }));
+const SELECTED_SKUS=new Set('1428 2174 2641 2976 3228 5150 5252 5255 5630 5632 5902 7993 8532 9672 9909 12283 13631 14703 14709 16210 16466 17155 20469 21146 21159 21189 21730 22102 22242 22256 22265 22270 22271 23013 23047 23121'.split(' '));
 const norm=s=>String(s??'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
 const code=s=>String(s??'').trim().replace(/\.0+$/,'').replace(/\s/g,'');
 const txt=v=>String(v??'').trim();
@@ -63,7 +64,7 @@ function groupSelected(rows){
  for(const r of rows||[]){
   const label=txt(r.descripcion);const match=label.match(/^(\d+)\s*\|\s*(.*)$/);
   const clientId=match?.[1]||'';
-  if(!CUSTOMERS.has(clientId)||norm(r.familia)!=='lata')continue;
+  if(!CUSTOMERS.has(clientId)||!SELECTED_SKUS.has(code(r.material)))continue;
   const item={transporte:txt(r.transporte),descripcion:txt(match[2])||CUSTOMERS.get(clientId),vehiculo:txt(r.vehiculo),viaje:txt(r.viaje),material:txt(r.material),denominacion:txt(r.denominacion),cantidad:qty(r.cantidad)};
   const key=[clientId,item.transporte,item.vehiculo,item.viaje,item.material,item.denominacion].join('\u001f');
   if(groups.has(key))groups.get(key).cantidad+=item.cantidad;
@@ -75,15 +76,15 @@ function render(){
  const records=window.ctTapaKaReadRows?.()||[];
  reportRows=groupSelected(records);
  const tbody=$('ctTapaReportRows');if(!tbody)return;
- tbody.innerHTML=reportRows.map(r=>`<tr><td>${escape(r.transporte)}</td><td>${escape(r.descripcion)}</td><td>${escape(r.vehiculo)}</td><td>${escape(r.viaje)}</td><td>${escape(r.material)}</td><td>${escape(r.denominacion)}</td><td>${fmt(r.cantidad)}</td></tr>`).join('')||'<tr><td colspan="7">No hay registros de familia LATA para los 10 clientes Éxito.</td></tr>';
+ tbody.innerHTML=reportRows.map(r=>`<tr><td>${escape(r.transporte)}</td><td>${escape(r.descripcion)}</td><td>${escape(r.vehiculo)}</td><td>${escape(r.viaje)}</td><td>${escape(r.material)}</td><td>${escape(r.denominacion)}</td><td>${fmt(r.cantidad)}</td></tr>`).join('')||'<tr><td colspan="7">No hay registros de los 36 SKU seleccionados para los 10 clientes Éxito.</td></tr>';
  $('ctTapaReportTotal').textContent=fmt(reportRows.reduce((s,r)=>s+r.cantidad,0));
- $('ctTapaReportSummary').textContent=`${reportRows.length} combinaciones consolidadas · ${new Set(reportRows.map(r=>r.descripcion)).size} clientes encontrados · ${fmt(reportRows.reduce((s,r)=>s+r.cantidad,0))} unidades (solo familia LATA, según origen)`;
+ $('ctTapaReportSummary').textContent=`${reportRows.length} combinaciones consolidadas · ${new Set(reportRows.map(r=>r.descripcion)).size} clientes encontrados · ${fmt(reportRows.reduce((s,r)=>s+r.cantidad,0))} unidades (solo SKU seleccionados)`;
 }
 window.ctTapaKaRenderSummary=render;
 function excelDownload(wb,name){XLSX.writeFile(wb,name,{compression:true});}
 function downloadFull(){if(!completedBook)return;excelDownload(completedBook,'Tapa_Codigos_Completado.xlsx');}
 function downloadReport(){
- if(!reportRows.length){$('ctTapaReportSummary').textContent='No hay registros de familia LATA de los 10 clientes para descargar.';return;}
+ if(!reportRows.length){$('ctTapaReportSummary').textContent='No hay registros de los SKU seleccionados para los 10 clientes para descargar.';return;}
  const wb=XLSX.utils.book_new();const cols=['TRANSPORTE','DESCRIPCIÓN','VEHÍCULO','VIAJE','MATERIAL','DENOMINACIÓN','CANTIDAD'];
  const aoa=[cols,...reportRows.map(r=>[r.transporte,r.descripcion,r.vehiculo,r.viaje,r.material,r.denominacion,r.cantidad])];
  aoa.push(['TOTAL GENERAL','','','','','',reportRows.reduce((s,r)=>s+r.cantidad,0)]);
@@ -94,7 +95,7 @@ function downloadReport(){
   const tail=XLSX.utils.encode_cell({r:aoa.length-1,c});
   if(ws[tail])ws[tail].s={font:{bold:true,color:{rgb:'232F3D'}},fill:{fgColor:{rgb:'FCD039'}}};
  }
- XLSX.utils.book_append_sheet(wb,ws,'Exito LATA');excelDownload(wb,'Resumen_Tapa_Codigos_KA_Exito_LATA.xlsx');
+ XLSX.utils.book_append_sheet(wb,ws,'Exito SKU');excelDownload(wb,'Resumen_Tapa_Codigos_KA_Exito_SKU.xlsx');
 }
 async function upload(){
  const status=$('ctTapaImportStatus'),btn=$('ctTapaProcessBtn'),file=$('ctTapaExcelFile')?.files?.[0];
