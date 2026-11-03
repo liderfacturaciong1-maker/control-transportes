@@ -17,7 +17,7 @@ const fmt=v=>Number(v||0).toLocaleString('es-CO',{maximumFractionDigits:3});
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const findSheet=(wb,label)=>wb.SheetNames.find(n=>norm(n)===norm(label));
 const headers=(a,row=0)=>{const m=new Map();(a[row]||[]).forEach((v,i)=>{if(norm(v)&&!m.has(norm(v)))m.set(norm(v),i)});return m};
-let completedBook=null, reportRows=[];
+let completedBook=null, reportRows=[],localProcessedRows=null;
 function parseWorkbook(wb){
  const baseName=findSheet(wb,'Bases Datos')||findSheet(wb,'Base Datos');
  const tapaName=findSheet(wb,'Tapa Codigos')||findSheet(wb,'Tapa Códigos');
@@ -81,12 +81,14 @@ function groupSelected(rows){
  return [...groups.values()].sort((a,b)=>[a.transporte,a.descripcion,a.vehiculo,a.viaje,a.material,a.denominacion].join('|').localeCompare([b.transporte,b.descripcion,b.vehiculo,b.viaje,b.material,b.denominacion].join('|'),'es',{numeric:true}));
 }
 function render(){
- const records=window.ctTapaKaReadRows?.()||[];
+ const records=localProcessedRows||window.ctTapaKaReadRows?.()||[];
  reportRows=groupSelected(records);
  const tbody=$('ctTapaReportRows');if(!tbody)return;
- tbody.innerHTML=reportRows.map(r=>`<tr><td>${escape(r.transporte)}</td><td>${escape(r.descripcion)}</td><td>${escape(r.vehiculo)}</td><td>${escape(r.viaje)}</td><td>${escape(r.material)}</td><td>${escape(r.denominacion)}</td><td>${fmt(r.cantidad)}</td></tr>`).join('')||'<tr><td colspan="7">No hay registros de los 36 SKU seleccionados para los 10 clientes Éxito.</td></tr>';
+ tbody.innerHTML=reportRows.map(r=>`<tr><td>${escape(r.transporte)}</td><td>${escape(r.descripcion)}</td><td>${escape(r.vehiculo)}</td><td>${escape(r.viaje)}</td><td>${escape(r.material)}</td><td>${escape(r.denominacion)}</td><td>${fmt(r.cantidad)}</td></tr>`).join('')||'<tr><td colspan="7">Sin coincidencias simultáneas de los 10 clientes Éxito y los 36 SKU. Revisa la vista previa del cruce M→T y G→S en Cargar archivos.</td></tr>';
  $('ctTapaReportTotal').textContent=fmt(reportRows.reduce((s,r)=>s+r.cantidad,0));
- $('ctTapaReportSummary').textContent=`${reportRows.length} combinaciones consolidadas · ${new Set(reportRows.map(r=>r.descripcion)).size} clientes encontrados · ${fmt(reportRows.reduce((s,r)=>s+r.cantidad,0))} unidades (solo SKU seleccionados)`;
+ const skuMatches=records.filter(r=>SELECTED_SKUS.has(code(r.material))).length;
+ const customerMatches=records.filter(r=>CUSTOMERS.has(code(String(r.descripcion||'').split('|')[0]))).length;
+ $('ctTapaReportSummary').textContent=`${reportRows.length} combinaciones · ${fmt(reportRows.reduce((s,r)=>s+r.cantidad,0))} unidades. Origen: ${records.length} filas · SKU permitidos: ${skuMatches} · clientes Éxito: ${customerMatches} · coinciden ambos filtros: ${records.filter(r=>SELECTED_SKUS.has(code(r.material))&&CUSTOMERS.has(code(String(r.descripcion||'').split('|')[0]))).length}.`;
 }
 window.ctTapaKaRenderSummary=render;
 function excelDownload(wb,name){XLSX.writeFile(wb,name,{compression:true});}
@@ -105,21 +107,31 @@ function downloadReport(){
  }
  XLSX.utils.book_append_sheet(wb,ws,'Exito SKU');excelDownload(wb,'Resumen_Tapa_Codigos_KA_Exito_SKU.xlsx');
 }
+function showCrossPreview(rows,info){
+ const host=$('ctTapaCrossPreview');if(!host)return;
+ const both=rows.filter(r=>SELECTED_SKUS.has(code(r.material))&&CUSTOMERS.has(code(String(r.descripcion||'').split('|')[0]))).length;
+ const shown=rows.slice(0,20);
+ host.hidden=false;
+ host.innerHTML=`<h4 style="margin:12px 0 6px">Verificación del cruce (primeras ${shown.length} filas)</h4>
+ <p class="hint">Cliente M→A→B→T: ${info.foundClient} encontrados, ${info.missingClient} sin coincidencia. Material G→D→E→S: ${info.foundFamily} encontrados, ${info.missingFamily} sin coincidencia. Coinciden con los 10 clientes y 36 SKU del resumen: <b>${both}</b> registros.</p>
+ <div class="tableWrap"><table><thead><tr><th>M · SOLIC.</th><th>T · Cliente</th><th>G · MATERIAL</th><th>S · Descripción</th></tr></thead><tbody>${shown.map(r=>{const m=String(r.descripcion||'').split('|');return `<tr><td>${escape(txt(m[0]))}</td><td>${escape(txt(m.slice(1).join('|')))}</td><td>${escape(r.material)}</td><td>${escape(r.familia)}</td></tr>`}).join('')}</tbody></table></div>`;
+}
 async function upload(){
  const status=$('ctTapaImportStatus'),btn=$('ctTapaProcessBtn'),file=$('ctTapaExcelFile')?.files?.[0];
  if(!file){status.textContent='Selecciona el Excel de Tapa Códigos.';return;}
  if(!window.ctTapaKaCanUpload?.()){status.textContent='No tienes permiso de modificación o carga de archivos. Inicia sesión con un usuario autorizado.';return;}
- btn.disabled=true;completedBook=null;$('ctTapaFullExcelBtn').disabled=true;
+ btn.disabled=true;completedBook=null;localProcessedRows=null;$('ctTapaFullExcelBtn').disabled=true;
  try{
   status.textContent='Leyendo hojas y cruzando códigos de clientes y materiales…';
   const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellStyles:true,cellDates:true});
   const result=parseWorkbook(wb);
+  completedBook=wb;localProcessedRows=result.rows;
+  $('ctTapaFullExcelBtn').disabled=false;showCrossPreview(result.rows,result);render();
   status.textContent=`Cruce realizado: ${result.rows.length} registros, ${result.foundClient} clientes encontrados y ${result.foundFamily} descripciones de producto encontradas. Guardando datos…`;
   await window.ctTapaKaSaveRows(result.rows);
-  completedBook=wb;$('ctTapaFullExcelBtn').disabled=false;
   status.textContent=`Carga exitosa: ${result.rows.length} registros. Cliente: ${result.foundClient} encontrados / ${result.missingClient} sin coincidencia. Descripción en S: ${result.foundFamily} encontradas / ${result.missingFamily} sin coincidencia. Puedes descargar el Excel actualizado y consultar el resumen en Tapa Códigos KA.`;
   render();
- }catch(err){status.textContent='Error: '+(err?.message||err);console.error('[Tapa Códigos KA]',err)}
+ }catch(err){status.textContent='Error: '+(err?.message||err)+(completedBook?' El cruce local sí se realizó: puedes descargar el Excel completado. No se confirmó el guardado en Supabase.':'');console.error('[Tapa Códigos KA]',err)}
  finally{btn.disabled=false}
 }
 function init(){
