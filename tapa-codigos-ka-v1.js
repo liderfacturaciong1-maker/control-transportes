@@ -23,29 +23,37 @@ function parseWorkbook(wb){
  const tapaName=findSheet(wb,'Tapa Codigos')||findSheet(wb,'Tapa Códigos');
  if(!baseName||!tapaName)throw Error('El Excel debe contener las pestañas Bases Datos y Tapa Codigos.');
  const source=XLSX.utils.sheet_to_json(wb.Sheets[baseName],{header:1,defval:'',raw:true});
- // Base Datos: primera fila agrupa las bases, segunda fila contiene encabezados.
+ // Cruces por posiciones fijas del archivo, no por nombres ambiguos de encabezados:
+ // Bases Datos A (código cliente) → B (nombre cliente)
+ // Bases Datos D (SKU) → E (descripción del producto)
+ // Tapa Codigos M (SOLIC.) → T (Cliente)
+ // Tapa Codigos G (MATERIAL) → S (Familia: texto de columna E solicitado)
  const hd=headers(source,1);
- for(const k of ['cliente','nombre3','sku','familia'])if(!hd.has(k))throw Error('Falta la columna '+k+' en la segunda fila de Bases Datos.');
+ if(hd.get('cliente')!==0||hd.get('nombre3')!==1||hd.get('sku')!==3||hd.get('descripcion')!==4){
+  throw Error('Bases Datos no tiene el formato esperado: A=Cliente, B=Nombre 3, D=SKU, E=Descripcion (encabezados en fila 2).');
+ }
  const clients=new Map(),families=new Map();
  for(const row of source.slice(2)){
-  const c=code(row[hd.get('cliente')]);if(c&&!clients.has(c))clients.set(c,txt(row[hd.get('nombre3')]));
-  const sku=code(row[hd.get('sku')]);if(sku&&!families.has(sku))families.set(sku,txt(row[hd.get('familia')]));
+  const c=code(row[0]);if(c&&!clients.has(c))clients.set(c,txt(row[1]));
+  const sku=code(row[3]);if(sku&&!families.has(sku))families.set(sku,txt(row[4]));
  }
  const sheet=wb.Sheets[tapaName];const data=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:''});
  const th=headers(data);
- const need=['transporte','vehiculo','viaje','material','denominacion','cantidad','solic','familia','cliente'];
- for(const k of need)if(!th.has(k))throw Error('Falta la columna '+k+' en Tapa Codigos.');
+ if(th.get('solic')!==12||th.get('material')!==6||th.get('familia')!==18||th.get('cliente')!==19){
+  throw Error('Tapa Codigos debe tener G=MATERIAL, M=SOLIC., S=Familia y T=Cliente. Comprueba las columnas.');
+ }
+ for(const k of ['transporte','vehiculo','viaje','denominacion','cantidad'])if(!th.has(k))throw Error('Falta '+k+' en Tapa Codigos.');
  const result=[];let foundClient=0,foundFamily=0,missingClient=0,missingFamily=0;
  for(let i=1;i<data.length;i++){
   const row=data[i]||[];if(row.every(v=>txt(v)===''))continue;
   const clientCode=code(row[th.get('solic')]);const sku=code(row[th.get('material')]);
-  const clientName=clients.get(clientCode)||CUSTOMERS.get(clientCode)||'';
+  const clientName=clients.get(clientCode)||'';
   const family=families.get(sku)||'';
   if(clientName)foundClient++;else missingClient++;
   if(family)foundFamily++;else missingFamily++;
   // Columna Cliente: nombre legible; la descripción almacenada incluye código para el filtro exacto.
-  const ec=XLSX.utils.encode_cell({r:i,c:th.get('cliente')});
-  const ef=XLSX.utils.encode_cell({r:i,c:th.get('familia')});
+  const ec=XLSX.utils.encode_cell({r:i,c:19});
+  const ef=XLSX.utils.encode_cell({r:i,c:18});
   sheet[ec]={...(sheet[ec]||{}),t:'s',v:clientName};
   sheet[ef]={...(sheet[ef]||{}),t:'s',v:family};
   result.push({
@@ -106,10 +114,10 @@ async function upload(){
   status.textContent='Leyendo hojas y cruzando códigos de clientes y materiales…';
   const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellStyles:true,cellDates:true});
   const result=parseWorkbook(wb);
-  status.textContent=`Cruce realizado: ${result.rows.length} registros, ${result.foundClient} clientes encontrados y ${result.foundFamily} familias encontradas. Guardando datos…`;
+  status.textContent=`Cruce realizado: ${result.rows.length} registros, ${result.foundClient} clientes encontrados y ${result.foundFamily} descripciones de producto encontradas. Guardando datos…`;
   await window.ctTapaKaSaveRows(result.rows);
   completedBook=wb;$('ctTapaFullExcelBtn').disabled=false;
-  status.textContent=`Carga exitosa: ${result.rows.length} registros. Cliente: ${result.foundClient} encontrados / ${result.missingClient} sin coincidencia. Familia: ${result.foundFamily} encontradas / ${result.missingFamily} sin coincidencia. Puedes descargar el Excel actualizado y consultar el resumen en Tapa Códigos KA.`;
+  status.textContent=`Carga exitosa: ${result.rows.length} registros. Cliente: ${result.foundClient} encontrados / ${result.missingClient} sin coincidencia. Descripción en S: ${result.foundFamily} encontradas / ${result.missingFamily} sin coincidencia. Puedes descargar el Excel actualizado y consultar el resumen en Tapa Códigos KA.`;
   render();
  }catch(err){status.textContent='Error: '+(err?.message||err);console.error('[Tapa Códigos KA]',err)}
  finally{btn.disabled=false}
