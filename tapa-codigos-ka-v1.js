@@ -25,17 +25,17 @@ function parseWorkbook(wb){
  const source=XLSX.utils.sheet_to_json(wb.Sheets[baseName],{header:1,defval:'',raw:true});
  // Cruces por posiciones fijas del archivo, no por nombres ambiguos de encabezados:
  // Bases Datos A (código cliente) → B (nombre cliente)
- // Bases Datos D (SKU) → E (descripción del producto)
+ // Bases Datos D (SKU) → F (Familia), como el BUSCARV de ejemplo
  // Tapa Codigos M (SOLIC.) → T (Cliente)
- // Tapa Codigos G (MATERIAL) → S (Familia: texto de columna E solicitado)
+ // Tapa Codigos G (MATERIAL) → S (Familia), valor de F, sin fórmulas
  const hd=headers(source,1);
- if(hd.get('cliente')!==0||hd.get('nombre3')!==1||hd.get('sku')!==3||hd.get('descripcion')!==4){
-  throw Error('Bases Datos no tiene el formato esperado: A=Cliente, B=Nombre 3, D=SKU, E=Descripcion (encabezados en fila 2).');
+ if(hd.get('cliente')!==0||hd.get('nombre3')!==1||hd.get('sku')!==3||hd.get('familia')!==5){
+  throw Error('Bases Datos no tiene el formato esperado: A=Cliente, B=Nombre 3, D=SKU, F=Familia (encabezados en fila 2).');
  }
  const clients=new Map(),families=new Map();
  for(const row of source.slice(2)){
   const c=code(row[0]);if(c&&!clients.has(c))clients.set(c,txt(row[1]));
-  const sku=code(row[3]);if(sku&&!families.has(sku))families.set(sku,txt(row[4]));
+  const sku=code(row[3]);if(sku&&!families.has(sku))families.set(sku,txt(row[5]));
  }
  const sheet=wb.Sheets[tapaName];const data=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:''});
  const th=headers(data);
@@ -54,8 +54,11 @@ function parseWorkbook(wb){
   // Columna Cliente: nombre legible; la descripción almacenada incluye código para el filtro exacto.
   const ec=XLSX.utils.encode_cell({r:i,c:19});
   const ef=XLSX.utils.encode_cell({r:i,c:18});
-  sheet[ec]={...(sheet[ec]||{}),t:'s',v:clientName};
-  sheet[ef]={...(sheet[ef]||{}),t:'s',v:family};
+  // Reemplazamos la celda completa de valor: conservar `f` mantendría la fórmula
+  // BUSCARV y Excel podría recalcular / reemplazar el resultado mostrado.
+  const clientStyle=sheet[ec]?.s, familyStyle=sheet[ef]?.s;
+  sheet[ec]={t:'s',v:clientName,...(clientStyle?{s:clientStyle}:{})};
+  sheet[ef]={t:'s',v:family,...(familyStyle?{s:familyStyle}:{})};
   result.push({
    transporte:txt(row[th.get('transporte')]),
    descripcion:clientCode?(clientCode+' | '+clientName):clientName,
@@ -92,7 +95,7 @@ function render(){
 }
 window.ctTapaKaRenderSummary=render;
 function excelDownload(wb,name){XLSX.writeFile(wb,name,{compression:true});}
-function downloadFull(){if(!completedBook)return;excelDownload(completedBook,'Tapa_Codigos_Completado.xlsx');}
+function downloadFull(){if(!completedBook)return;excelDownload(completedBook,'Tapa_Codigos_Completado_Sin_Formulas.xlsx');}
 function downloadReport(){
  if(!reportRows.length){$('ctTapaReportSummary').textContent='No hay registros de los SKU seleccionados para los 10 clientes para descargar.';return;}
  const wb=XLSX.utils.book_new();const cols=['TRANSPORTE','DESCRIPCIÓN','VEHÍCULO','VIAJE','MATERIAL','DENOMINACIÓN','CANTIDAD'];
@@ -113,13 +116,13 @@ function showCrossPreview(rows,info){
  const shown=rows.slice(0,20);
  host.hidden=false;
  host.innerHTML=`<h4 style="margin:12px 0 6px">Verificación del cruce (primeras ${shown.length} filas)</h4>
- <p class="hint">Cliente M→A→B→T: ${info.foundClient} encontrados, ${info.missingClient} sin coincidencia. Material G→D→E→S: ${info.foundFamily} encontrados, ${info.missingFamily} sin coincidencia. Coinciden con los 10 clientes y 36 SKU del resumen: <b>${both}</b> registros.</p>
- <div class="tableWrap"><table><thead><tr><th>M · SOLIC.</th><th>T · Cliente</th><th>G · MATERIAL</th><th>S · Descripción</th></tr></thead><tbody>${shown.map(r=>{const m=String(r.descripcion||'').split('|');return `<tr><td>${escape(txt(m[0]))}</td><td>${escape(txt(m.slice(1).join('|')))}</td><td>${escape(r.material)}</td><td>${escape(r.familia)}</td></tr>`}).join('')}</tbody></table></div>`;
+ <p class="hint">Cliente M→A→B→T: ${info.foundClient} encontrados, ${info.missingClient} sin coincidencia. Material G→D→F→S: ${info.foundFamily} encontrados, ${info.missingFamily} sin coincidencia. Coinciden con los 10 clientes y 36 SKU del resumen: <b>${both}</b> registros.</p>
+ <div class="tableWrap"><table><thead><tr><th>M · SOLIC.</th><th>T · Cliente</th><th>G · MATERIAL</th><th>S · Familia</th></tr></thead><tbody>${shown.map(r=>{const m=String(r.descripcion||'').split('|');return `<tr><td>${escape(txt(m[0]))}</td><td>${escape(txt(m.slice(1).join('|')))}</td><td>${escape(r.material)}</td><td>${escape(r.familia)}</td></tr>`}).join('')}</tbody></table></div>`;
 }
 async function upload(){
  const status=$('ctTapaImportStatus'),btn=$('ctTapaProcessBtn'),file=$('ctTapaExcelFile')?.files?.[0];
  if(!file){status.textContent='Selecciona el Excel de Tapa Códigos.';return;}
- if(!window.ctTapaKaCanUpload?.()){status.textContent='No tienes permiso de modificación o carga de archivos. Inicia sesión con un usuario autorizado.';return;}
+ 
  btn.disabled=true;completedBook=null;localProcessedRows=null;$('ctTapaFullExcelBtn').disabled=true;
  try{
   status.textContent='Leyendo hojas y cruzando códigos de clientes y materiales…';
@@ -127,9 +130,13 @@ async function upload(){
   const result=parseWorkbook(wb);
   completedBook=wb;localProcessedRows=result.rows;
   $('ctTapaFullExcelBtn').disabled=false;showCrossPreview(result.rows,result);render();
-  status.textContent=`Cruce realizado: ${result.rows.length} registros, ${result.foundClient} clientes encontrados y ${result.foundFamily} descripciones de producto encontradas. Guardando datos…`;
+  status.textContent=`Cruce realizado: ${result.rows.length} registros, ${result.foundClient} clientes encontrados y ${result.foundFamily} familias encontradas. Guardando datos…`;
+  if(!window.ctTapaKaCanUpload?.()){
+   status.textContent=`Excel procesado correctamente: ${result.rows.length} registros. Familia y Cliente se completaron como valores, sin fórmulas. Descarga el Excel. Para guardar el resumen compartido, entra con un usuario autorizado.`;
+   return;
+  }
   await window.ctTapaKaSaveRows(result.rows);
-  status.textContent=`Carga exitosa: ${result.rows.length} registros. Cliente: ${result.foundClient} encontrados / ${result.missingClient} sin coincidencia. Descripción en S: ${result.foundFamily} encontradas / ${result.missingFamily} sin coincidencia. Puedes descargar el Excel actualizado y consultar el resumen en Tapa Códigos KA.`;
+  status.textContent=`Carga exitosa: ${result.rows.length} registros. Cliente: ${result.foundClient} encontrados / ${result.missingClient} sin coincidencia. Familia en S: ${result.foundFamily} encontradas / ${result.missingFamily} sin coincidencia. Puedes descargar el Excel actualizado y consultar el resumen en Tapa Códigos KA.`;
   render();
  }catch(err){status.textContent='Error: '+(err?.message||err)+(completedBook?' El cruce local sí se realizó: puedes descargar el Excel completado. No se confirmó el guardado en Supabase.':'');console.error('[Tapa Códigos KA]',err)}
  finally{btn.disabled=false}
