@@ -1,4 +1,4 @@
-/* Tapa Códigos KA - importación independiente y resumen de diez clientes. */
+/* Tapa Códigos KA - importación independiente y resumen de diez clientes, solo familia LATA. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const CUSTOMERS=new Map(Object.entries({
@@ -63,7 +63,7 @@ function groupSelected(rows){
  for(const r of rows||[]){
   const label=txt(r.descripcion);const match=label.match(/^(\d+)\s*\|\s*(.*)$/);
   const clientId=match?.[1]||'';
-  if(!CUSTOMERS.has(clientId))continue;
+  if(!CUSTOMERS.has(clientId)||norm(r.familia)!=='lata')continue;
   const item={transporte:txt(r.transporte),descripcion:txt(match[2])||CUSTOMERS.get(clientId),vehiculo:txt(r.vehiculo),viaje:txt(r.viaje),material:txt(r.material),denominacion:txt(r.denominacion),cantidad:qty(r.cantidad)};
   const key=[clientId,item.transporte,item.vehiculo,item.viaje,item.material,item.denominacion].join('\u001f');
   if(groups.has(key))groups.get(key).cantidad+=item.cantidad;
@@ -75,15 +75,15 @@ function render(){
  const records=window.ctTapaKaReadRows?.()||[];
  reportRows=groupSelected(records);
  const tbody=$('ctTapaReportRows');if(!tbody)return;
- tbody.innerHTML=reportRows.map(r=>`<tr><td>${escape(r.transporte)}</td><td>${escape(r.descripcion)}</td><td>${escape(r.vehiculo)}</td><td>${escape(r.viaje)}</td><td>${escape(r.material)}</td><td>${escape(r.denominacion)}</td><td>${fmt(r.cantidad)}</td></tr>`).join('')||'<tr><td colspan="7">No hay registros para los 10 clientes Éxito en el archivo cargado.</td></tr>';
+ tbody.innerHTML=reportRows.map(r=>`<tr><td>${escape(r.transporte)}</td><td>${escape(r.descripcion)}</td><td>${escape(r.vehiculo)}</td><td>${escape(r.viaje)}</td><td>${escape(r.material)}</td><td>${escape(r.denominacion)}</td><td>${fmt(r.cantidad)}</td></tr>`).join('')||'<tr><td colspan="7">No hay registros de familia LATA para los 10 clientes Éxito.</td></tr>';
  $('ctTapaReportTotal').textContent=fmt(reportRows.reduce((s,r)=>s+r.cantidad,0));
- $('ctTapaReportSummary').textContent=`${reportRows.length} combinaciones consolidadas · ${new Set(reportRows.map(r=>r.descripcion)).size} clientes encontrados · ${fmt(reportRows.reduce((s,r)=>s+r.cantidad,0))} unidades (según origen)`;
+ $('ctTapaReportSummary').textContent=`${reportRows.length} combinaciones consolidadas · ${new Set(reportRows.map(r=>r.descripcion)).size} clientes encontrados · ${fmt(reportRows.reduce((s,r)=>s+r.cantidad,0))} unidades (solo familia LATA, según origen)`;
 }
 window.ctTapaKaRenderSummary=render;
 function excelDownload(wb,name){XLSX.writeFile(wb,name,{compression:true});}
 function downloadFull(){if(!completedBook)return;excelDownload(completedBook,'Tapa_Codigos_Completado.xlsx');}
 function downloadReport(){
- if(!reportRows.length){$('ctTapaReportSummary').textContent='No hay datos de los 10 clientes para descargar.';return;}
+ if(!reportRows.length){$('ctTapaReportSummary').textContent='No hay registros de familia LATA de los 10 clientes para descargar.';return;}
  const wb=XLSX.utils.book_new();const cols=['TRANSPORTE','DESCRIPCIÓN','VEHÍCULO','VIAJE','MATERIAL','DENOMINACIÓN','CANTIDAD'];
  const aoa=[cols,...reportRows.map(r=>[r.transporte,r.descripcion,r.vehiculo,r.viaje,r.material,r.denominacion,r.cantidad])];
  aoa.push(['TOTAL GENERAL','','','','','',reportRows.reduce((s,r)=>s+r.cantidad,0)]);
@@ -94,7 +94,7 @@ function downloadReport(){
   const tail=XLSX.utils.encode_cell({r:aoa.length-1,c});
   if(ws[tail])ws[tail].s={font:{bold:true,color:{rgb:'232F3D'}},fill:{fgColor:{rgb:'FCD039'}}};
  }
- XLSX.utils.book_append_sheet(wb,ws,'Resumen Exito');excelDownload(wb,'Resumen_Tapa_Codigos_KA_Exito.xlsx');
+ XLSX.utils.book_append_sheet(wb,ws,'Exito LATA');excelDownload(wb,'Resumen_Tapa_Codigos_KA_Exito_LATA.xlsx');
 }
 async function upload(){
  const status=$('ctTapaImportStatus'),btn=$('ctTapaProcessBtn'),file=$('ctTapaExcelFile')?.files?.[0];
