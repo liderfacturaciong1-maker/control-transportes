@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Control Precintos · Control Operación CD Girardota</title>
+<style>
+:root{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#173b59;background:#f1f7fc}*{box-sizing:border-box}body{margin:0}header{background:linear-gradient(115deg,#123d62,#1d7fb5);padding:24px max(22px,calc((100vw - 1120px)/2));color:#fff}header small{display:block;font-weight:700;letter-spacing:.1em;opacity:.85}header h1{font-size:clamp(24px,4vw,34px);margin:7px 0}main{max-width:1140px;margin:25px auto;padding:0 22px}.panel{border:1px solid #c9dfea;background:white;box-shadow:0 15px 32px #123c5919;padding:24px;border-radius:18px;margin-bottom:20px}h2{margin:0 0 12px;font-size:21px}h3{margin:12px 0}p{line-height:1.5;color:#49697e}.btn{border:0;border-radius:10px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer}.primary{background:#1485bb;color:white}.secondary{background:#eaf4fb;color:#18587f}.btn:focus-visible,input:focus-visible,.tab:focus-visible{outline:3px solid #7cc9f0;outline-offset:2px}.back{display:inline-block;color:#fff;background:#177db0;padding:11px 18px;text-decoration:none;border-radius:10px;font-weight:700;margin:8px 0 15px}.notice{background:#eef8fe;border-left:4px solid #1485bb;border-radius:7px;padding:12px 14px;margin:15px 0;color:#234c68}.fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:17px 0}label{display:block;font-weight:700;font-size:13px;margin-bottom:7px}input{width:100%;border:1px solid #b8ccda;border-radius:9px;padding:12px 10px;font-size:19px;letter-spacing:.08em;font-weight:600}input::placeholder{color:#98acb9}.hint{font-size:12px;color:#617f90;margin-top:5px}.actions{display:flex;gap:10px;flex-wrap:wrap}.message{margin-top:12px;font-weight:650;min-height:1.2em}.message.error{color:#b42318}.message.ok{color:#126b46}.summary{font-weight:700;margin:16px 0}.table-wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:650px}th{background:#174c73;color:#fff;text-align:left;padding:12px}td{border-bottom:1px solid #d9e6ee;padding:12px}tbody tr:nth-child(even){background:#f4f8fb}.empty{color:#607a8c;padding:14px}.small{font-size:12px;color:#607a8c}footer{margin:24px 0;font-size:13px;color:#6c8595}.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin-bottom:20px}.metric{background:#fff;border:1px solid #c9dfea;border-radius:16px;padding:19px 20px;box-shadow:0 8px 22px #123c5913}.metric span{font-size:13px;font-weight:700;color:#486d85;display:block}.metric strong{font-size:clamp(27px,4vw,40px);display:block;margin-top:8px;color:#12476b}.metric.balance{border-top:4px solid #1685bb}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px;border-bottom:1px solid #c9dfea;padding-bottom:12px}.tab{border:1px solid #bbd5e7;background:#eaf4fb;color:#245777;border-radius:9px;padding:11px 15px;font:inherit;font-weight:700;cursor:pointer}.tab[aria-selected=true]{background:#174c73;border-color:#174c73;color:white}.tab-panel[hidden],.form-panel[hidden]{display:none}dialog{border:0;border-radius:18px;box-shadow:0 20px 70px #102c4a66;padding:26px;max-width:min(450px,calc(100% - 30px));color:#173b59}dialog::backdrop{background:#0927448c}dialog h2{color:#ac2525}dialog p{margin:12px 0 20px} @media(max-width:700px){.fields{grid-template-columns:repeat(2,minmax(0,1fr))}.cards{grid-template-columns:1fr}.panel{padding:18px}}@media(max-width:430px){.fields{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><small>CONTROL OPERACIÓN CD GIRARDOTA · SUBMÓDULO</small><h1>🔒 Control Precintos</h1></header>
+<main>
+<section class="cards" aria-label="Indicadores de precintos">
+<div class="metric"><span>Total ingresado al inventario</span><strong id="metricIn">0</strong></div>
+<div class="metric"><span>Total de precintos entregados</span><strong id="metricOut">0</strong></div>
+<div class="metric balance"><span>Saldo disponible (ingresados − entregados)</span><strong id="metricBalance">0</strong></div>
+</section>
+<section class="panel">
+<div class="tabs" role="tablist" aria-label="Secciones de Control Precintos">
+<button type="button" class="tab" role="tab" id="tabIngreso" aria-controls="paneIngreso" aria-selected="true">Ingreso de inventario</button>
+<button type="button" class="tab" role="tab" id="tabActual" aria-controls="paneActual" aria-selected="false" tabindex="-1">Inventario actual</button>
+<button type="button" class="tab" role="tab" id="tabEntrega" aria-controls="paneEntrega" aria-selected="false" tabindex="-1">Entrega de precintos</button>
+</div>
+<div id="paneIngreso" role="tabpanel" aria-labelledby="tabIngreso" class="tab-panel">
+<h2>Ingreso de inventario</h2><p>Registra los dos prefijos y el rango completo. Los precintos quedarán disponibles inmediatamente en Inventario actual.</p>
+<button class="btn primary" id="toggleForm" type="button" aria-expanded="false" aria-controls="inventoryForm">+ Ingreso de Inventario</button>
+<div class="form-panel" id="inventoryForm" hidden>
+<form id="entryForm" novalidate>
+<div class="fields">
+<div><label for="prefix1">Prefijo 1 (2 letras)</label><input id="prefix1" maxlength="2" placeholder="GT" autocomplete="off" required></div>
+<div><label for="prefix2">Prefijo 2 (2 letras)</label><input id="prefix2" maxlength="2" placeholder="OL" autocomplete="off" required></div>
+<div><label for="start">Consecutivo desde (5 dígitos)</label><input id="start" inputmode="numeric" maxlength="5" placeholder="68101" autocomplete="off" required></div>
+<div><label for="end">Consecutivo hasta (5 dígitos)</label><input id="end" inputmode="numeric" maxlength="5" placeholder="68200" autocomplete="off" required></div>
+</div>
+<div id="previewIn" class="summary" aria-live="polite"></div>
+<div class="actions"><button class="btn primary" type="submit">Ingresar</button><button class="btn secondary" type="button" id="cancel">Cancelar</button></div><div id="formMessage" class="message" role="status" aria-live="polite"></div>
+</form></div>
+<h3>Historial de ingresos</h3><div class="table-wrap"><table><thead><tr><th>Prefijo 1</th><th>Prefijo 2</th><th>Desde</th><th>Hasta</th><th>Cantidad</th><th>Fecha</th></tr></thead><tbody id="entries"></tbody></table></div><p id="emptyIn" class="empty">No hay ingresos registrados.</p>
+</div>
+<div id="paneActual" role="tabpanel" aria-labelledby="tabActual" class="tab-panel" hidden>
+<h2>Inventario actual</h2><p>Solo aparecen los consecutivos que siguen disponibles. Los rangos se dividen automáticamente al registrar una entrega.</p>
+<div id="totalCurrent" class="summary"></div><div class="table-wrap"><table><thead><tr><th>Prefijo 1</th><th>Prefijo 2</th><th>Consecutivo desde</th><th>Consecutivo hasta</th><th>Disponibles</th></tr></thead><tbody id="available"></tbody></table></div><p id="emptyCurrent" class="empty">No hay precintos disponibles.</p>
+</div>
+<div id="paneEntrega" role="tabpanel" aria-labelledby="tabEntrega" class="tab-panel" hidden>
+<h2>Entrega de precintos</h2><p>Indica los dos prefijos y el rango a entregar. El sistema comprobará <strong>cada consecutivo</strong> antes de descontarlo.</p>
+<form id="deliveryForm" novalidate><div class="fields">
+<div><label for="dPrefix1">Prefijo 1 (2 letras)</label><input id="dPrefix1" maxlength="2" placeholder="GT" autocomplete="off" required></div>
+<div><label for="dPrefix2">Prefijo 2 (2 letras)</label><input id="dPrefix2" maxlength="2" placeholder="OL" autocomplete="off" required></div>
+<div><label for="dStart">Consecutivo desde (5 dígitos)</label><input id="dStart" inputmode="numeric" maxlength="5" placeholder="68101" autocomplete="off" required></div>
+<div><label for="dEnd">Consecutivo hasta (5 dígitos)</label><input id="dEnd" inputmode="numeric" maxlength="5" placeholder="68200" autocomplete="off" required></div>
+</div><div id="previewOut" class="summary" aria-live="polite"></div><button class="btn primary" type="submit">Entregar</button><div id="deliveryMessage" class="message" role="status" aria-live="polite"></div></form>
+<h3>Historial de entregas</h3><div class="table-wrap"><table><thead><tr><th>Prefijo 1</th><th>Prefijo 2</th><th>Desde</th><th>Hasta</th><th>Cantidad</th><th>Fecha</th></tr></thead><tbody id="deliveries"></tbody></table></div><p id="emptyOut" class="empty">No hay entregas registradas.</p>
+</div>
+<div class="notice">Los registros se guardan <strong>solo en este navegador</strong>. No están sincronizados entre usuarios ni dispositivos. Para uso operativo compartido será necesario conectar Supabase.</div>
+</section>
+<a class="back" href="../index.html">← Volver a Control Operación</a><footer>Control Operación CD Girardota</footer>
+</main>
+<dialog id="missingDialog" aria-labelledby="missingTitle"><h2 id="missingTitle">Consecutivo no existente en el inventario</h2><p id="missingDetail">No se puede entregar el consecutivo solicitado.</p><button type="button" class="btn primary" id="closeDialog">Aceptar</button></dialog>
+<script>
+(()=>{'use strict';
+const KEY='control-transportes-precintos-v2',OLD='control-transportes-precintos-inventario-v1';
+const $=id=>document.getElementById(id),fmt=n=>n.toLocaleString('es-CO'),pad=n=>String(n).padStart(5,'0');
+const validRecord=x=>x&&/^[A-Z]{2}$/.test(x.p1)&&/^[A-Z]{2}$/.test(x.p2)&&Number.isInteger(x.start)&&Number.isInteger(x.end)&&x.start>=0&&x.end<=99999&&x.start<=x.end;
+const normalize=(x)=>({p1:x.p1,p2:x.p2,start:x.start,end:x.end,date:x.date||''});
+let data={in:[],out:[]};
+try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(saved&&Array.isArray(saved.in)&&Array.isArray(saved.out)){data.in=saved.in.filter(validRecord).map(normalize);data.out=saved.out.filter(validRecord).map(normalize);}else{const original=JSON.parse(localStorage.getItem(OLD)||'[]');if(Array.isArray(original))data.in=original.filter(validRecord).map(normalize);}}catch(e){console.warn('No se pudo leer el inventario guardado',e);}
+// Recupera los ingresos del formato anterior sin borrar ni modificar el registro de origen.
+function save(next){try{localStorage.setItem(KEY,JSON.stringify(next));data=next;return true;}catch(e){console.error('No fue posible guardar',e);return false;}}
+function displayTab(which){for(const name of ['Ingreso','Actual','Entrega']){const yes=name===which;const tab=$('tab'+name);tab.setAttribute('aria-selected',String(yes));tab.tabIndex=yes?0:-1;$('pane'+name).hidden=!yes;} }
+for(const name of ['Ingreso','Actual','Entrega'])$('tab'+name).addEventListener('click',()=>displayTab(name));
+const entryForm=$('inventoryForm');$('toggleForm').addEventListener('click',()=>{entryForm.hidden=!entryForm.hidden;$('toggleForm').setAttribute('aria-expanded',String(!entryForm.hidden));if(!entryForm.hidden)$('prefix1').focus();});$('cancel').addEventListener('click',()=>{entryForm.hidden=true;$('toggleForm').setAttribute('aria-expanded','false');$('entryForm').reset();$('formMessage').textContent='';updatePreview('In');});
+for(const id of ['prefix1','prefix2','dPrefix1','dPrefix2'])$(id).addEventListener('input',e=>{e.target.value=e.target.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z]/g,'').toUpperCase().slice(0,2);updatePreview(id.startsWith('d')?'Out':'In');});
+for(const id of ['start','end','dStart','dEnd'])$(id).addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,5);updatePreview(id.startsWith('d')?'Out':'In');});
+function get(which){const ids=which==='Out'?['dPrefix1','dPrefix2','dStart','dEnd']:['prefix1','prefix2','start','end'];const v=ids.map(id=>$(id).value.trim());return{p1:v[0],p2:v[1],startText:v[2],endText:v[3]};}
+function parsed(which){const x=get(which);if(!/^[A-Z]{2}$/.test(x.p1)||!/^[A-Z]{2}$/.test(x.p2)||!/^[0-9]{5}$/.test(x.startText)||!/^[0-9]{5}$/.test(x.endText))return{error:'Completa dos letras en cada prefijo y cinco dígitos en los dos consecutivos.'};const start=Number(x.startText),end=Number(x.endText);if(start>end)return{error:'El consecutivo Hasta debe ser mayor o igual que Desde.'};return{p1:x.p1,p2:x.p2,start,end};}
+function updatePreview(which){const x=parsed(which),id=which==='Out'?'previewOut':'previewIn';$(id).textContent=x.error?'Ingresa dos prefijos de 2 letras y consecutivos de 5 dígitos.':`Vista previa: ${x.p1} · ${x.p2} · ${pad(x.start)} a ${pad(x.end)} (${fmt(x.end-x.start+1)} precintos)`;}
+const qty=x=>x.end-x.start+1;
+function availableRanges(){const events=[];for(const x of data.in){events.push({p1:x.p1,p2:x.p2,start:x.start,end:x.end,sign:1});}for(const x of data.out){events.push({p1:x.p1,p2:x.p2,start:x.start,end:x.end,sign:-1});}const groups=new Map();for(const e of events){const key=e.p1+'|'+e.p2;if(!groups.has(key))groups.set(key,[]);groups.get(key).push([e.start,e.sign],[e.end+1,-e.sign]);}const result=[];for(const [key,points] of groups){points.sort((a,b)=>a[0]-b[0]);let pos=null,balance=0,segStart=null;for(let i=0;i<points.length;){const p=points[i][0];if(pos!==null&&balance>0&&pos<p) {if(segStart===null)segStart=pos;} else if(segStart!==null&&pos!==null&&pos<p){result.push({p1:key.split('|')[0],p2:key.split('|')[1],start:segStart,end:pos-1});segStart=null;}let delta=0;while(i<points.length&&points[i][0]===p){delta+=points[i][1];i++;}const newBalance=balance+delta;if(balance>0&&newBalance<=0&&segStart!==null){result.push({p1:key.split('|')[0],p2:key.split('|')[1],start:segStart,end:p-1});segStart=null;}if(balance<=0&&newBalance>0)segStart=p;balance=newBalance;pos=p;}if(segStart!==null&&pos!==null&&balance>0){/* Last interval ends at end+1: normally flushed by zero balance. */}}
+return result.sort((a,b)=>a.p1.localeCompare(b.p1)||a.p2.localeCompare(b.p2)||a.start-b.start);}
+function fullyAvailable(x){const matching=availableRanges().filter(y=>y.p1===x.p1&&y.p2===x.p2);let cursor=x.start;for(const y of matching){if(y.end<cursor)continue;if(y.start>cursor)return{ok:false,missing:cursor};cursor=Math.min(x.end+1,y.end+1);if(cursor>x.end)return{ok:true};}return{ok:false,missing:cursor};}
+function cell(tr,text){const td=document.createElement('td');td.textContent=String(text);tr.append(td);}
+function populate(id,items,withDate){const tb=$(id);tb.replaceChildren();for(const x of items){const tr=document.createElement('tr');for(const v of [x.p1,x.p2,pad(x.start),pad(x.end),fmt(qty(x)),...(withDate?[x.date||'—']:[])])cell(tr,v);tb.append(tr);}}
+function render(){const a=availableRanges(),totalIn=data.in.reduce((s,x)=>s+qty(x),0),totalOut=data.out.reduce((s,x)=>s+qty(x),0),totalAvailable=a.reduce((s,x)=>s+qty(x),0);$('metricIn').textContent=fmt(totalIn);$('metricOut').textContent=fmt(totalOut);$('metricBalance').textContent=fmt(totalAvailable);$('totalCurrent').textContent=`${fmt(totalAvailable)} precintos disponibles en ${a.length} rango(s)`;populate('entries',data.in,true);populate('deliveries',data.out,true);populate('available',a,false);$('emptyIn').hidden=data.in.length>0;$('emptyOut').hidden=data.out.length>0;$('emptyCurrent').hidden=a.length>0;}
+function msg(id,text,error){$(id).textContent=text;$(id).className='message '+(error?'error':'ok');}
+function now(){return new Date().toLocaleString('es-CO');}
+$('entryForm').addEventListener('submit',e=>{e.preventDefault();const x=parsed('In');if(x.error){msg('formMessage',x.error,true);return;}if(data.in.some(y=>y.p1===x.p1&&y.p2===x.p2&&x.start<=y.end&&x.end>=y.start)){msg('formMessage','El rango se cruza con un ingreso ya registrado para ese prefijo.',true);return;}const next={in:[...data.in,{...x,date:now()}],out:[...data.out]};if(!save(next)){msg('formMessage','No fue posible guardar el inventario en este navegador.',true);return;}render();$('entryForm').reset();updatePreview('In');msg('formMessage','Ingreso guardado. Los consecutivos ya aparecen en Inventario actual.',false);});
+function missing(x,n){const dialog=$('missingDialog');$('missingDetail').textContent=`El consecutivo ${x.p1}-${x.p2}-${pad(n)} no está disponible o ya fue entregado. No se descontó ningún precinto.`;if(typeof dialog.showModal==='function')dialog.showModal();else alert('CONSECUTIVO NO EXISTENTE EN EL INVENTARIO\n'+$('missingDetail').textContent);}
+$('closeDialog').addEventListener('click',()=>$('missingDialog').close());
+$('deliveryForm').addEventListener('submit',e=>{e.preventDefault();const x=parsed('Out');if(x.error){msg('deliveryMessage',x.error,true);return;}const test=fullyAvailable(x);if(!test.ok){missing(x,test.missing);msg('deliveryMessage','No se registró la entrega porque hay consecutivos que no están disponibles.',true);return;}const next={in:[...data.in],out:[...data.out,{...x,date:now()}]};if(!save(next)){msg('deliveryMessage','No fue posible guardar la entrega en este navegador.',true);return;}render();$('deliveryForm').reset();updatePreview('Out');msg('deliveryMessage',`Entrega registrada: ${fmt(qty(x))} precintos descontados del inventario.`,false);});
+render();updatePreview('In');updatePreview('Out');
+})();
+</script>
+</body></html>
