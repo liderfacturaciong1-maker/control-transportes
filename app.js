@@ -177,6 +177,56 @@ function configured(){return cfg.SUPABASE_URL&&!cfg.SUPABASE_URL.includes("TU-PR
 // Seguimiento T1 v5.71: carga independiente y persistente de Despachos y Tránsitos.
 const t1Settings={despachos:{file:'t1DespachosFile',button:'t1DespachosUpload',remove:'t1DespachosDelete',info:'t1DespachosInfo',preview:'t1DespachosPreview',sheet:'Despachos'},transitos:{file:'t1TransitosFile',button:'t1TransitosUpload',remove:'t1TransitosDelete',info:'t1TransitosInfo',preview:'t1TransitosPreview',sheet:'Transitos'}};
 const t1Cached={};
+// SAP exports .XLS sometimes contain UTF-16 tab-delimited text, not a binary workbook.
+// Preserve column positions when removing empty separators; never shift row values independently.
+function t1SapTextReport(buffer, kind){
+ const bytes=new Uint8Array(buffer);
+ const utf16le=bytes.length>=2&&bytes[0]===255&&bytes[1]===254;
+ const utf16be=bytes.length>=2&&bytes[0]===254&&bytes[1]===255;
+ if(!utf16le&&!utf16be)return null;
+ let source;
+ try{source=new TextDecoder(utf16be?'utf-16be':'utf-16le').decode(bytes).replace(/^\uFEFF/,'');}
+ catch(e){throw Error('No se pudo leer el reporte SAP codificado en UTF-16.');}
+ if(!source.includes('\t')||!source.toUpperCase().includes('MATERIAL'))return null;
+ const lines=source.split(/\r?\n/);
+ const headerPosition=lines.findIndex(l=>/^\s*MATERIAL\t/i.test(l));
+ if(headerPosition<0)throw Error('No se encontró la fila de encabezados MATERIAL del reporte SAP.');
+ const sourceHead=lines[headerPosition].split('\t').map(v=>v.trim());
+ // SAP exports an empty header at index 16, but the actual quantity is stored there.
+ const indices=[0,2,6,7,8,9,11,12,14,15,16,18,19,20,21,22];
+ const headers=['MATERIAL','DESCRIPCION','No ENTREGA','POS','FECHA S.M.','FACTURA','DESTINO','ALM','Origen','LOTE','CANTIDAD','UMB','No PEDIDO','ALM','Destino','Placa'];
+ if(sourceHead.length<23||sourceHead[0].toUpperCase()!=='MATERIAL'||sourceHead[2].toUpperCase()!=='DESCRIPCION'||sourceHead[9].toUpperCase()!=='FACTURA')throw Error('Formato de reporte SAP no reconocido.');
+ const rows=[];
+ for(const line of lines.slice(headerPosition+1)){
+  if(!line.trim())continue;
+  const values=line.split('\t');
+  if(!/^\d+$/.test(String(values[0]||'').trim()))continue;
+  if(!String(values[6]||'').trim()||!String(values[16]||'').trim())continue;
+  rows.push(indices.map(i=>String(values[i]??'').trim()));
+ }
+ if(!rows.length)throw Error('No se encontraron registros en el reporte SAP.');
+ return {headers,rows};
+}
+function t1PrepareWorkbook(wb, kind){
+ const required=t1Settings[kind].sheet;
+ const sheetName=wb.SheetNames.find(n=>n.toLocaleLowerCase('es')===required.toLocaleLowerCase('es'))||wb.SheetNames[0];
+ if(!sheetName)throw Error('El Excel no contiene hojas de datos.');
+ const matrix=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:'',raw:false,blankrows:false});
+ const heading=matrix.findIndex(row=>String(row[0]??'').trim().toUpperCase()==='MATERIAL');
+ if(heading<0)throw Error('No se encontró la fila MATERIAL.');
+ const srcHeader=matrix[heading].map(x=>String(x??'').trim());
+ const data=matrix.slice(heading+1).filter(row=>row.some(v=>String(v??'').trim()));
+ const relevant=srcHeader.map((h,i)=>i).filter(i=>srcHeader[i]||data.some(row=>String(row[i]??'').trim()));
+ const headers=relevant.map(i=>srcHeader[i]);
+ const dateIndex=headers.findIndex(h=>h.toUpperCase()==='FECHA S.M.');
+ const rows=data.map(row=>relevant.map((orig,i)=>{
+   const value=row[orig];
+   if(i===dateIndex&&value instanceof Date&&!isNaN(value))return [value.getFullYear(),String(value.getMonth()+1).padStart(2,'0'),String(value.getDate()).padStart(2,'0')].join('-');
+   return String(value??'').trim();
+ })).filter(row=>row.some(v=>v));
+ return {headers,rows};
+}
+
 function t1Message(s,err=false){const e=$('t1FileStatus');if(e){e.textContent=s;e.style.color=err?'#ac2a2a':'#23516f';}}
 function t1Escape(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function t1Quantity(value){
@@ -310,21 +360,17 @@ async function t1Upload(kind){const cfg=t1Settings[kind],input=$(cfg.file),file=
  if(!/\.xlsx?$/i.test(file.name)){t1Message('Solo se permiten archivos .xlsx o .xls.',true);return;}
  if(file.size>8*1024*1024){t1Message('El archivo supera 8 MB.',true);return;}
  const btn=$(cfg.button);btn.disabled=true;
- try{if(!window.XLSX)throw Error('No se pudo cargar el lector Excel.');const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
- const sheetName=wb.SheetNames.find(n=>n.toLocaleLowerCase('es')===cfg.sheet.toLocaleLowerCase('es'));
- if(!sheetName)throw Error(`El Excel debe incluir la hoja «${cfg.sheet}».`);
- const matrix=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:'',raw:false,blankrows:false});
- if(matrix.length<2)throw Error('El Excel debe incluir encabezados y al menos una fila de datos.');
- const headers=matrix[0].map(x=>String(x??''));
- const dateIndex=headers.findIndex(h=>String(h).trim().toUpperCase()==='FECHA S.M.');
- const rows=matrix.slice(1).map(row=>headers.map((_,i)=>{
-  const v=row[i];if(i===dateIndex&&v instanceof Date&&!isNaN(v))return [v.getFullYear(),String(v.getMonth()+1).padStart(2,'0'),String(v.getDate()).padStart(2,'0')].join('-');
-  return String(v??'');
- }));
- if(headers[0]?.trim().toUpperCase()!=='MATERIAL'||!['DESCRIPCION','CANTIDAD'].every(n=>headers.some(h=>h.trim().toUpperCase()===n)))throw Error('Se requieren MATERIAL, DESCRIPCION y Cantidad.');
- if(!confirm(`¿Guardar «${file.name}» (${rows.length} filas)? Reemplazará solamente el archivo de ${kind}.`))return;
- const {error}=await sb.rpc('ct_t1_file_save',{p_pin:loginPin,p_kind:kind,p_filename:file.name,p_headers:headers,p_rows:rows});if(error)throw error;
- t1Message('Archivo '+file.name+' guardado correctamente.');input.value='';await t1LoadFiles();
+ try{if(!window.XLSX)throw Error('No se pudo cargar el lector Excel.');
+ const buffer=await file.arrayBuffer();
+ let result=t1SapTextReport(buffer,kind);
+ if(!result){const wb=XLSX.read(buffer,{type:'array',cellDates:true});result=t1PrepareWorkbook(wb,kind);}
+ const {headers,rows}=result;
+ if(!rows.length)throw Error('El archivo no contiene filas de datos.');
+ if(headers[0]?.trim().toUpperCase()!=='MATERIAL'||!['DESCRIPCION','CANTIDAD'].every(n=>headers.some(h=>h.trim().toUpperCase()===n)))throw Error('Se requieren MATERIAL, DESCRIPCION y CANTIDAD.');
+ const savedName=kind==='despachos'?'DESPACHO.xlsx':'TRANSITOS.xlsx';
+ if(!confirm(`¿Importar «${file.name}» como ${savedName} (${rows.length} filas limpias)? Reemplazará solamente el archivo de ${kind}.`))return;
+ const {error}=await sb.rpc('ct_t1_file_save',{p_pin:loginPin,p_kind:kind,p_filename:savedName,p_headers:headers,p_rows:rows});if(error)throw error;
+ t1Message('Archivo '+savedName+' cargado correctamente: '+rows.length+' filas sin separadores vacíos.');input.value='';await t1LoadFiles();
  }catch(e){t1Message('No se pudo guardar: '+e.message,true);}finally{btn.disabled=false;}}
 async function t1Delete(kind){const cfg=t1Settings[kind],cur=t1Cached[kind];if(!cur){t1Message('No hay archivo de '+kind+' para borrar.',true);return;}
  if(!confirm(`¿BORRAR el archivo ${cur.filename||kind} de Supabase? Este proceso no se puede deshacer.`))return;
