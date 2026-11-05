@@ -177,56 +177,6 @@ function configured(){return cfg.SUPABASE_URL&&!cfg.SUPABASE_URL.includes("TU-PR
 // Seguimiento T1 v5.71: carga independiente y persistente de Despachos y Tránsitos.
 const t1Settings={despachos:{file:'t1DespachosFile',button:'t1DespachosUpload',remove:'t1DespachosDelete',info:'t1DespachosInfo',preview:'t1DespachosPreview',sheet:'Despachos'},transitos:{file:'t1TransitosFile',button:'t1TransitosUpload',remove:'t1TransitosDelete',info:'t1TransitosInfo',preview:'t1TransitosPreview',sheet:'Transitos'}};
 const t1Cached={};
-// SAP exports .XLS sometimes contain UTF-16 tab-delimited text, not a binary workbook.
-// Preserve column positions when removing empty separators; never shift row values independently.
-function t1SapTextReport(buffer, kind){
- const bytes=new Uint8Array(buffer);
- const utf16le=bytes.length>=2&&bytes[0]===255&&bytes[1]===254;
- const utf16be=bytes.length>=2&&bytes[0]===254&&bytes[1]===255;
- if(!utf16le&&!utf16be)return null;
- let source;
- try{source=new TextDecoder(utf16be?'utf-16be':'utf-16le').decode(bytes).replace(/^\uFEFF/,'');}
- catch(e){throw Error('No se pudo leer el reporte SAP codificado en UTF-16.');}
- if(!source.includes('\t')||!source.toUpperCase().includes('MATERIAL'))return null;
- const lines=source.split(/\r?\n/);
- const headerPosition=lines.findIndex(l=>/^\s*MATERIAL\t/i.test(l));
- if(headerPosition<0)throw Error('No se encontró la fila de encabezados MATERIAL del reporte SAP.');
- const sourceHead=lines[headerPosition].split('\t').map(v=>v.trim());
- // SAP exports an empty header at index 16, but the actual quantity is stored there.
- const indices=[0,2,6,7,8,9,11,12,14,15,16,18,19,20,21,22];
- const headers=['MATERIAL','DESCRIPCION','No ENTREGA','POS','FECHA S.M.','FACTURA','DESTINO','ALM','Origen','LOTE','CANTIDAD','UMB','No PEDIDO','ALM','Destino','Placa'];
- if(sourceHead.length<23||sourceHead[0].toUpperCase()!=='MATERIAL'||sourceHead[2].toUpperCase()!=='DESCRIPCION'||sourceHead[9].toUpperCase()!=='FACTURA')throw Error('Formato de reporte SAP no reconocido.');
- const rows=[];
- for(const line of lines.slice(headerPosition+1)){
-  if(!line.trim())continue;
-  const values=line.split('\t');
-  if(!/^\d+$/.test(String(values[0]||'').trim()))continue;
-  if(!String(values[6]||'').trim()||!String(values[16]||'').trim())continue;
-  rows.push(indices.map(i=>String(values[i]??'').trim()));
- }
- if(!rows.length)throw Error('No se encontraron registros en el reporte SAP.');
- return {headers,rows};
-}
-function t1PrepareWorkbook(wb, kind){
- const required=t1Settings[kind].sheet;
- const sheetName=wb.SheetNames.find(n=>n.toLocaleLowerCase('es')===required.toLocaleLowerCase('es'))||wb.SheetNames[0];
- if(!sheetName)throw Error('El Excel no contiene hojas de datos.');
- const matrix=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:'',raw:false,blankrows:false});
- const heading=matrix.findIndex(row=>String(row[0]??'').trim().toUpperCase()==='MATERIAL');
- if(heading<0)throw Error('No se encontró la fila MATERIAL.');
- const srcHeader=matrix[heading].map(x=>String(x??'').trim());
- const data=matrix.slice(heading+1).filter(row=>row.some(v=>String(v??'').trim()));
- const relevant=srcHeader.map((h,i)=>i).filter(i=>srcHeader[i]||data.some(row=>String(row[i]??'').trim()));
- const headers=relevant.map(i=>srcHeader[i]);
- const dateIndex=headers.findIndex(h=>h.toUpperCase()==='FECHA S.M.');
- const rows=data.map(row=>relevant.map((orig,i)=>{
-   const value=row[orig];
-   if(i===dateIndex&&value instanceof Date&&!isNaN(value))return [value.getFullYear(),String(value.getMonth()+1).padStart(2,'0'),String(value.getDate()).padStart(2,'0')].join('-');
-   return String(value??'').trim();
- })).filter(row=>row.some(v=>v));
- return {headers,rows};
-}
-
 function t1Message(s,err=false){const e=$('t1FileStatus');if(e){e.textContent=s;e.style.color=err?'#ac2a2a':'#23516f';}}
 function t1Escape(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function t1Quantity(value){
@@ -360,17 +310,21 @@ async function t1Upload(kind){const cfg=t1Settings[kind],input=$(cfg.file),file=
  if(!/\.xlsx?$/i.test(file.name)){t1Message('Solo se permiten archivos .xlsx o .xls.',true);return;}
  if(file.size>8*1024*1024){t1Message('El archivo supera 8 MB.',true);return;}
  const btn=$(cfg.button);btn.disabled=true;
- try{if(!window.XLSX)throw Error('No se pudo cargar el lector Excel.');
- const buffer=await file.arrayBuffer();
- let result=t1SapTextReport(buffer,kind);
- if(!result){const wb=XLSX.read(buffer,{type:'array',cellDates:true});result=t1PrepareWorkbook(wb,kind);}
- const {headers,rows}=result;
- if(!rows.length)throw Error('El archivo no contiene filas de datos.');
- if(headers[0]?.trim().toUpperCase()!=='MATERIAL'||!['DESCRIPCION','CANTIDAD'].every(n=>headers.some(h=>h.trim().toUpperCase()===n)))throw Error('Se requieren MATERIAL, DESCRIPCION y CANTIDAD.');
- const savedName=kind==='despachos'?'DESPACHO.xlsx':'TRANSITOS.xlsx';
- if(!confirm(`¿Importar «${file.name}» como ${savedName} (${rows.length} filas limpias)? Reemplazará solamente el archivo de ${kind}.`))return;
- const {error}=await sb.rpc('ct_t1_file_save',{p_pin:loginPin,p_kind:kind,p_filename:savedName,p_headers:headers,p_rows:rows});if(error)throw error;
- t1Message('Archivo '+savedName+' cargado correctamente: '+rows.length+' filas sin separadores vacíos.');input.value='';await t1LoadFiles();
+ try{if(!window.XLSX)throw Error('No se pudo cargar el lector Excel.');const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
+ const sheetName=wb.SheetNames.find(n=>n.toLocaleLowerCase('es')===cfg.sheet.toLocaleLowerCase('es'));
+ if(!sheetName)throw Error(`El Excel debe incluir la hoja «${cfg.sheet}».`);
+ const matrix=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:'',raw:false,blankrows:false});
+ if(matrix.length<2)throw Error('El Excel debe incluir encabezados y al menos una fila de datos.');
+ const headers=matrix[0].map(x=>String(x??''));
+ const dateIndex=headers.findIndex(h=>String(h).trim().toUpperCase()==='FECHA S.M.');
+ const rows=matrix.slice(1).map(row=>headers.map((_,i)=>{
+  const v=row[i];if(i===dateIndex&&v instanceof Date&&!isNaN(v))return [v.getFullYear(),String(v.getMonth()+1).padStart(2,'0'),String(v.getDate()).padStart(2,'0')].join('-');
+  return String(v??'');
+ }));
+ if(headers[0]?.trim().toUpperCase()!=='MATERIAL'||!['DESCRIPCION','CANTIDAD'].every(n=>headers.some(h=>h.trim().toUpperCase()===n)))throw Error('Se requieren MATERIAL, DESCRIPCION y Cantidad.');
+ if(!confirm(`¿Guardar «${file.name}» (${rows.length} filas)? Reemplazará solamente el archivo de ${kind}.`))return;
+ const {error}=await sb.rpc('ct_t1_file_save',{p_pin:loginPin,p_kind:kind,p_filename:file.name,p_headers:headers,p_rows:rows});if(error)throw error;
+ t1Message('Archivo '+file.name+' guardado correctamente.');input.value='';await t1LoadFiles();
  }catch(e){t1Message('No se pudo guardar: '+e.message,true);}finally{btn.disabled=false;}}
 async function t1Delete(kind){const cfg=t1Settings[kind],cur=t1Cached[kind];if(!cur){t1Message('No hay archivo de '+kind+' para borrar.',true);return;}
  if(!confirm(`¿BORRAR el archivo ${cur.filename||kind} de Supabase? Este proceso no se puede deshacer.`))return;
@@ -378,21 +332,6 @@ async function t1Delete(kind){const cfg=t1Settings[kind],cur=t1Cached[kind];if(!
 
 document.addEventListener('click',e=>{if(e.target.closest('#t1SummaryOpen'))t1ShowSummary();});
 async function init(){for(const [kind,c] of Object.entries(t1Settings)){$(c.button).addEventListener("click",()=>void t1Upload(kind));$(c.remove).addEventListener("click",()=>void t1Delete(kind));const toggle=$(kind==="despachos"?"t1DespachosRecountToggle":"t1TransitosRecountToggle");toggle.addEventListener("click",()=>{const panel=$(c.preview);panel.hidden=!panel.hidden;toggle.classList.toggle("active",!panel.hidden);});const pt=$(kind==="despachos"?"t1DespachosPendingToggle":"t1TransitosPendingToggle");pt.addEventListener("click",()=>{const panel=$(kind==="despachos"?"t1DespachosPending":"t1TransitosPending");panel.hidden=!panel.hidden;pt.classList.toggle("active",!panel.hidden);if(!panel.hidden)t1ArrivalRender(kind,t1Cached[kind]);});}if(!configured()){$("loginMsg").innerHTML="Falta configurar <b>config.js</b>. Revisa README.";return}if(!window.supabase?.createClient){$("loginMsg").textContent="No cargó el servicio de inicio de sesión. Verifica internet y recarga la página.";return;}sb=supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);$("mainModuleBtn").onclick=()=>switchModule("main");$("tapaModuleBtn").onclick=()=>switchModule("tapa");$("cargoPrimaryBtn").onclick=()=>switchModule(activeTopModule==="cargo"?(activeModule==="tapa"?"tapa":"main"):"main");$("checkinPrimaryBtn").onclick=()=>switchModule("checkin");$("brujulaPrimaryBtn").onclick=()=>switchModule("brujula");$("syncPrimaryBtn").onclick=()=>switchModule("sync");$("tapaFamilyFilter").onchange=renderTapa;$("tapaClientFilter").onchange=renderTapa;$("tapaSearch").oninput=renderTapa;$("loginBtn").onclick=login;$("pin").onkeydown=e=>e.key==="Enter"&&login();$("logout").onclick=logout;$("ctFinanceEntry").onclick=ctOpenFinance;$("ctValidacionesEntry").onclick=ctOpenValidaciones;$("ctReturnsBack").onclick=()=>ctBillingOpen?ctBillingCloseModule():ctCloseReturns();$("users").addEventListener("click",e=>{const finance=e.target.closest('.ctFinanceUserToggle');if(finance){void ctChangeFinancePermission(finance.dataset.user,finance.dataset.enabled!=='true');return;}const b=e.target.closest('.ctReturnsUserToggle');if(!b)return;void ctChangeReturnsPermission(b.dataset.user,b.dataset.enabled!=='true');});$("ctManualRefresh")?.addEventListener("click",()=>{void ctManualRefreshAll()});for(const id of ["smartPlate","smartTransport","smartStatus"])$(id).addEventListener(id==="smartStatus"?"change":"input",renderSmartSearch);$("smartClear").onclick=()=>{for(const id of ["smartPlate","smartTransport","smartStatus"])$(id).value="";renderSmartSearch()};$("smartResults").addEventListener("click",e=>{const b=e.target.closest(".smartGoTo");if(b)openSmartResult(b.dataset.category,b.dataset.transporte)});$("openPorteriaPending").onclick=openPorteriaPending;$("closePorteriaPending").onclick=closePorteriaPending;$("porteriaPendingModal").addEventListener("click",e=>{if(e.target.id==="porteriaPendingModal")closePorteriaPending()});document.addEventListener("keydown",e=>{if(e.key==="Escape")closePorteriaPending()});function updateCategoryTabs(){document.querySelectorAll(".categoryTab[data-category]").forEach(btn=>{const on=categoryMultiMode?selectedCategories.includes(btn.dataset.category):btn.dataset.category===activeCategory;btn.classList.toggle("active",on);btn.setAttribute("aria-selected",String(on))});$("clearCategorySelection").style.display=categoryMultiMode?"inline-block":"none";$("categorySelectionHint").textContent=categoryMultiMode?"Selección múltiple activa: haz clic en las demás pestañas para agregarlas o quitarlas.":"Para combinar pestañas, haz doble clic en la primera pestaña y luego haz clic en las demás."}document.querySelectorAll(".categoryTab[data-category]").forEach(btn=>{btn.addEventListener("dblclick",e=>{e.preventDefault();const cat=btn.dataset.category;if(cat==="Todos"){categoryMultiMode=false;selectedCategories=[];activeCategory="Todos";toast("La pestaña Todos ya reúne todas las categorías.");}else{categoryMultiMode=true;selectedCategories=[cat];activeCategory="__MULTI__";toast("Selección múltiple activada. Ahora elige las demás pestañas.");}updateCategoryTabs();ctUpdateOnlineClearButton();render()});btn.addEventListener("click",()=>{const cat=btn.dataset.category;if(categoryMultiMode){if(cat==="Todos"){categoryMultiMode=false;selectedCategories=[];activeCategory="Todos"}else{selectedCategories=selectedCategories.includes(cat)?selectedCategories.filter(x=>x!==cat):[...selectedCategories,cat];if(!selectedCategories.length){categoryMultiMode=false;activeCategory="Viajes HYM y URBAN"}}}else{activeCategory=cat;selectedCategories=[]}updateCategoryTabs();ctUpdateOnlineClearButton();render()})});$("clearCategorySelection").addEventListener("click",()=>{categoryMultiMode=false;selectedCategories=[];activeCategory="Viajes HYM y URBAN";updateCategoryTabs();ctUpdateOnlineClearButton();render()});updateCategoryTabs();setupCategoryHoverPreview();$("ctClearOnlineTrips").onclick=ctClearOnlineTrips;$("importBtn").onclick=prepareImport;$("confirmImportBtn").onclick=confirmImport;$("cancelImportBtn").onclick=cancelImport;$("previewClose").onclick=cancelImport;$("downloadBtn").onclick=downloadExcel;$("beesCompareBtn").onclick=compareBeesCsv;$("beesClearBtn").onclick=clearBeesReport;$("porteriaUploadBtn").onclick=loadPorteriaExcel;$("porteriaClearBtn").onclick=clearPorteria;$("addUser").onclick=addUser;$("saveModulePermissions").onclick=saveModulePermissionEdits;$("cancelModulePermissions").onclick=()=>$("modulePermissionEditor").classList.add("hidden");$("newRole").onchange=updateRoleOptions;$("deleteAllBtn").onclick=deleteAllTransports;$("cancelDeleteBtn").onclick=closeDeleteModal;$("confirmDeleteBtn").onclick=confirmDeleteAll;$("deleteConfirmModal").addEventListener("click",e=>{if(e.target.id==="deleteConfirmModal")closeDeleteModal()});document.querySelectorAll(".statCard").forEach(card=>{card.addEventListener("click",()=>openStatChart(card.dataset.stat));card.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openStatChart(card.dataset.stat)}})});$("statChartClose").onclick=closeStatChart;$("statChartModal").addEventListener("click",e=>{if(e.target.id==="statChartModal")closeStatChart()});document.addEventListener("keydown",e=>{if(e.key==="Escape")closeStatChart()})}
-
-// SSO temporal entre ventanas del mismo origen. El PIN permanece solo en memoria.
-const ctSSOChildren = new Set();
-function ctOpenSSOModule(url){
-  const child=window.open(url,'_blank');
-  if(child)ctSSOChildren.add(child);
-  return child;
-}
-window.addEventListener('message',event=>{
-  if(event.origin!==location.origin || !event.data || event.data.type!=='CT_SSO_REQUEST_V1')return;
-  if(!ctSSOChildren.has(event.source)||!loginPin||!user)return;
-  if(typeof event.data.nonce!=='string'||!/^[-a-f0-9]{16,100}$/i.test(event.data.nonce))return;
-  try{event.source.postMessage({type:'CT_SSO_REPLY_V1',nonce:event.data.nonce,pin:loginPin},location.origin)}catch(e){console.warn('SSO:',e)}
-});
-
 async function login(){
  const msg=$("loginMsg"),button=$("loginBtn"),pin=$("pin").value.trim();
  if(!/^\d{1,8}$/.test(pin)){msg.textContent="Ingresa tu PIN numérico de 1 a 8 dígitos.";return;}
@@ -446,7 +385,7 @@ function setupAdminModuleToggles(){document.querySelectorAll(".moduleToggle").fo
 // v5.57: módulo independiente; los permisos se consultan en Supabase, no se confía solo en ocultar botones.
 let ctFinanceAllowed=false;
 async function ctLoadFinancePermission(){ctFinanceAllowed=false;try{if(loginPin){const {data,error}=await sb.rpc('ct_finance_can_access',{p_pin:loginPin});if(error)throw error;ctFinanceAllowed=data===true;}}catch(e){console.warn('Permiso de Liquidación Financiera:',e.message);} $('ctFinanceEntry')?.classList.toggle('hidden',!ctFinanceAllowed);}
-function ctOpenFinance(){if(!ctFinanceAllowed){toast('Sin permiso para Liquidación Financiera');return;}ctOpenSSOModule('liquidacion-financiera/index.html');}
+function ctOpenFinance(){if(!ctFinanceAllowed){toast('Sin permiso para Liquidación Financiera');return;}window.open('liquidacion-financiera/index.html','_blank','noopener,noreferrer');}
 // Validaciones Operación: acceso predeterminado denegado; Supabase determina la visibilidad.
 let ctValidacionesAllowed=false;
 async function ctLoadValidacionesPermission(){
@@ -459,7 +398,7 @@ async function ctOpenValidaciones(){
  if(!loginPin)return;
  await ctLoadValidacionesPermission();
  if(!ctValidacionesAllowed){toast('Sin permiso para Validaciones Operación');return;}
- ctOpenSSOModule('validaciones-operacion/index.html');
+ window.open('validaciones-operacion/index.html','_blank','noopener,noreferrer');
 }
 let ctBillingAllowed=false,ctBillingOpen=false,ctBillingTabs={rotation:false,handover:false,rotation_edit:false,handover_edit:false};
 async function ctBillingLoadTabs(){
@@ -509,7 +448,7 @@ function ctOpenModuleNewTab(module){
  if(!allowed){toast('No tienes permiso para abrir este módulo');return;}
  const url=new URL(location.pathname,location.href);
  url.searchParams.set('ct_modulo',module);
- ctOpenSSOModule(url.href);
+ window.open(url.href,'_blank','noopener');
 }
 let ctRequestedModuleOpened=false;
 function ctOpenRequestedModule(){
@@ -544,7 +483,17 @@ async function ctChangeFinancePermission(id,enabled){
  await ctPaintFinanceAdminPermissions();
 }
 async function ctChangeReturnsPermission(id,enabled){if(!permissions.is_admin)return;const {error}=await sb.rpc('ct_devoluciones_admin_set_access',{p_admin_pin:loginPin,p_user_id:id,p_can_view:enabled});if(error){toast('No se pudo guardar permiso: '+error.message);return;}toast(enabled?'Acceso a Devoluciones autorizado':'Acceso a Devoluciones revocado');await ctPaintReturnsAdminPermissions();}
-async function showApp(){$("ctReturnsEntry")?.classList.toggle("hidden",!ctReturnsAllowed);$("ctPorteriaBillingEntry")?.classList.toggle("hidden",!ctBillingAllowed);$("ctFinanceEntry")?.classList.toggle("hidden",!ctFinanceAllowed);$("ctValidacionesEntry")?.classList.toggle("hidden",!ctValidacionesAllowed);$("ctPrecintosEntry")?.classList.remove("hidden");$("ctManualRefresh")?.classList.remove("hidden");$("login").classList.add("hidden");$("app").classList.remove("hidden");$("logout").classList.remove("hidden");$("userName").textContent=user.name;$("connection").textContent="● Conectado";if(permissions.can_upload||permissions.is_admin)$("uploadPanel").classList.remove("hidden");if(permissions.can_create_users||permissions.is_admin)$("usersPanel").classList.remove("hidden");if(permissions.can_delete_all_transports||permissions.is_admin)$("deletePanel").classList.remove("hidden");if(permissions.is_admin||permissions.can_create_users){$("checkinPermissionLabel").classList.remove("hidden")}$("historyPanel").classList.toggle("hidden",!permissions.is_admin);setupAdminModuleToggles();setupCheckinCollapses();ctSetupCheckinFilters();ctSetupActionSettings();applyModuleRights();if(permissions.is_admin){$("permissionLabel").classList.remove("hidden");$("createPermissionLabel").classList.remove("hidden");$("deletePermissionLabel").classList.remove("hidden");$("statusPermissionLabels").classList.remove("hidden")}updateRoleOptions();await refresh();await refreshCheckin();await loadSharedCheckin();subscribe();if(permissions.is_admin)loadUsers();if(!canModule("cargo","view"))switchModule(canModule("checkin","view")?"checkin":"brujula");else playCargoSplash();ctOpenRequestedModule()}
+
+// Brújula y Rutero diario: autorización independiente en Supabase.
+async function ctBrujulaDailyCheck(){
+ const btn=document.getElementById('ctBrujulaDailyEntry');if(!btn)return;
+ btn.classList.add('hidden');
+ if(!loginPin||!sb)return;
+ try{const {data,error}=await sb.rpc('ct_brujula_access_get',{p_pin:loginPin});
+  if(!error&&data?.can_view===true)btn.classList.remove('hidden');
+ }catch(err){console.warn('Brújula y Rutero pendiente de configuración:',err);}
+}
+async function showApp(){void ctBrujulaDailyCheck();$("ctReturnsEntry")?.classList.toggle("hidden",!ctReturnsAllowed);$("ctPorteriaBillingEntry")?.classList.toggle("hidden",!ctBillingAllowed);$("ctFinanceEntry")?.classList.toggle("hidden",!ctFinanceAllowed);$("ctValidacionesEntry")?.classList.toggle("hidden",!ctValidacionesAllowed);$("ctPrecintosEntry")?.classList.remove("hidden");$("ctManualRefresh")?.classList.remove("hidden");$("login").classList.add("hidden");$("app").classList.remove("hidden");$("logout").classList.remove("hidden");$("userName").textContent=user.name;$("connection").textContent="● Conectado";if(permissions.can_upload||permissions.is_admin)$("uploadPanel").classList.remove("hidden");if(permissions.can_create_users||permissions.is_admin)$("usersPanel").classList.remove("hidden");if(permissions.can_delete_all_transports||permissions.is_admin)$("deletePanel").classList.remove("hidden");if(permissions.is_admin||permissions.can_create_users){$("checkinPermissionLabel").classList.remove("hidden")}$("historyPanel").classList.toggle("hidden",!permissions.is_admin);setupAdminModuleToggles();setupCheckinCollapses();ctSetupCheckinFilters();ctSetupActionSettings();applyModuleRights();if(permissions.is_admin){$("permissionLabel").classList.remove("hidden");$("createPermissionLabel").classList.remove("hidden");$("deletePermissionLabel").classList.remove("hidden");$("statusPermissionLabels").classList.remove("hidden")}updateRoleOptions();await refresh();await refreshCheckin();await loadSharedCheckin();subscribe();if(permissions.is_admin)loadUsers();if(!canModule("cargo","view"))switchModule(canModule("checkin","view")?"checkin":"brujula");else playCargoSplash();ctOpenRequestedModule()}
 // v5.63: borrar solo Viajes en Línea y verificar en el servidor ANTES y DESPUÉS.
 let ctOnlineClearBusy=false;
 function ctUpdateOnlineClearButton(){
@@ -584,10 +533,7 @@ async function ctClearOnlineTrips(){
  }catch(e){console.error('[Borrado Viajes en Línea]',e);alert('No fue posible completar el borrado.\n'+(e?.message||String(e)));}
  finally{ctOnlineClearBusy=false;if(btn)btn.textContent='🗑 Eliminar viajes cargados';ctUpdateOnlineClearButton();}
 }
-function logout(){
- for(const child of ctSSOChildren){try{if(!child.closed)child.postMessage({type:'CT_SSO_LOGOUT_V1'},location.origin)}catch(e){}}
- ctSSOChildren.clear();loginPin="";sessionStorage.clear();location.reload()
-}
+function logout(){loginPin="";sessionStorage.clear();location.reload()}
 function updateRoleOptions(){const admin=permissions.is_admin;const opt=$("newRole").querySelector('option[value="Administrador"]');if(opt)opt.disabled=!admin;if(!admin&&$("newRole").value==="Administrador")$("newRole").value="Operativo";if(!admin){$("newCanUpload").checked=false;$("newCanCreateUsers").checked=false;$("newCanDeleteAll").checked=false;["newCanArm","newCanCount","newCanLoad","newCanAvailability","newCanPhysicalPlate"].forEach(id=>$(id).checked=false)}}
 
 // v5.46: vista flotante al hacer clic en una categoría, conservando su filtro normal.
