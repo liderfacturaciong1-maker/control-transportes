@@ -5,20 +5,21 @@
 <main><section id="auth" class="card"><h2>Ingreso al submódulo</h2><p class="muted">Acceso exclusivo a usuarios autorizados por el administrador.</p><div class="flex"><input id="pin" type="password" autocomplete="off" inputmode="numeric" placeholder="PIN personal" aria-label="PIN personal"><button id="enter">Ingresar</button><a href="../index.html">Volver al inicio</a></div><p id="authMsg" class="msg" role="status"></p></section>
 <section id="workspace" class="hidden"><div class="card flex"><div class="grow"><strong id="who"></strong><div class="muted" id="rights"></div></div><button class="secondary" id="refresh">Actualizar</button><button class="secondary" id="logout">Cerrar sesión</button></div>
 <section class="card"><h2>Archivo vigente</h2><div class="statgrid"><div class="stat">Estado<strong id="fileStatus">Consultando…</strong></div><div class="stat">Registros en Rutero<strong id="fileRows">—</strong></div><div class="stat">Fecha de carga<strong id="fileDate">—</strong></div></div><p id="currentDetails" class="muted"></p><button id="download" disabled>⬇ Descargar archivo vigente</button></section>
-<section id="uploadSection" class="card hidden"><h2>Ingreso diario de archivo</h2><p>Se guardará y descargará siempre con el nombre:</p><p><strong>Brújula, Rutero y Brújula Preventa CD GIRARDOTA-APP.xlsx</strong></p><label for="file">Seleccionar archivo Excel (.xlsx)</label><input id="file" type="file" accept=".xlsx"><p class="foot">Límite: 10 MB. Se verifica la hoja Rutero y se completan automáticamente X a AG antes de guardarlo. No reemplaza un archivo vigente: primero debe eliminarlo un usuario con permiso.</p><button id="save" disabled>Validar y cargar archivo</button><p id="uploadMsg" class="msg" role="status"></p></section>
+<section id="uploadSection" class="card hidden"><h2>Ingreso diario de archivo</h2><p>Se guardará y descargará siempre con el nombre:</p><p><strong>Brújula, Rutero y Brújula Preventa CD GIRARDOTA-APP.xlsx</strong></p><label for="file">Seleccionar archivo Excel (.xlsx)</label><input id="file" type="file" accept=".xlsx"><p class="foot">Capacidad inicial: hasta 100 MB por archivo procesado. Se sube y descarga por bloques; para archivos muy pesados utiliza un computador con suficiente memoria RAM. Se verifica la hoja Rutero y se completan automáticamente X a AG antes de guardarlo. No reemplaza un archivo vigente: primero debe eliminarlo un usuario con permiso.</p><button id="save" disabled>Validar y cargar archivo</button><p id="uploadMsg" class="msg" role="status"></p></section>
 <section id="deleteSection" class="card hidden"><h2>Gestión del archivo diario</h2><p class="muted">El borrado retira el archivo compartido para permitir la carga del día siguiente. Descarga una copia antes de eliminar.</p><button id="delete" class="danger" disabled>🗑 Eliminar archivo vigente</button></section>
 <section class="card"><h2>Procesamiento automático X–AG</h2><div class="notice">Al cargar el archivo, se completan automáticamente las columnas X a AG de cada fila con datos de Rutero. Se consultan Monit, Vtts, Consped y BD. La fecha AD se fija al día de procesamiento y AF siempre será AV55. Las claves no encontradas quedan vacías y se informa su cantidad. Para Fecha Preferente Entrega (AB) se busca primero el transporte en Consped A, según la instrucción; si no existe, se usa el Pedido de Rutero S contra Documento de Consped B, una correspondencia comprobable en el ejemplo.</div><p id="processMsg" class="msg" role="status"></p></section>
 <section id="adminSection" class="card hidden"><h2>Permisos · Administrador</h2><p class="muted">Asigna permisos independientes para consultar, cargar y eliminar archivos. Los usuarios sin acceso no pueden abrir este submódulo.</p><div class="scroll"><table><thead><tr><th>Usuario</th><th>Activo</th><th>Consultar</th><th>Cargar</th><th>Eliminar</th><th>Acción</th></tr></thead><tbody id="users"></tbody></table></div><p id="adminMsg" class="msg"></p></section>
 </section></main><div id="toast" class="hidden" role="alertdialog" aria-live="assertive"></div>
 <script>
 (()=>{'use strict';
+const MAX_BYTES=100*1024*1024, CHUNK_SIZE=512*1024;
 const $=id=>document.getElementById(id);const FIXED='Brújula, Rutero y Brújula Preventa CD GIRARDOTA-APP.xlsx';let db=null,pin='',rights=null,info=null;
 function showError(id,error){$(id).textContent=String(error?.message||error);$(id).classList.add('error')}
 function message(txt){const t=$('toast');t.textContent=txt;t.classList.remove('hidden');setTimeout(()=>t.classList.add('hidden'),6000)}
 async function rpc(name,args){const {data,error}=await db.rpc(name,args);if(error)throw error;return data}
 function safe(text){return String(text??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function login(){const candidate=$('pin').value.trim();if(!candidate){$('authMsg').textContent='Ingresa el PIN.';return}try{const r=await rpc('ct_brujula_access_get',{p_pin:candidate});if(!r.can_view){$('authMsg').textContent='El administrador no ha concedido acceso a Brújula y Rutero.';return}pin=candidate;rights=r;$('pin').value='';$('auth').classList.add('hidden');$('workspace').classList.remove('hidden');$('who').textContent=r.name||'Usuario';$('rights').textContent=['Consultar',r.can_upload&&'Cargar',r.can_delete&&'Eliminar'].filter(Boolean).join(' · ');$('uploadSection').classList.toggle('hidden',!r.can_upload);$('deleteSection').classList.toggle('hidden',!r.can_delete);$('adminSection').classList.toggle('hidden',!r.is_admin);await refresh();if(r.is_admin)await loadUsers()}catch(e){showError('authMsg',e)}}
-async function refresh(){try{info=await rpc('ct_brujula_file_info',{p_pin:pin});$('fileStatus').textContent=info.exists?'Disponible':'Sin archivo';$('fileRows').textContent=info.exists?Number(info.rows).toLocaleString('es-CO'):'—';$('fileDate').textContent=info.exists?new Date(info.created_at).toLocaleString('es-CO'):'—';$('currentDetails').textContent=info.exists?'Nombre: '+info.filename+' · Origen: '+info.source_name:'El administrador podrá habilitar la carga del archivo del día.';$('download').disabled=!info.exists;$('delete').disabled=!info.exists;$('save').disabled=!!info.exists;}catch(e){showError('authMsg',e);message('No fue posible consultar el archivo: '+e.message)}}
+async function refresh(){try{info=await rpc('ct_brujula_large_info',{p_pin:pin});$('fileStatus').textContent=info.exists?(info.pending?'Carga incompleta':'Disponible'):'Sin archivo';$('fileRows').textContent=info.exists?Number(info.rows).toLocaleString('es-CO'):'—';$('fileDate').textContent=info.exists?new Date(info.created_at).toLocaleString('es-CO'):'—';$('currentDetails').textContent=info.exists?'Nombre: '+info.filename+' · Origen: '+info.source_name+(info.large?' · Tamaño: '+(Number(info.bytes)/1048576).toFixed(1)+' MiB':''):'El administrador podrá habilitar la carga del archivo del día.';$('download').disabled=!info.exists||!!info.pending;$('delete').disabled=!info.exists;$('save').disabled=!!info.exists;}catch(e){showError('authMsg',e);message('No fue posible consultar el archivo: '+e.message)}}
 function bytesToBase64(bytes){let acc='';const batch=16384;for(let i=0;i<bytes.length;i+=batch)acc+=String.fromCharCode(...bytes.subarray(i,i+batch));return btoa(acc)}
 function base64ToBytes(b64){const raw=atob(b64.replace(/\s/g,''));const out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out}
 const FIELD_NAMES=['Status','Destino','Transportista','Clientes','Fecha Preferente Entrega','Telefono','Fecha','Viaje','Centro','Com'];
@@ -70,29 +71,75 @@ function processWorkbook(arrayBuffer){
     if(row[prefColumn]&&typeof row[prefColumn].v==='number'&&row[prefColumn].v>20000&&row[prefColumn].v<90000)row[prefColumn].z='dd/mm/yyyy';
   }
   const output=XLSX.write(book,{bookType:'xlsx',type:'array',compression:true});
-  if(output.byteLength>10000000)throw Error('El Excel procesado supera los 10 MB admitidos en Supabase ('+(output.byteLength/1048576).toFixed(1)+' MiB). Se necesita aumentar el límite del módulo.');
+  if(output.byteLength>MAX_BYTES)throw Error('El Excel procesado supera el límite configurado de 100 MB ('+(output.byteLength/1048576).toFixed(1)+' MiB). Para archivos mayores se requiere almacenamiento de objetos y procesamiento optimizado.');
   return {bytes:new Uint8Array(output),stats};
 }
 async function save(){
   const f=$('file').files[0];
   if(!f)return message('Selecciona un archivo.');
   if(!/\.xlsx$/i.test(f.name))return message('Utiliza un archivo .xlsx.');
-  if(f.size>10000000)return message('El archivo supera 10 MB.');
+  if(f.size>MAX_BYTES)return message('El archivo de origen supera 100 MB.');
   if(info?.exists)return message('Primero debe eliminarse el archivo vigente.');
-  $('save').disabled=true;$('uploadMsg').textContent='Procesando hoja Rutero, búsquedas X–AG y preparando Excel…';
+  $('save').disabled=true;
+  $('uploadMsg').textContent='Leyendo archivo y procesando Rutero X–AG. No cierres esta ventana…';
+  let uploadId=null;
   try{
-    const result=processWorkbook(await f.arrayBuffer());
-    const {stats,bytes}=result;
+    const {stats,bytes}=processWorkbook(await f.arrayBuffer());
     const noMatch=Object.entries(stats.notFound).filter(([_,num])=>num).map(([field,num])=>`${field}: ${num}`).join(' · ');
     $('processMsg').textContent=`${stats.rows.toLocaleString('es-CO')} filas procesadas. ${stats.dateViaOrder} fechas preferentes obtenidas por Pedido/Documento.`+(noMatch?' Sin coincidencia: '+noMatch:' Todas las búsquedas tienen coincidencia.');
-    $('uploadMsg').textContent=`${stats.rows.toLocaleString('es-CO')} registros procesados; guardando archivo compartido…`;
-    await rpc('ct_brujula_file_put',{p_pin:pin,p_base64:bytesToBase64(bytes),p_source_name:f.name,p_row_count:stats.rows});
-    $('file').value='';$('uploadMsg').textContent='Archivo procesado y guardado con valores en X–AG. Ya puedes descargarlo.';
+    const chunks=Math.ceil(bytes.length/CHUNK_SIZE);
+    uploadId=crypto.randomUUID();
+    $('uploadMsg').textContent='Reservando almacenamiento del archivo diario…';
+    await rpc('ct_brujula_large_begin',{p_pin:pin,p_upload_id:uploadId,p_source_name:f.name,p_row_count:stats.rows,p_total_bytes:bytes.length,p_chunk_count:chunks});
+    for(let i=0;i<chunks;i++){
+      const chunk=bytes.subarray(i*CHUNK_SIZE,Math.min((i+1)*CHUNK_SIZE,bytes.length));
+      await rpc('ct_brujula_large_chunk_put',{p_pin:pin,p_upload_id:uploadId,p_index:i,p_base64:bytesToBase64(chunk)});
+      $('uploadMsg').textContent=`Guardando archivo en Supabase: ${Math.round((i+1)*100/chunks)}% (${i+1} de ${chunks} bloques). No cierres esta ventana.`;
+    }
+    await rpc('ct_brujula_large_finish',{p_pin:pin,p_upload_id:uploadId});
+    uploadId=null;
+    $('file').value='';
+    $('uploadMsg').textContent=`Archivo de ${(bytes.length/1048576).toFixed(1)} MiB procesado y guardado. Ya puedes descargarlo.`;
     await refresh();
-  }catch(e){showError('uploadMsg',e);$('save').disabled=false}
+  }catch(e){
+    if(uploadId){
+      try{await rpc('ct_brujula_large_abort',{p_pin:pin,p_upload_id:uploadId})}
+      catch(_){$('uploadMsg').textContent='Error de carga. Si quedó una carga incompleta, un usuario con permiso de eliminar puede liberar el espacio desde el módulo.';}
+    }
+    showError('uploadMsg',e);$('save').disabled=false;
+    await refresh().catch(()=>{});
+  }
 }
-async function download(){try{$('download').disabled=true;const data=await rpc('ct_brujula_file_get',{p_pin:pin});const blob=new Blob([base64ToBytes(data)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=FIXED;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}catch(e){message('Error al descargar: '+e.message)}finally{$('download').disabled=false}}
-async function remove(){if(!info?.exists)return;if(!confirm('¿Descargaste una copia? Esta acción eliminará el archivo compartido de todos los usuarios.'))return;if(!confirm('Confirmar eliminación definitiva del archivo diario.'))return;try{$('delete').disabled=true;await rpc('ct_brujula_file_delete',{p_pin:pin});await refresh();message('Archivo diario eliminado. Ya puede cargarse el siguiente.')}catch(e){message('No se pudo eliminar: '+e.message);$('delete').disabled=false}}
+async function download(){
+  try{
+    $('download').disabled=true;
+    if(info?.large){
+      const chunks=[];
+      const total=Number(info.chunks);
+      if(!Number.isInteger(total)||total<1||total>300)throw Error('Cantidad de bloques inválida.');
+      for(let i=0;i<total;i++){
+        const chunkB64=await rpc('ct_brujula_large_chunk_get',{p_pin:pin,p_index:i});
+        chunks.push(base64ToBytes(chunkB64));
+        $('currentDetails').textContent=`Descargando archivo: ${Math.round((i+1)*100/total)}%. No cierres la ventana.`;
+      }
+      const blob=new Blob(chunks,{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      if(blob.size!==Number(info.bytes))throw Error('Descarga incompleta: no coincide el tamaño del archivo.');
+      triggerFile(blob);
+    }else{
+      const data=await rpc('ct_brujula_file_get',{p_pin:pin});
+      triggerFile(new Blob([base64ToBytes(data)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    }
+  }catch(e){message('Error al descargar: '+e.message)}
+  finally{$('download').disabled=false;await refresh()}
+}
+function triggerFile(blob){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=FIXED;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}
+async function remove(){
+  if(!info?.exists)return;
+  if(!confirm('¿Descargaste una copia? Esta acción eliminará el archivo compartido de todos los usuarios.'))return;
+  if(!confirm('Confirmar eliminación definitiva del archivo diario.'))return;
+  try{$('delete').disabled=true;await rpc('ct_brujula_large_delete',{p_pin:pin});await refresh();message('Archivo diario eliminado. Ya puede cargarse el siguiente.')}
+  catch(e){message('No se pudo eliminar: '+e.message);$('delete').disabled=false}
+}
 async function loadUsers(){try{const users=await rpc('ct_brujula_admin_users',{p_admin_pin:pin});$('users').innerHTML=users.map(u=>`<tr data-id="${safe(u.user_id)}"><td>${safe(u.name)}</td><td>${u.active?'Sí':'No'}</td><td><input aria-label="Consultar ${safe(u.name)}" type="checkbox" data-key="view" ${u.can_view?'checked':''}></td><td><input aria-label="Cargar ${safe(u.name)}" type="checkbox" data-key="upload" ${u.can_upload?'checked':''}></td><td><input aria-label="Eliminar ${safe(u.name)}" type="checkbox" data-key="delete" ${u.can_delete?'checked':''}></td><td><button data-save="1">Guardar</button></td></tr>`).join('')}catch(e){showError('adminMsg',e)}}
 $('users').addEventListener('click',async e=>{const b=e.target.closest('button[data-save]');if(!b)return;const row=b.closest('tr'),get=key=>row.querySelector(`[data-key="${key}"]`).checked;b.disabled=true;try{await rpc('ct_brujula_admin_set_access',{p_admin_pin:pin,p_user_id:row.dataset.id,p_can_view:get('view'),p_can_upload:get('upload'),p_can_delete:get('delete')});$('adminMsg').textContent='Permiso actualizado.'}catch(err){showError('adminMsg',err)}finally{b.disabled=false}});
 $('enter').onclick=login;$('pin').addEventListener('keydown',e=>{if(e.key==='Enter')login()});$('refresh').onclick=refresh;$('save').onclick=save;$('download').onclick=download;$('delete').onclick=remove;$('logout').onclick=()=>{pin='';rights=null;info=null;$('workspace').classList.add('hidden');$('auth').classList.remove('hidden');$('authMsg').textContent='';};const cfg=window.APP_CONFIG||{};if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY||!window.supabase){$('authMsg').textContent='No se cargó la configuración de Supabase.';return}db=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);
