@@ -5,9 +5,9 @@
 <main><section id="auth" class="card"><h2>Ingreso al submódulo</h2><p class="muted">Acceso exclusivo a usuarios autorizados por el administrador.</p><div class="flex"><input id="pin" type="password" autocomplete="off" inputmode="numeric" placeholder="PIN personal" aria-label="PIN personal"><button id="enter">Ingresar</button><a href="../index.html">Volver al inicio</a></div><p id="authMsg" class="msg" role="status"></p></section>
 <section id="workspace" class="hidden"><div class="card flex"><div class="grow"><strong id="who"></strong><div class="muted" id="rights"></div></div><button class="secondary" id="refresh">Actualizar</button><button class="secondary" id="logout">Cerrar sesión</button></div>
 <section class="card"><h2>Archivo vigente</h2><div class="statgrid"><div class="stat">Estado<strong id="fileStatus">Consultando…</strong></div><div class="stat">Registros en Rutero<strong id="fileRows">—</strong></div><div class="stat">Fecha de carga<strong id="fileDate">—</strong></div></div><p id="currentDetails" class="muted"></p><button id="download" disabled>⬇ Descargar archivo vigente</button></section>
-<section id="uploadSection" class="card hidden"><h2>Ingreso diario de archivo</h2><p>Se guardará y descargará siempre con el nombre:</p><p><strong>Brújula, Rutero y Brújula Preventa CD GIRARDOTA-APP.xlsx</strong></p><label for="file">Seleccionar archivo Excel (.xlsx)</label><input id="file" type="file" accept=".xlsx"><p class="foot">Límite: 10 MB. Se verifica la hoja Rutero y que existan datos de A a W. No reemplaza un archivo vigente: primero debe eliminarlo un usuario con permiso.</p><button id="save" disabled>Validar y cargar archivo</button><p id="uploadMsg" class="msg" role="status"></p></section>
+<section id="uploadSection" class="card hidden"><h2>Ingreso diario de archivo</h2><p>Se guardará y descargará siempre con el nombre:</p><p><strong>Brújula, Rutero y Brújula Preventa CD GIRARDOTA-APP.xlsx</strong></p><label for="file">Seleccionar archivo Excel (.xlsx)</label><input id="file" type="file" accept=".xlsx"><p class="foot">Límite: 10 MB. Se verifica la hoja Rutero y se completan automáticamente X a AG antes de guardarlo. No reemplaza un archivo vigente: primero debe eliminarlo un usuario con permiso.</p><button id="save" disabled>Validar y cargar archivo</button><p id="uploadMsg" class="msg" role="status"></p></section>
 <section id="deleteSection" class="card hidden"><h2>Gestión del archivo diario</h2><p class="muted">El borrado retira el archivo compartido para permitir la carga del día siguiente. Descarga una copia antes de eliminar.</p><button id="delete" class="danger" disabled>🗑 Eliminar archivo vigente</button></section>
-<section class="card"><h2>Procesamiento automático</h2><div class="notice"><strong>Reglas X–AG pendientes.</strong> El Excel de ejemplo contiene la hoja Rutero con información de A a W, pero no define los encabezados y cálculos de X a AG. Esta versión valida, almacena y permite descargar el archivo original <strong>sin inventar valores</strong>. El autollenado se habilitará cuando se definan las diez reglas.</div></section>
+<section class="card"><h2>Procesamiento automático X–AG</h2><div class="notice">Al cargar el archivo, se completan automáticamente las columnas X a AG de cada fila con datos de Rutero. Se consultan Monit, Vtts, Consped y BD. La fecha AD se fija al día de procesamiento y AF siempre será AV55. Las claves no encontradas quedan vacías y se informa su cantidad. Para Fecha Preferente Entrega (AB) se busca primero el transporte en Consped A, según la instrucción; si no existe, se usa el Pedido de Rutero S contra Documento de Consped B, una correspondencia comprobable en el ejemplo.</div><p id="processMsg" class="msg" role="status"></p></section>
 <section id="adminSection" class="card hidden"><h2>Permisos · Administrador</h2><p class="muted">Asigna permisos independientes para consultar, cargar y eliminar archivos. Los usuarios sin acceso no pueden abrir este submódulo.</p><div class="scroll"><table><thead><tr><th>Usuario</th><th>Activo</th><th>Consultar</th><th>Cargar</th><th>Eliminar</th><th>Acción</th></tr></thead><tbody id="users"></tbody></table></div><p id="adminMsg" class="msg"></p></section>
 </section></main><div id="toast" class="hidden" role="alertdialog" aria-live="assertive"></div>
 <script>
@@ -21,8 +21,76 @@ async function login(){const candidate=$('pin').value.trim();if(!candidate){$('a
 async function refresh(){try{info=await rpc('ct_brujula_file_info',{p_pin:pin});$('fileStatus').textContent=info.exists?'Disponible':'Sin archivo';$('fileRows').textContent=info.exists?Number(info.rows).toLocaleString('es-CO'):'—';$('fileDate').textContent=info.exists?new Date(info.created_at).toLocaleString('es-CO'):'—';$('currentDetails').textContent=info.exists?'Nombre: '+info.filename+' · Origen: '+info.source_name:'El administrador podrá habilitar la carga del archivo del día.';$('download').disabled=!info.exists;$('delete').disabled=!info.exists;$('save').disabled=!!info.exists;}catch(e){showError('authMsg',e);message('No fue posible consultar el archivo: '+e.message)}}
 function bytesToBase64(bytes){let acc='';const batch=16384;for(let i=0;i<bytes.length;i+=batch)acc+=String.fromCharCode(...bytes.subarray(i,i+batch));return btoa(acc)}
 function base64ToBytes(b64){const raw=atob(b64.replace(/\s/g,''));const out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out}
-function validate(arrayBuffer){if(!window.XLSX)throw Error('No se pudo cargar el lector Excel; verifica tu conexión.');const book=XLSX.read(arrayBuffer,{type:'array',dense:true,bookVBA:false});const ws=book.Sheets.Rutero;if(!ws)throw Error('El archivo debe contener la pestaña Rutero.');const range=XLSX.utils.decode_range(ws['!ref']||'A1');if(range.e.c<22)throw Error('La hoja Rutero no contiene las columnas A a W.');const head=XLSX.utils.sheet_to_json(ws,{header:1,range:0,blankrows:false})[0]||[];if(String(head[0]||'').trim().toLowerCase()!=='transporte')throw Error('La hoja Rutero no tiene el encabezado esperado en A1: Transporte.');let rows=0;const grid=XLSX.utils.sheet_to_json(ws,{header:1,range:1,blankrows:false});for(const r of grid){if(r.slice(0,23).some(v=>v!==''&&v!==null&&v!==undefined))rows++}if(!rows)throw Error('Rutero no contiene registros.');return rows}
-async function save(){const f=$('file').files[0];if(!f)return message('Selecciona un archivo.');if(!/\.xlsx$/i.test(f.name))return message('Utiliza un archivo .xlsx.');if(f.size>10000000)return message('El archivo supera 10 MB.');if(info?.exists)return message('Primero debe eliminarse el archivo vigente.');$('save').disabled=true;$('uploadMsg').textContent='Leyendo y verificando la pestaña Rutero…';try{const array=await f.arrayBuffer();const rows=validate(array);$('uploadMsg').textContent=`${rows.toLocaleString('es-CO')} registros reconocidos. Guardando archivo compartido…`;await rpc('ct_brujula_file_put',{p_pin:pin,p_base64:bytesToBase64(new Uint8Array(array)),p_source_name:f.name,p_row_count:rows});$('file').value='';$('uploadMsg').textContent='Archivo registrado correctamente. Recuerda que las reglas de autollenado X–AG están pendientes.';await refresh()}catch(e){showError('uploadMsg',e);$('save').disabled=false}}
+const FIELD_NAMES=['Status','Destino','Transportista','Clientes','Fecha Preferente Entrega','Telefono','Fecha','Viaje','Centro','Com'];
+function key(v){return String(v??'').trim().replace(/\.0+$/,'').toUpperCase()}
+function populated(v){return v!==null&&v!==undefined&&String(v).trim()!==''}
+function excelSerial(date){return (Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())-Date.UTC(1899,11,30))/86400000}
+function mapFirst(rows,keyCol,valueCol){const result=new Map();for(const row of rows.slice(1)){const k=key(row[keyCol]);if(k&&!result.has(k)&&populated(row[valueCol]))result.set(k,row[valueCol]);}return result}
+function processWorkbook(arrayBuffer){
+  if(!window.XLSX)throw Error('No se pudo cargar el lector Excel; verifica tu conexión.');
+  const book=XLSX.read(arrayBuffer,{type:'array',dense:true,bookVBA:false,cellDates:false});
+  const missing=['Rutero','Monit','Vtts','Consped','BD'].filter(name=>!book.Sheets[name]);
+  if(missing.length)throw Error('Faltan las pestañas necesarias: '+missing.join(', '));
+  const rutero=book.Sheets.Rutero;
+  const range=XLSX.utils.decode_range(rutero['!ref']||'A1');
+  if(range.e.c<22)throw Error('La hoja Rutero no contiene columnas A a W.');
+  const read=name=>XLSX.utils.sheet_to_json(book.Sheets[name],{header:1,defval:null,blankrows:false,raw:true});
+  const rawRut=XLSX.utils.sheet_to_json(rutero,{header:1,defval:null,blankrows:true,raw:true});
+  if(key(rawRut[0]?.[0])!=='TRANSPORTE')throw Error('Rutero debe tener Transporte en A1.');
+  const monit=read('Monit'), vtts=read('Vtts'), consped=read('Consped'), bd=read('BD');
+  const monitorStatus=mapFirst(monit,0,1), monitorCarrier=mapFirst(monit,0,4), monitorTrip=mapFirst(monit,0,3);
+  const destination=mapFirst(vtts,0,2), vttCounts=new Map();
+  for(const line of vtts.slice(1)){const k=key(line[0]);if(k)vttCounts.set(k,(vttCounts.get(k)||0)+1)}
+  const preferredByTransport=mapFirst(consped,0,5), preferredByOrder=mapFirst(consped,1,5);
+  const phone=mapFirst(bd,0,5),zone=mapFirst(bd,0,1);
+  const day=excelSerial(new Date());
+  const stats={rows:0,notFound:{Status:0,Destino:0,Transportista:0,Clientes:0,'Fecha Preferente Entrega':0,Telefono:0,Viaje:0,Com:0},dateViaOrder:0};
+  const newCells=[];
+  // The original workbook keeps the instruction examples in row 2; replace those values with real lookups.
+  for(let i=1;i<rawRut.length;i++){
+    const r=rawRut[i]||[];
+    if(!r.slice(0,23).some(populated)){newCells.push(Array(10).fill(null));continue}
+    stats.rows++;
+    const transport=key(r[0]),customer=key(r[10]),pedido=key(r[18]);
+    let pref=preferredByTransport.get(transport);
+    if(!populated(pref)&&pedido){pref=preferredByOrder.get(pedido);if(populated(pref))stats.dateViaOrder++}
+    const output=[monitorStatus.get(transport),destination.get(transport),monitorCarrier.get(transport),vttCounts.get(transport),pref,phone.get(customer),day,monitorTrip.get(transport),'AV55',zone.get(customer)];
+    for(const [i,col] of [[0,'Status'],[1,'Destino'],[2,'Transportista'],[3,'Clientes'],[4,'Fecha Preferente Entrega'],[5,'Telefono'],[7,'Viaje'],[9,'Com']])if(!populated(output[i]))stats.notFound[col]++;
+    newCells.push(output.map(v=>populated(v)?v:null));
+  }
+  if(!stats.rows)throw Error('Rutero no contiene registros de datos.');
+  // Row 1 contains the headers; row 2 onward is populated with results, not Excel formulas.
+  XLSX.utils.sheet_add_aoa(rutero,[FIELD_NAMES,...newCells],{origin:{r:0,c:23}});
+  const dateColumn=XLSX.utils.decode_col('AD');
+  const prefColumn=XLSX.utils.decode_col('AB');
+  for(let ri=1;ri<=newCells.length;ri++){
+    const row=rutero[ri];
+    if(!row)continue;
+    if(row[dateColumn]){row[dateColumn].z='dd/mm/yyyy';row[dateColumn].t='n'}
+    if(row[prefColumn]&&typeof row[prefColumn].v==='number'&&row[prefColumn].v>20000&&row[prefColumn].v<90000)row[prefColumn].z='dd/mm/yyyy';
+  }
+  const output=XLSX.write(book,{bookType:'xlsx',type:'array',compression:true});
+  if(output.byteLength>10000000)throw Error('El Excel procesado supera los 10 MB admitidos en Supabase ('+(output.byteLength/1048576).toFixed(1)+' MiB). Se necesita aumentar el límite del módulo.');
+  return {bytes:new Uint8Array(output),stats};
+}
+async function save(){
+  const f=$('file').files[0];
+  if(!f)return message('Selecciona un archivo.');
+  if(!/\.xlsx$/i.test(f.name))return message('Utiliza un archivo .xlsx.');
+  if(f.size>10000000)return message('El archivo supera 10 MB.');
+  if(info?.exists)return message('Primero debe eliminarse el archivo vigente.');
+  $('save').disabled=true;$('uploadMsg').textContent='Procesando hoja Rutero, búsquedas X–AG y preparando Excel…';
+  try{
+    const result=processWorkbook(await f.arrayBuffer());
+    const {stats,bytes}=result;
+    const noMatch=Object.entries(stats.notFound).filter(([_,num])=>num).map(([field,num])=>`${field}: ${num}`).join(' · ');
+    $('processMsg').textContent=`${stats.rows.toLocaleString('es-CO')} filas procesadas. ${stats.dateViaOrder} fechas preferentes obtenidas por Pedido/Documento.`+(noMatch?' Sin coincidencia: '+noMatch:' Todas las búsquedas tienen coincidencia.');
+    $('uploadMsg').textContent=`${stats.rows.toLocaleString('es-CO')} registros procesados; guardando archivo compartido…`;
+    await rpc('ct_brujula_file_put',{p_pin:pin,p_base64:bytesToBase64(bytes),p_source_name:f.name,p_row_count:stats.rows});
+    $('file').value='';$('uploadMsg').textContent='Archivo procesado y guardado con valores en X–AG. Ya puedes descargarlo.';
+    await refresh();
+  }catch(e){showError('uploadMsg',e);$('save').disabled=false}
+}
 async function download(){try{$('download').disabled=true;const data=await rpc('ct_brujula_file_get',{p_pin:pin});const blob=new Blob([base64ToBytes(data)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=FIXED;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}catch(e){message('Error al descargar: '+e.message)}finally{$('download').disabled=false}}
 async function remove(){if(!info?.exists)return;if(!confirm('¿Descargaste una copia? Esta acción eliminará el archivo compartido de todos los usuarios.'))return;if(!confirm('Confirmar eliminación definitiva del archivo diario.'))return;try{$('delete').disabled=true;await rpc('ct_brujula_file_delete',{p_pin:pin});await refresh();message('Archivo diario eliminado. Ya puede cargarse el siguiente.')}catch(e){message('No se pudo eliminar: '+e.message);$('delete').disabled=false}}
 async function loadUsers(){try{const users=await rpc('ct_brujula_admin_users',{p_admin_pin:pin});$('users').innerHTML=users.map(u=>`<tr data-id="${safe(u.user_id)}"><td>${safe(u.name)}</td><td>${u.active?'Sí':'No'}</td><td><input aria-label="Consultar ${safe(u.name)}" type="checkbox" data-key="view" ${u.can_view?'checked':''}></td><td><input aria-label="Cargar ${safe(u.name)}" type="checkbox" data-key="upload" ${u.can_upload?'checked':''}></td><td><input aria-label="Eliminar ${safe(u.name)}" type="checkbox" data-key="delete" ${u.can_delete?'checked':''}></td><td><button data-save="1">Guardar</button></td></tr>`).join('')}catch(e){showError('adminMsg',e)}}
