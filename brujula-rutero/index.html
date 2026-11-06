@@ -56,7 +56,7 @@ function processWorkbook(arrayBuffer){
   const preferred=mapPreferred(consped);
   const phone=mapFirst(bd,0,5),zone=mapFirst(bd,0,1);
   const day=excelSerial(new Date());
-  const stats={rows:0,notFound:{Status:0,Destino:0,Transportista:0,Clientes:0,'Fecha Preferente Entrega':0,Telefono:0,Viaje:0,Com:0},dateViaOrder:0,ambiguousDate:0};
+  const stats={rows:0,missingMonit:new Set(),missingVtts:new Set(),notFound:{Status:0,Destino:0,Transportista:0,Clientes:0,'Fecha Preferente Entrega':0,Telefono:0,Viaje:0,Com:0},dateViaOrder:0,ambiguousDate:0};
   const newCells=[];
   // The original workbook keeps the instruction examples in row 2; replace those values with real lookups.
   for(let i=1;i<rawRut.length;i++){
@@ -64,6 +64,8 @@ function processWorkbook(arrayBuffer){
     if(!r.slice(0,23).some(populated)){newCells.push(Array(10).fill(null));continue}
     stats.rows++;
     const transport=key(r[0]),customer=key(r[10]),pedido=key(r[18]);
+    if(transport&&!monitorStatus.has(transport)&&!monitorTrip.has(transport)&&!monitorCarrier.has(transport))stats.missingMonit.add(transport);
+    if(transport&&!destination.has(transport)&&!vttCounts.has(transport))stats.missingVtts.add(transport);
     // Consped A = Cliente, B = Documento, F = Fecha preferente.
     // Nunca cruzar Rutero Transporte con Consped Cliente.
     let pref=pedido&&customer?preferred.byOrderCustomer.get(pedido+'|'+customer):undefined;
@@ -75,8 +77,17 @@ function processWorkbook(arrayBuffer){
     newCells.push(output.map(v=>populated(v)?v:null));
   }
   if(!stats.rows)throw Error('Rutero no contiene registros de datos.');
+  // Eliminar las instrucciones de ejemplo en X:AG, incluidos sus colores amarillos.
+  // Si una clave no existe en la base de origen, el resultado debe quedar vacío.
+  for(let ri=1;ri<rawRut.length;ri++)for(let ci=23;ci<=32;ci++){
+    const ref=XLSX.utils.encode_cell({r:ri,c:ci});
+    delete rutero[ref];
+    if(rutero[ri])rutero[ri][ci]=undefined;
+  }
   // Row 1 contains the headers; row 2 onward is populated with results, not Excel formulas.
   XLSX.utils.sheet_add_aoa(rutero,[FIELD_NAMES,...newCells],{origin:{r:0,c:23}});
+  stats.missingMonit=[...stats.missingMonit];
+  stats.missingVtts=[...stats.missingVtts];
   const dateColumn=XLSX.utils.decode_col('AD');
   const prefColumn=XLSX.utils.decode_col('AB');
   for(let ri=1;ri<=newCells.length;ri++){
@@ -101,7 +112,8 @@ async function save(){
   try{
     const {stats,bytes}=processWorkbook(await f.arrayBuffer());
     const noMatch=Object.entries(stats.notFound).filter(([_,num])=>num).map(([field,num])=>`${field}: ${num}`).join(' · ');
-    $('processMsg').textContent=`${stats.rows.toLocaleString('es-CO')} filas procesadas. ${stats.dateViaOrder} fechas preferentes obtenidas por Pedido/Documento.`+(stats.ambiguousDate?` ${stats.ambiguousDate} pedidos con fechas ambiguas (sin asignar).`:``)+(noMatch?' Sin coincidencia: '+noMatch:' Todas las búsquedas tienen coincidencia.');
+    const missingSource=[stats.missingMonit.length?`No aparecen en Monit (${stats.missingMonit.length} transportes): ${stats.missingMonit.slice(0,8).join(', ')}${stats.missingMonit.length>8?'…':''}`:'',stats.missingVtts.length?`No aparecen en Vtts (${stats.missingVtts.length} transportes): ${stats.missingVtts.slice(0,8).join(', ')}${stats.missingVtts.length>8?'…':''}`:''].filter(Boolean).join('\n');
+    $('processMsg').textContent=`${stats.rows.toLocaleString('es-CO')} filas procesadas. ${stats.dateViaOrder} fechas preferentes obtenidas por Pedido/Documento.`+(stats.ambiguousDate?` ${stats.ambiguousDate} pedidos con fechas ambiguas (sin asignar).`:``)+(noMatch?'\nSin coincidencia por columna: '+noMatch:' Todas las búsquedas tienen coincidencia.')+(missingSource?'\nATENCIÓN: los siguientes transportes no existen en las hojas de consulta. Y (Destino) y AE (Viaje) quedarán vacíos donde corresponda; no se inventarán valores.\n'+missingSource:'');
     const chunks=Math.ceil(bytes.length/CHUNK_SIZE);
     uploadId=crypto.randomUUID();
     $('uploadMsg').textContent='Reservando almacenamiento del archivo diario…';
