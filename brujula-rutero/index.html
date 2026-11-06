@@ -7,7 +7,7 @@
 <section class="card"><h2>Archivo vigente</h2><div class="statgrid"><div class="stat">Estado<strong id="fileStatus">Consultando…</strong></div><div class="stat">Registros en Rutero<strong id="fileRows">—</strong></div><div class="stat">Fecha de carga<strong id="fileDate">—</strong></div></div><p id="currentDetails" class="muted"></p><button id="download" disabled>⬇ Descargar archivo vigente</button></section>
 <section id="uploadSection" class="card hidden"><h2>Ingreso diario de archivo</h2><p>Se guardará y descargará siempre con el nombre:</p><p><strong>Brújula, Rutero y Brújula Preventa CD GIRARDOTA-APP.xlsx</strong></p><label for="file">Seleccionar archivo Excel (.xlsx)</label><input id="file" type="file" accept=".xlsx"><p class="foot">Capacidad inicial: hasta 100 MB por archivo procesado. Se sube y descarga por bloques; para archivos muy pesados utiliza un computador con suficiente memoria RAM. Se verifica la hoja Rutero y se completan automáticamente X a AG antes de guardarlo. No reemplaza un archivo vigente: primero debe eliminarlo un usuario con permiso.</p><button id="save" disabled>Validar y cargar archivo</button><p id="uploadMsg" class="msg" role="status"></p></section>
 <section id="deleteSection" class="card hidden"><h2>Gestión del archivo diario</h2><p class="muted">El borrado retira el archivo compartido para permitir la carga del día siguiente. Descarga una copia antes de eliminar.</p><button id="delete" class="danger" disabled>🗑 Eliminar archivo vigente</button></section>
-<section class="card"><h2>Procesamiento automático X–AG</h2><div class="notice">Al cargar el archivo, se completan automáticamente las columnas X a AG de cada fila con datos de Rutero. Se consultan Monit, Vtts, Consped y BD. La fecha AD se fija al día de procesamiento y AF siempre será AV55. Las claves no encontradas quedan vacías y se informa su cantidad. Para Fecha Preferente Entrega (AB) se busca primero el transporte en Consped A, según la instrucción; si no existe, se usa el Pedido de Rutero S contra Documento de Consped B, una correspondencia comprobable en el ejemplo.</div><p id="processMsg" class="msg" role="status"></p></section>
+<section class="card"><h2>Procesamiento automático X–AG</h2><div class="notice">Al cargar el archivo, se completan automáticamente las columnas X a AG de cada fila con datos de Rutero. Se consultan Monit, Vtts, Consped y BD. La fecha AD se fija al día de procesamiento y AF siempre será AV55. Las claves no encontradas quedan vacías y se informa su cantidad. Para Fecha Preferente Entrega (AB), se vincula Pedido de Rutero (S) con Documento de Consped (B) y se verifica el cliente Rutero (K) con Cliente Consped (A). Consped no contiene el número de transporte, por lo que se evita una coincidencia incorrecta. Si no existe la referencia, se informa y se deja la celda vacía.</div><p id="processMsg" class="msg" role="status"></p></section>
 <section id="adminSection" class="card hidden"><h2>Permisos · Administrador</h2><p class="muted">Asigna permisos independientes para consultar, cargar y eliminar archivos. Los usuarios sin acceso no pueden abrir este submódulo.</p><div class="scroll"><table><thead><tr><th>Usuario</th><th>Activo</th><th>Consultar</th><th>Cargar</th><th>Eliminar</th><th>Acción</th></tr></thead><tbody id="users"></tbody></table></div><p id="adminMsg" class="msg"></p></section>
 </section></main><div id="toast" class="hidden" role="alertdialog" aria-live="assertive"></div>
 <script>
@@ -27,6 +27,17 @@ function key(v){return String(v??'').trim().replace(/\.0+$/,'').toUpperCase()}
 function populated(v){return v!==null&&v!==undefined&&String(v).trim()!==''}
 function excelSerial(date){return (Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())-Date.UTC(1899,11,30))/86400000}
 function mapFirst(rows,keyCol,valueCol){const result=new Map();for(const row of rows.slice(1)){const k=key(row[keyCol]);if(k&&!result.has(k)&&populated(row[valueCol]))result.set(k,row[valueCol]);}return result}
+function mapPreferred(consped){
+  const byOrder=new Map(), byOrderCustomer=new Map(), conflicts=new Set();
+  for(const r of consped.slice(1)){
+    const order=key(r[1]), customer=key(r[0]), date=r[5];
+    if(!order||!populated(date))continue;
+    if(!byOrder.has(order))byOrder.set(order,date);
+    else if(String(byOrder.get(order))!==String(date))conflicts.add(order);
+    if(customer&&!byOrderCustomer.has(order+'|'+customer))byOrderCustomer.set(order+'|'+customer,date);
+  }
+  return {byOrder,byOrderCustomer,conflicts};
+}
 function processWorkbook(arrayBuffer){
   if(!window.XLSX)throw Error('No se pudo cargar el lector Excel; verifica tu conexión.');
   const book=XLSX.read(arrayBuffer,{type:'array',dense:true,bookVBA:false,cellDates:false});
@@ -42,10 +53,10 @@ function processWorkbook(arrayBuffer){
   const monitorStatus=mapFirst(monit,0,1), monitorCarrier=mapFirst(monit,0,4), monitorTrip=mapFirst(monit,0,3);
   const destination=mapFirst(vtts,0,2), vttCounts=new Map();
   for(const line of vtts.slice(1)){const k=key(line[0]);if(k)vttCounts.set(k,(vttCounts.get(k)||0)+1)}
-  const preferredByTransport=mapFirst(consped,0,5), preferredByOrder=mapFirst(consped,1,5);
+  const preferred=mapPreferred(consped);
   const phone=mapFirst(bd,0,5),zone=mapFirst(bd,0,1);
   const day=excelSerial(new Date());
-  const stats={rows:0,notFound:{Status:0,Destino:0,Transportista:0,Clientes:0,'Fecha Preferente Entrega':0,Telefono:0,Viaje:0,Com:0},dateViaOrder:0};
+  const stats={rows:0,notFound:{Status:0,Destino:0,Transportista:0,Clientes:0,'Fecha Preferente Entrega':0,Telefono:0,Viaje:0,Com:0},dateViaOrder:0,ambiguousDate:0};
   const newCells=[];
   // The original workbook keeps the instruction examples in row 2; replace those values with real lookups.
   for(let i=1;i<rawRut.length;i++){
@@ -53,8 +64,12 @@ function processWorkbook(arrayBuffer){
     if(!r.slice(0,23).some(populated)){newCells.push(Array(10).fill(null));continue}
     stats.rows++;
     const transport=key(r[0]),customer=key(r[10]),pedido=key(r[18]);
-    let pref=preferredByTransport.get(transport);
-    if(!populated(pref)&&pedido){pref=preferredByOrder.get(pedido);if(populated(pref))stats.dateViaOrder++}
+    // Consped A = Cliente, B = Documento, F = Fecha preferente.
+    // Nunca cruzar Rutero Transporte con Consped Cliente.
+    let pref=pedido&&customer?preferred.byOrderCustomer.get(pedido+'|'+customer):undefined;
+    if(!populated(pref)&&pedido&&!preferred.conflicts.has(pedido))pref=preferred.byOrder.get(pedido);
+    if(populated(pref))stats.dateViaOrder++;
+    else if(pedido&&preferred.conflicts.has(pedido))stats.ambiguousDate++;
     const output=[monitorStatus.get(transport),destination.get(transport),monitorCarrier.get(transport),vttCounts.get(transport),pref,phone.get(customer),day,monitorTrip.get(transport),'AV55',zone.get(customer)];
     for(const [i,col] of [[0,'Status'],[1,'Destino'],[2,'Transportista'],[3,'Clientes'],[4,'Fecha Preferente Entrega'],[5,'Telefono'],[7,'Viaje'],[9,'Com']])if(!populated(output[i]))stats.notFound[col]++;
     newCells.push(output.map(v=>populated(v)?v:null));
@@ -86,7 +101,7 @@ async function save(){
   try{
     const {stats,bytes}=processWorkbook(await f.arrayBuffer());
     const noMatch=Object.entries(stats.notFound).filter(([_,num])=>num).map(([field,num])=>`${field}: ${num}`).join(' · ');
-    $('processMsg').textContent=`${stats.rows.toLocaleString('es-CO')} filas procesadas. ${stats.dateViaOrder} fechas preferentes obtenidas por Pedido/Documento.`+(noMatch?' Sin coincidencia: '+noMatch:' Todas las búsquedas tienen coincidencia.');
+    $('processMsg').textContent=`${stats.rows.toLocaleString('es-CO')} filas procesadas. ${stats.dateViaOrder} fechas preferentes obtenidas por Pedido/Documento.`+(stats.ambiguousDate?` ${stats.ambiguousDate} pedidos con fechas ambiguas (sin asignar).`:``)+(noMatch?' Sin coincidencia: '+noMatch:' Todas las búsquedas tienen coincidencia.');
     const chunks=Math.ceil(bytes.length/CHUNK_SIZE);
     uploadId=crypto.randomUUID();
     $('uploadMsg').textContent='Reservando almacenamiento del archivo diario…';
