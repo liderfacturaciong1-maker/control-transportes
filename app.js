@@ -350,7 +350,7 @@ async function login(){
   if(pr.error||!pr.data?.length){console.error("Error permisos base:",pr.error);msg.textContent="Tu PIN fue aceptado, pero no fue posible consultar los permisos principales. Contacta al administrador.";return;}
   const dp=await limited("get_user_all_permissions_by_pin",{p_pin:pin});
   if(dp.error||!dp.data?.length){console.error("Error permisos adicionales:",dp.error);msg.textContent="Tu PIN fue aceptado, pero no fue posible consultar los permisos adicionales. Contacta al administrador.";return;}
-  user=data[0];loginPin=pin;permissions={...pr.data[0],...dp.data[0]};
+  user=data[0];loginPin=pin;permissions={...pr.data[0],...dp.data[0]};const ctPermShortcut=document.getElementById("ctMainPermissionShortcuts");if(ctPermShortcut){ctPermShortcut.dataset.admin=permissions.is_admin?"yes":"no";ctPermShortcut.classList.toggle("hidden",!permissions.is_admin);}
   try{sessionStorage.setItem("transport_user",JSON.stringify(user));}catch(e){console.warn("SessionStorage:",e);}
   await loadModuleRights();await ctLoadReturnsPermission();await ctFetchActions();await showApp();msg.textContent="";
  }catch(e){console.error("No se completó el inicio de sesión:",e);msg.textContent=e.message?.includes("Tiempo de espera")?e.message:"No se pudo completar el ingreso. Verifica tu conexión y vuelve a intentarlo.";}
