@@ -217,4 +217,4 @@ async function option(category,name,remove){if(remove&&!confirm(`¿Quitar la opc
 for(const btn of document.querySelectorAll('[data-add]'))btn.onclick=()=>{const category=btn.dataset.add;option(category,$(category==='socio'?'newSocio':'newEstado').value,false)};
 if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY||!window.supabase){$('loginMsg').textContent='No se pudo inicializar Supabase';return}sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);
 })();
-</script></body></html>
+</script><script src="../permisos/entrada-modulo.js?v=2" data-modulo="atenciones-t4"></script></body></html>
