@@ -1,0 +1,64 @@
+{
+  "liquidacion-financiera": {
+    "name": "Liquidación Financiera",
+    "sections": [
+      "Pendientes",
+      "Novedades",
+      "Restricciones",
+      "Documentos",
+      "Reportes"
+    ]
+  },
+  "validaciones-operacion": {
+    "name": "Validaciones Operación",
+    "sections": [
+      "Validaciones",
+      "Control de llaves",
+      "Reportes"
+    ]
+  },
+  "seguimiento-t1": {
+    "name": "Seguimiento T1",
+    "sections": [
+      "Despachos",
+      "Tránsitos",
+      "Recuentos",
+      "Seguimiento"
+    ]
+  },
+  "facturacion-porteria": {
+    "name": "Facturación – Portería",
+    "sections": [
+      "Facturación",
+      "Portería",
+      "Reportes"
+    ]
+  },
+  "brujula-rutero": {
+    "name": "Brújula y Rutero",
+    "sections": [
+      "Archivos diarios",
+      "Procesamiento",
+      "Historial"
+    ]
+  },
+  "atenciones-t4": {
+    "name": "Atenciones T4",
+    "sections": [
+      "Citas T4",
+      "Resumen de Atención",
+      "Acumulado Atenciones",
+      "Acumulado Abonos",
+      "Configuración de socios y estados"
+    ]
+  },
+  "control-precintos": {
+    "name": "Control Precintos",
+    "sections": [
+      "Ingreso de Inventario",
+      "Inventario Actual",
+      "Entrega de Precintos",
+      "Historial"
+    ]
+  }
+}
