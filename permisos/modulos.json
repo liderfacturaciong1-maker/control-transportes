@@ -1,64 +1,23 @@
-{
-  "liquidacion-financiera": {
-    "name": "Liquidación Financiera",
-    "sections": [
-      "Pendientes",
-      "Novedades",
-      "Restricciones",
-      "Documentos",
-      "Reportes"
-    ]
-  },
-  "validaciones-operacion": {
-    "name": "Validaciones Operación",
-    "sections": [
-      "Validaciones",
-      "Control de llaves",
-      "Reportes"
-    ]
-  },
-  "seguimiento-t1": {
-    "name": "Seguimiento T1",
-    "sections": [
-      "Despachos",
-      "Tránsitos",
-      "Recuentos",
-      "Seguimiento"
-    ]
-  },
-  "facturacion-porteria": {
-    "name": "Facturación – Portería",
-    "sections": [
-      "Facturación",
-      "Portería",
-      "Reportes"
-    ]
-  },
-  "brujula-rutero": {
-    "name": "Brújula y Rutero",
-    "sections": [
-      "Archivos diarios",
-      "Procesamiento",
-      "Historial"
-    ]
-  },
-  "atenciones-t4": {
-    "name": "Atenciones T4",
-    "sections": [
-      "Citas T4",
-      "Resumen de Atención",
-      "Acumulado Atenciones",
-      "Acumulado Abonos",
-      "Configuración de socios y estados"
-    ]
-  },
-  "control-precintos": {
-    "name": "Control Precintos",
-    "sections": [
-      "Ingreso de Inventario",
-      "Inventario Actual",
-      "Entrega de Precintos",
-      "Historial"
-    ]
-  }
-}
+(function(){
+  'use strict';
+  const key=document.currentScript && document.currentScript.dataset.modulo;
+  const entries={
+    'liquidacion-financiera':'Liquidación Financiera',
+    'validaciones-operacion':'Validaciones Operación',
+    'seguimiento-t1':'Seguimiento T1',
+    'facturacion-porteria':'Facturación - Portería',
+    'brujula-rutero':'Brújula y Rutero',
+    'atenciones-t4':'Atenciones T4',
+    'control-precintos':'Control Precintos'
+  };
+  if(!entries[key])return;
+  const root=document.createElement('div');root.className='ct-module-permission-entry';
+  const b=document.createElement('button');b.type='button';b.textContent='🔐 Permisos';b.setAttribute('aria-label','Administrar permisos de '+entries[key]);
+  b.onclick=()=>{const overlay=document.createElement('div');overlay.className='ct-permissions-overlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','Permisos de '+entries[key]);
+    const container=document.createElement('div');container.className='ct-permissions-window';const title=document.createElement('div');title.className='ct-permissions-head';const strong=document.createElement('strong');strong.textContent='Permisos · '+entries[key];const close=document.createElement('button');close.type='button';close.textContent='✕ Cerrar';
+    close.onclick=()=>overlay.remove(); title.append(strong,close);
+    const iframe=document.createElement('iframe');iframe.title='Administración de permisos';iframe.src='/permisos/?modulo='+encodeURIComponent(key);container.append(title,iframe);overlay.append(container);overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove()});document.body.append(overlay);close.focus();
+  };
+  root.append(b);document.body.append(root);
+  const style=document.createElement('style');style.textContent='.ct-module-permission-entry{position:fixed;right:20px;bottom:20px;z-index:998}.ct-module-permission-entry>button{background:#12446a;color:#fff;border:1px solid #fff;padding:12px 20px;border-radius:14px;box-shadow:0 6px 20px #152c4a55;font-weight:800;font-size:15px;cursor:pointer}.ct-permissions-overlay{position:fixed;inset:0;background:#081b31b8;display:flex;align-items:center;justify-content:center;padding:12px;z-index:100000}.ct-permissions-window{width:min(1180px,100%);height:min(92vh,940px);background:#fff;border-radius:15px;display:flex;flex-direction:column;overflow:hidden}.ct-permissions-head{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:#153f60;color:white;gap:15px}.ct-permissions-head button{padding:7px 12px;background:white;color:#153f60;border:0;border-radius:7px;cursor:pointer}.ct-permissions-window iframe{width:100%;border:0;flex:1}';document.head.append(style);
+})();
