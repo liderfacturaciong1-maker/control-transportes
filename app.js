@@ -310,10 +310,10 @@ async function t1Upload(kind){const cfg=t1Settings[kind],input=$(cfg.file),file=
  if(!/\.xlsx?$/i.test(file.name)){t1Message('Solo se permiten archivos .xlsx o .xls.',true);return;}
  if(file.size>8*1024*1024){t1Message('El archivo supera 8 MB.',true);return;}
  const btn=$(cfg.button);btn.disabled=true;
- try{if(!window.XLSX)throw Error('No se pudo cargar el lector Excel.');const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
+ try{const excel=window.XLSX;if(typeof excel?.read!=='function'||typeof excel?.utils?.sheet_to_json!=='function')throw Error('No se pudo cargar el lector Excel. Actualiza la página con Ctrl+Shift+R e inténtalo nuevamente.');const buffer=await file.arrayBuffer();const wb=excel.read(buffer,{type:'array',cellDates:true});
  const sheetName=wb.SheetNames.find(n=>n.toLocaleLowerCase('es')===cfg.sheet.toLocaleLowerCase('es'));
  if(!sheetName)throw Error(`El Excel debe incluir la hoja «${cfg.sheet}».`);
- const matrix=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:'',raw:false,blankrows:false});
+ const matrix=excel.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:'',raw:false,blankrows:false});
  if(matrix.length<2)throw Error('El Excel debe incluir encabezados y al menos una fila de datos.');
  const headers=matrix[0].map(x=>String(x??''));
  const dateIndex=headers.findIndex(h=>String(h).trim().toUpperCase()==='FECHA S.M.');
