@@ -19,7 +19,7 @@
     if(event.data.type!=='CT_SSO_REPLY_V1'||event.data.nonce!==nonce||handled)return;
     if(!/^\d{1,8}$/.test(String(event.data.pin||'')))return;
     const field=document.getElementById('pin');
-    const button=document.getElementById(document.getElementById('enter')?'enter':document.getElementById('connect')?'connect':'loginBtn');
+    const button=['enter','connect','loginBtn','login'].map(id=>document.getElementById(id)).find(Boolean);
     if(!field||!button)return;
     handled=true;
     clearTimeout(timer);
