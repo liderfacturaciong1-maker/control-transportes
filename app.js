@@ -332,6 +332,27 @@ async function t1Delete(kind){const cfg=t1Settings[kind],cur=t1Cached[kind];if(!
 
 document.addEventListener('click',e=>{if(e.target.closest('#t1SummaryOpen'))t1ShowSummary();});
 async function init(){for(const [kind,c] of Object.entries(t1Settings)){$(c.button).addEventListener("click",()=>void t1Upload(kind));$(c.remove).addEventListener("click",()=>void t1Delete(kind));const toggle=$(kind==="despachos"?"t1DespachosRecountToggle":"t1TransitosRecountToggle");toggle.addEventListener("click",()=>{const panel=$(c.preview);panel.hidden=!panel.hidden;toggle.classList.toggle("active",!panel.hidden);});const pt=$(kind==="despachos"?"t1DespachosPendingToggle":"t1TransitosPendingToggle");pt.addEventListener("click",()=>{const panel=$(kind==="despachos"?"t1DespachosPending":"t1TransitosPending");panel.hidden=!panel.hidden;pt.classList.toggle("active",!panel.hidden);if(!panel.hidden)t1ArrivalRender(kind,t1Cached[kind]);});}if(!configured()){$("loginMsg").innerHTML="Falta configurar <b>config.js</b>. Revisa README.";return}if(!window.supabase?.createClient){$("loginMsg").textContent="No cargó el servicio de inicio de sesión. Verifica internet y recarga la página.";return;}sb=supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);$("mainModuleBtn").onclick=()=>switchModule("main");$("tapaModuleBtn").onclick=()=>switchModule("tapa");$("cargoPrimaryBtn").onclick=()=>switchModule(activeTopModule==="cargo"?(activeModule==="tapa"?"tapa":"main"):"main");$("checkinPrimaryBtn").onclick=()=>switchModule("checkin");$("brujulaPrimaryBtn").onclick=()=>switchModule("brujula");$("syncPrimaryBtn").onclick=()=>switchModule("sync");$("tapaFamilyFilter").onchange=renderTapa;$("tapaClientFilter").onchange=renderTapa;$("tapaSearch").oninput=renderTapa;$("loginBtn").onclick=login;$("pin").onkeydown=e=>e.key==="Enter"&&login();$("logout").onclick=logout;$("ctFinanceEntry").onclick=ctOpenFinance;$("ctValidacionesEntry").onclick=ctOpenValidaciones;$("ctReturnsBack").onclick=()=>ctBillingOpen?ctBillingCloseModule():ctCloseReturns();$("users").addEventListener("click",e=>{const finance=e.target.closest('.ctFinanceUserToggle');if(finance){void ctChangeFinancePermission(finance.dataset.user,finance.dataset.enabled!=='true');return;}const b=e.target.closest('.ctReturnsUserToggle');if(!b)return;void ctChangeReturnsPermission(b.dataset.user,b.dataset.enabled!=='true');});$("ctManualRefresh")?.addEventListener("click",()=>{void ctManualRefreshAll()});for(const id of ["smartPlate","smartTransport","smartStatus"])$(id).addEventListener(id==="smartStatus"?"change":"input",renderSmartSearch);$("smartClear").onclick=()=>{for(const id of ["smartPlate","smartTransport","smartStatus"])$(id).value="";renderSmartSearch()};$("smartResults").addEventListener("click",e=>{const b=e.target.closest(".smartGoTo");if(b)openSmartResult(b.dataset.category,b.dataset.transporte)});$("openPorteriaPending").onclick=openPorteriaPending;$("closePorteriaPending").onclick=closePorteriaPending;$("porteriaPendingModal").addEventListener("click",e=>{if(e.target.id==="porteriaPendingModal")closePorteriaPending()});document.addEventListener("keydown",e=>{if(e.key==="Escape")closePorteriaPending()});function updateCategoryTabs(){document.querySelectorAll(".categoryTab[data-category]").forEach(btn=>{const on=categoryMultiMode?selectedCategories.includes(btn.dataset.category):btn.dataset.category===activeCategory;btn.classList.toggle("active",on);btn.setAttribute("aria-selected",String(on))});$("clearCategorySelection").style.display=categoryMultiMode?"inline-block":"none";$("categorySelectionHint").textContent=categoryMultiMode?"Selección múltiple activa: haz clic en las demás pestañas para agregarlas o quitarlas.":"Para combinar pestañas, haz doble clic en la primera pestaña y luego haz clic en las demás."}document.querySelectorAll(".categoryTab[data-category]").forEach(btn=>{btn.addEventListener("dblclick",e=>{e.preventDefault();const cat=btn.dataset.category;if(cat==="Todos"){categoryMultiMode=false;selectedCategories=[];activeCategory="Todos";toast("La pestaña Todos ya reúne todas las categorías.");}else{categoryMultiMode=true;selectedCategories=[cat];activeCategory="__MULTI__";toast("Selección múltiple activada. Ahora elige las demás pestañas.");}updateCategoryTabs();ctUpdateOnlineClearButton();render()});btn.addEventListener("click",()=>{const cat=btn.dataset.category;if(categoryMultiMode){if(cat==="Todos"){categoryMultiMode=false;selectedCategories=[];activeCategory="Todos"}else{selectedCategories=selectedCategories.includes(cat)?selectedCategories.filter(x=>x!==cat):[...selectedCategories,cat];if(!selectedCategories.length){categoryMultiMode=false;activeCategory="Viajes HYM y URBAN"}}}else{activeCategory=cat;selectedCategories=[]}updateCategoryTabs();ctUpdateOnlineClearButton();render()})});$("clearCategorySelection").addEventListener("click",()=>{categoryMultiMode=false;selectedCategories=[];activeCategory="Viajes HYM y URBAN";updateCategoryTabs();ctUpdateOnlineClearButton();render()});updateCategoryTabs();setupCategoryHoverPreview();$("ctClearOnlineTrips").onclick=ctClearOnlineTrips;$("importBtn").onclick=prepareImport;$("confirmImportBtn").onclick=confirmImport;$("cancelImportBtn").onclick=cancelImport;$("previewClose").onclick=cancelImport;$("downloadBtn").onclick=downloadExcel;$("beesCompareBtn").onclick=compareBeesCsv;$("beesClearBtn").onclick=clearBeesReport;$("porteriaUploadBtn").onclick=loadPorteriaExcel;$("porteriaClearBtn").onclick=clearPorteria;$("addUser").onclick=addUser;$("saveModulePermissions").onclick=saveModulePermissionEdits;$("cancelModulePermissions").onclick=()=>$("modulePermissionEditor").classList.add("hidden");$("newRole").onchange=updateRoleOptions;$("deleteAllBtn").onclick=deleteAllTransports;$("cancelDeleteBtn").onclick=closeDeleteModal;$("confirmDeleteBtn").onclick=confirmDeleteAll;$("deleteConfirmModal").addEventListener("click",e=>{if(e.target.id==="deleteConfirmModal")closeDeleteModal()});document.querySelectorAll(".statCard").forEach(card=>{card.addEventListener("click",()=>openStatChart(card.dataset.stat));card.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openStatChart(card.dataset.stat)}})});$("statChartClose").onclick=closeStatChart;$("statChartModal").addEventListener("click",e=>{if(e.target.id==="statChartModal")closeStatChart()});document.addEventListener("keydown",e=>{if(e.key==="Escape")closeStatChart()})}
+// Sesión compartida exclusivamente con módulos del mismo origen, abierta desde la portada.
+// El PIN se conserva solo en memoria y cada módulo valida sus permisos en Supabase.
+const ctSsoWindows=new Set();
+const ctSsoAllowedPaths=new Set(['/atenciones-t4/index.html','/brujula-rutero/index.html','/liquidacion-financiera/index.html','/validaciones-operacion/index.html']);
+function ctOpenAuthorizedModule(path){
+ const url=new URL(path,location.href);
+ if(url.origin!==location.origin || !ctSsoAllowedPaths.has(url.pathname))return;
+ const child=window.open(url.href,'_blank');
+ if(child)ctSsoWindows.add(child);
+}
+window.addEventListener('message',event=>{
+ if(event.origin!==location.origin || !event.source || !event.data || event.data.type!=='CT_SSO_REQUEST_V1')return;
+ if(!loginPin || !user || !/^[-a-f0-9]{36}$/i.test(String(event.data.nonce||'')))return;
+ // Solo responder a una ventana previamente abierta por esta sesión.
+ if(!ctSsoWindows.has(event.source))return;
+ try{
+  const childUrl=new URL(event.source.location.href);
+  if(childUrl.origin!==location.origin || !ctSsoAllowedPaths.has(childUrl.pathname))return;
+  event.source.postMessage({type:'CT_SSO_REPLY_V1',nonce:event.data.nonce,pin:loginPin},location.origin);
+ }catch(e){console.warn('No se validó la ventana del módulo:',e);}
+});
 async function login(){
  const msg=$("loginMsg"),button=$("loginBtn"),pin=$("pin").value.trim();
  if(!/^\d{1,8}$/.test(pin)){msg.textContent="Ingresa tu PIN numérico de 1 a 8 dígitos.";return;}
@@ -385,7 +406,7 @@ function setupAdminModuleToggles(){document.querySelectorAll(".moduleToggle").fo
 // v5.57: módulo independiente; los permisos se consultan en Supabase, no se confía solo en ocultar botones.
 let ctFinanceAllowed=false;
 async function ctLoadFinancePermission(){ctFinanceAllowed=false;try{if(loginPin){const {data,error}=await sb.rpc('ct_finance_can_access',{p_pin:loginPin});if(error)throw error;ctFinanceAllowed=data===true;}}catch(e){console.warn('Permiso de Liquidación Financiera:',e.message);} $('ctFinanceEntry')?.classList.toggle('hidden',!ctFinanceAllowed);}
-function ctOpenFinance(){if(!ctFinanceAllowed){toast('Sin permiso para Liquidación Financiera');return;}window.open('liquidacion-financiera/index.html','_blank','noopener,noreferrer');}
+function ctOpenFinance(){if(!ctFinanceAllowed){toast('Sin permiso para Liquidación Financiera');return;}ctOpenAuthorizedModule('liquidacion-financiera/index.html');}
 // Validaciones Operación: acceso predeterminado denegado; Supabase determina la visibilidad.
 let ctValidacionesAllowed=false;
 async function ctLoadValidacionesPermission(){
@@ -398,7 +419,7 @@ async function ctOpenValidaciones(){
  if(!loginPin)return;
  await ctLoadValidacionesPermission();
  if(!ctValidacionesAllowed){toast('Sin permiso para Validaciones Operación');return;}
- window.open('validaciones-operacion/index.html','_blank','noopener,noreferrer');
+ ctOpenAuthorizedModule('validaciones-operacion/index.html');
 }
 let ctBillingAllowed=false,ctBillingOpen=false,ctBillingTabs={rotation:false,handover:false,rotation_edit:false,handover_edit:false};
 async function ctBillingLoadTabs(){
@@ -541,7 +562,10 @@ async function ctClearOnlineTrips(){
  }catch(e){console.error('[Borrado Viajes en Línea]',e);alert('No fue posible completar el borrado.\n'+(e?.message||String(e)));}
  finally{ctOnlineClearBusy=false;if(btn)btn.textContent='🗑 Eliminar viajes cargados';ctUpdateOnlineClearButton();}
 }
-function logout(){loginPin="";sessionStorage.clear();location.reload()}
+function logout(){
+ for(const child of ctSsoWindows){try{if(!child.closed)child.postMessage({type:'CT_SSO_LOGOUT_V1'},location.origin)}catch(e){}}
+ ctSsoWindows.clear();loginPin="";sessionStorage.clear();location.reload()
+}
 function updateRoleOptions(){const admin=permissions.is_admin;const opt=$("newRole").querySelector('option[value="Administrador"]');if(opt)opt.disabled=!admin;if(!admin&&$("newRole").value==="Administrador")$("newRole").value="Operativo";if(!admin){$("newCanUpload").checked=false;$("newCanCreateUsers").checked=false;$("newCanDeleteAll").checked=false;["newCanArm","newCanCount","newCanLoad","newCanAvailability","newCanPhysicalPlate"].forEach(id=>$(id).checked=false)}}
 
 // v5.46: vista flotante al hacer clic en una categoría, conservando su filtro normal.
