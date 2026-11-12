@@ -306,21 +306,72 @@ window.addEventListener('focus',()=>{const today=t1BogotaToday();if(today!==t1La
 async function t1LoadFiles(){if(!loginPin||!ctReturnsOpen)return;for(const kind of Object.keys(t1Settings)){
  try{const {data,error}=await sb.rpc('ct_t1_file_get',{p_pin:loginPin,p_kind:kind});if(error)throw error;t1Cached[kind]=data||null;t1Display(kind,data);}catch(e){$(t1Settings[kind].info).textContent='Error de consulta: '+e.message;t1Message('No se pudieron consultar los archivos T1. Instala INSTALAR_SEGUIMIENTO_T1_v571.sql en Supabase.',true);}
  }}
+// SAP exporta algunos .XLS como texto Unicode tabulado (no como libro BIFF).
+// Las posiciones se interpretan ANTES de quitar columnas vacías: la cantidad está en Q.
+function t1ParseSapDispatchText(buffer){
+ const bytes=new Uint8Array(buffer);
+ const isUTF16LE=bytes.length>1&&bytes[0]===0xff&&bytes[1]===0xfe;
+ const isUTF16BE=bytes.length>1&&bytes[0]===0xfe&&bytes[1]===0xff;
+ if(!isUTF16LE&&!isUTF16BE)return null;
+ const content=new TextDecoder(isUTF16BE?'utf-16be':'utf-16le').decode(bytes).replace(/^\uFEFF/,'');
+ if(!content.includes('\t')||!content.toUpperCase().includes('MATERIAL'))return null;
+ return content.split(/\r\n|\n|\r/).map(line=>line.split('\t'));
+}
+function t1NormalizeDispatchReport(matrix){
+ const text=v=>String(v??'').trim();
+ const headIndex=matrix.findIndex(row=>text(row[0]).toUpperCase()==='MATERIAL'&&row.some(cell=>text(cell).toUpperCase().includes('ENTREGA')));
+ if(headIndex<0)return null;
+ const header=matrix[headIndex]||[];
+ // Este diseño SAP sitúa Q=índice 16, aunque «CANTIDAD» figura en R=índice 17.
+ const isSapLayout=text(header[17]).toUpperCase()==='CANTIDAD'&&text(header[6]).toUpperCase().includes('ENTREGA');
+ if(!isSapLayout)return null;
+ const columns=[
+ ['MATERIAL',0],['DESCRIPCION',2],['NO ENTREGA',6],['POS',7],
+ ['FECHA S.M.',8],['FACTURA',9],['DESTINO',11],['ALM',12],
+ ['ORIGEN',14],['LOTE',15],['CANTIDAD',16],['UMB',18],
+ ['NO PEDIDO',19],['ALM DESTINO',20],['DESTINO ALM',21],['PLACA',22]
+ ];
+ const rows=matrix.slice(headIndex+1).filter(row=>/^\d+$/.test(text(row[0]))&&text(row[6])).map(row=>columns.map(([,i])=>text(row[i])));
+ if(!rows.length)throw Error('El reporte SAP no contiene líneas de despacho válidas.');
+ // Las columnas íntegramente vacías se omiten sin alterar la posición de Q original.
+ const keep=columns.map((_,i)=>i).filter(i=>columns[i][0]==='CANTIDAD'||rows.some(row=>row[i]!==''));
+ return {headers:keep.map(i=>columns[i][0]),rows:rows.map(row=>keep.map(i=>row[i]))};
+}
 async function t1Upload(kind){const cfg=t1Settings[kind],input=$(cfg.file),file=input.files?.[0];if(!file){t1Message('Selecciona primero el archivo Excel de '+kind+'.',true);return;}
  if(!/\.xlsx?$/i.test(file.name)){t1Message('Solo se permiten archivos .xlsx o .xls.',true);return;}
  if(file.size>8*1024*1024){t1Message('El archivo supera 8 MB.',true);return;}
  const btn=$(cfg.button);btn.disabled=true;
- try{const excel=window.XLSX;if(typeof excel?.read!=='function'||typeof excel?.utils?.sheet_to_json!=='function')throw Error('No se pudo cargar el lector Excel. Actualiza la página con Ctrl+Shift+R e inténtalo nuevamente.');const buffer=await file.arrayBuffer();const wb=excel.read(buffer,{type:'array',cellDates:true});
- const sheetName=wb.SheetNames.find(n=>n.toLocaleLowerCase('es')===cfg.sheet.toLocaleLowerCase('es'));
- if(!sheetName)throw Error(`El Excel debe incluir la hoja «${cfg.sheet}».`);
- const matrix=excel.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:'',raw:false,blankrows:false});
- if(matrix.length<2)throw Error('El Excel debe incluir encabezados y al menos una fila de datos.');
- const headers=matrix[0].map(x=>String(x??''));
- const dateIndex=headers.findIndex(h=>String(h).trim().toUpperCase()==='FECHA S.M.');
- const rows=matrix.slice(1).map(row=>headers.map((_,i)=>{
-  const v=row[i];if(i===dateIndex&&v instanceof Date&&!isNaN(v))return [v.getFullYear(),String(v.getMonth()+1).padStart(2,'0'),String(v.getDate()).padStart(2,'0')].join('-');
-  return String(v??'');
- }));
+ try{
+ const buffer=await file.arrayBuffer();
+ let matrix=t1ParseSapDispatchText(buffer),normalized=null;
+ if(matrix&&kind!=='despachos')throw Error('Este formato SAP está habilitado para Despachos.');
+ if(!matrix){
+  const excel=window.XLSX;
+  if(typeof excel?.read!=='function'||typeof excel?.utils?.sheet_to_json!=='function')throw Error('No se pudo cargar el lector Excel. Actualiza la página con Ctrl+Shift+R.');
+  const wb=excel.read(buffer,{type:'array',cellDates:true});
+  const sheetName=wb.SheetNames.find(n=>n.toLocaleLowerCase('es')===cfg.sheet.toLocaleLowerCase('es'));
+  if(!sheetName&&kind!=='despachos')throw Error(`El Excel debe incluir la hoja «${cfg.sheet}».`);
+  const selected=sheetName||wb.SheetNames[0];
+  matrix=excel.utils.sheet_to_json(wb.Sheets[selected],{header:1,defval:'',raw:false,blankrows:false});
+  if(kind==='despachos'&&!sheetName&&!t1NormalizeDispatchReport(matrix))throw Error('No se encontró la hoja «Despachos» ni un reporte SAP de despachos válido.');
+ }
+ if(kind==='despachos')normalized=t1NormalizeDispatchReport(matrix);
+ let headers,rows;
+ if(normalized){headers=normalized.headers;rows=normalized.rows;}
+ else{
+  // Para el formato habitual se eliminan filas y columnas enteramente vacías.
+  matrix=matrix.filter(row=>row.some(cell=>String(cell??'').trim()!==''));
+  if(matrix.length<2)throw Error('El Excel debe incluir encabezados y al menos una fila de datos.');
+  const width=Math.max(...matrix.map(row=>row.length));
+  const used=Array.from({length:width},(_,i)=>i).filter(i=>matrix.some(row=>String(row[i]??'').trim()!==''));
+  headers=used.map(i=>String(matrix[0][i]??'').trim());
+  const dateIndex=headers.findIndex(h=>h.toUpperCase()==='FECHA S.M.');
+  rows=matrix.slice(1).map(row=>used.map((original,i)=>{
+   const v=row[original];if(i===dateIndex&&v instanceof Date&&!isNaN(v))return [v.getFullYear(),String(v.getMonth()+1).padStart(2,'0'),String(v.getDate()).padStart(2,'0')].join('-');
+   return String(v??'').trim();
+  })).filter(row=>row.some(v=>v!==''));
+ }
+ if(!rows.length)throw Error('El archivo no contiene filas válidas.');
  if(headers[0]?.trim().toUpperCase()!=='MATERIAL'||!['DESCRIPCION','CANTIDAD'].every(n=>headers.some(h=>h.trim().toUpperCase()===n)))throw Error('Se requieren MATERIAL, DESCRIPCION y Cantidad.');
  if(!confirm(`¿Guardar «${file.name}» (${rows.length} filas)? Reemplazará solamente el archivo de ${kind}.`))return;
  const {error}=await sb.rpc('ct_t1_file_save',{p_pin:loginPin,p_kind:kind,p_filename:file.name,p_headers:headers,p_rows:rows});if(error)throw error;
