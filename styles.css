@@ -1021,3 +1021,17 @@ select.tapaState:focus-visible{outline:3px solid #f59e0b!important;outline-offse
 @media(max-width:760px){.ctPlateSplit{grid-template-columns:1fr}}
 
 .ctPlateManualActions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}.ctPlateManualActions button{flex:1;min-width:160px}.ctPlateManualHelp{margin-top:14px;padding:10px 14px;background:#f0f7fc;border-radius:10px;border:1px solid #d4e7f6}
+
+/* Cargue WIP — submódulo dentro de Seguimiento T1 */
+.wipSection{margin-top:22px;padding:22px;border:1px solid #c7dfea;background:#f7fbff;border-radius:17px;color:#18364d}
+.wipEyebrow{font-weight:800;letter-spacing:.06em;font-size:11px;color:#196989}
+.wipTitle h3{font-size:23px;margin:7px 0}.wipTitle p{margin:0 0 15px;color:#47657b}
+.wipControls{display:flex;align-items:center;flex-wrap:wrap;gap:11px;margin:14px 0}
+.wipPicker{background:#fff;border:1px solid #a6c9df;border-radius:9px;padding:10px 12px;display:flex;gap:8px;align-items:center;font-weight:750;cursor:pointer}
+.wipPicker input{max-width:230px}.wipControls button{border-radius:9px;padding:11px 15px;font-weight:800;cursor:pointer;background:#196989;color:#fff;border:0}
+.wipControls #wipDownload{background:#16794a}.wipControls button:disabled{opacity:.48;cursor:not-allowed}
+.wipMessage{margin:10px 0 14px;font-size:14px;font-weight:650;color:#185c81}.wipMessage.wipError{color:#a31f26}
+.wipStats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:15px}.wipStats>div{min-width:150px;background:#fff;padding:12px 16px;border-radius:10px;border:1px solid #d5e7ef;display:grid;gap:5px}.wipStats small{color:#536f80}.wipStats strong{font-size:25px;color:#196989}
+.wipTableScroll{overflow:auto;max-height:485px;background:#fff;border:1px solid #d5e7ef;border-radius:12px}
+.wipTable{border-collapse:collapse;font-size:12px;width:100%;min-width:1250px}.wipTable th{position:sticky;top:0;background:#232f3d;color:#fff;padding:11px 10px;white-space:nowrap;text-align:left}.wipTable td{padding:9px 10px;border-bottom:1px solid #e6edf2;white-space:nowrap}.wipTable tbody tr:nth-child(even){background:#f6f9fc}.wipTable td:nth-child(10){text-align:right;font-weight:800}.wipFoot{font-size:12px;color:#54758c;margin:10px 0 0}
+@media(max-width:720px){.wipSection{padding:13px}.wipControls{align-items:stretch;flex-direction:column}.wipPicker input{max-width:180px}}
