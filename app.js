@@ -424,7 +424,7 @@ async function login(){
   if(dp.error||!dp.data?.length){console.error("Error permisos adicionales:",dp.error);msg.textContent="Tu PIN fue aceptado, pero no fue posible consultar los permisos adicionales. Contacta al administrador.";return;}
   user=data[0];loginPin=pin;permissions={...pr.data[0],...dp.data[0]};const ctPermShortcut=document.getElementById("ctMainPermissionShortcuts");if(ctPermShortcut){ctPermShortcut.dataset.admin=permissions.is_admin?"yes":"no";ctPermShortcut.classList.toggle("hidden",!permissions.is_admin);}
   try{sessionStorage.setItem("transport_user",JSON.stringify(user));}catch(e){console.warn("SessionStorage:",e);}
-  await loadModuleRights();await ctLoadReturnsPermission();await ctFetchActions();await showApp();msg.textContent="";
+  await loadModuleRights();await ctLoadReturnsPermission();await ctFetchActions();await showApp();window.ctNavigationSession?.save(pin);msg.textContent="";
  }catch(e){console.error("No se completó el inicio de sesión:",e);msg.textContent=e.message?.includes("Tiempo de espera")?e.message:"No se pudo completar el ingreso. Verifica tu conexión y vuelve a intentarlo.";}
  finally{button.disabled=false;}
 }
@@ -520,7 +520,7 @@ function ctOpenModuleNewTab(module){
  if(!allowed){toast('No tienes permiso para abrir este módulo');return;}
  const url=new URL(location.pathname,location.href);
  url.searchParams.set('ct_modulo',module);
- window.open(url.href,'_blank','noopener');
+ window.open(url.href,'_blank');
 }
 let ctRequestedModuleOpened=false;
 function ctOpenRequestedModule(){
@@ -615,7 +615,7 @@ async function ctClearOnlineTrips(){
 }
 function logout(){
  for(const child of ctSsoWindows){try{if(!child.closed)child.postMessage({type:'CT_SSO_LOGOUT_V1'},location.origin)}catch(e){}}
- ctSsoWindows.clear();loginPin="";sessionStorage.clear();location.reload()
+ ctSsoWindows.clear();window.ctNavigationSession?.clear(true);loginPin="";sessionStorage.clear();location.reload()
 }
 function updateRoleOptions(){const admin=permissions.is_admin;const opt=$("newRole").querySelector('option[value="Administrador"]');if(opt)opt.disabled=!admin;if(!admin&&$("newRole").value==="Administrador")$("newRole").value="Operativo";if(!admin){$("newCanUpload").checked=false;$("newCanCreateUsers").checked=false;$("newCanDeleteAll").checked=false;["newCanArm","newCanCount","newCanLoad","newCanAvailability","newCanPhysicalPlate"].forEach(id=>$(id).checked=false)}}
 
@@ -1610,6 +1610,8 @@ async function clearBeesReport(){
 }
 
 init();
+// Restaurar la sesión al volver al inicio / recargar (Supabase valida otra vez permisos).
+(()=>{const restore=()=>{const p=window.ctNavigationSession?.get();const input=document.getElementById('pin'),btn=document.getElementById('loginBtn');if(p&&input&&btn&&!input.value){input.value=p;btn.click();}};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',restore,{once:true});else setTimeout(restore,0);})();
 
 function deleteAllTransports(){if(!permissions.can_delete_all_transports&&!permissions.is_admin){toast("No tienes permiso para eliminar todos los transportes.");return}if(!records.length){toast("No hay transportes para eliminar.");return}$("deleteConfirmCount").textContent=String(records.length);$("deleteConfirmModal").classList.remove("hidden");$("confirmDeleteBtn").focus()}function closeDeleteModal(){$("deleteConfirmModal").classList.add("hidden")}async function confirmDeleteAll(){if(!permissions.can_delete_all_transports&&!permissions.is_admin){closeDeleteModal();toast("No tienes permiso para eliminar todos los transportes.");return}if(!records.length){closeDeleteModal();toast("No hay transportes para eliminar.");return}const count=records.length;$("confirmDeleteBtn").disabled=true;$("confirmDeleteBtn").textContent="Eliminando…";const{data,error}=await sb.rpc("delete_all_transports_secure",{p_pin:loginPin});$("confirmDeleteBtn").disabled=false;$("confirmDeleteBtn").textContent="Sí, eliminar todos";if(error){closeDeleteModal();toast("No se pudo eliminar: "+error.message);return}closeDeleteModal();toast(`Se eliminaron ${data?.deleted??count} transportes y se vació Tapa Códigos KA. El historial se conservó.`);await refresh()}
 
