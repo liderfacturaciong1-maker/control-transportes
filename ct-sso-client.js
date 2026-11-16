@@ -3,7 +3,8 @@
 (() => {
   'use strict';
   if(window.parent !== window) return; // Las vistas embebidas conservan su autenticacion actual.
-  if(!window.opener || window.opener === window) return;
+  const openerAvailable=!!(window.opener && window.opener!==window);
+  if(!openerAvailable && !window.ctNavigationSession?.get()) return;
   if(typeof crypto?.randomUUID !== 'function') return;
   const nonce=crypto.randomUUID();
   let handled=false;
@@ -24,11 +25,21 @@
     handled=true;
     clearTimeout(timer);
     field.value=String(event.data.pin);
+    window.ctNavigationSession?.save(event.data.pin);
     // La validación de permisos del módulo continúa ejecutándose en Supabase.
     button.click();
   }
   window.addEventListener('message',accept);
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',request,{once:true});
-  else request();
+  function start(){
+    const cached=window.ctNavigationSession?.get();
+    if(cached){
+      const field=document.getElementById('pin');
+      const button=['enter','connect','loginBtn','login'].map(id=>document.getElementById(id)).find(Boolean);
+      if(field&&button){handled=true;field.value=cached;button.click();return;}
+    }
+    if(openerAvailable)request();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
+  else start();
   timer=setTimeout(()=>{if(!handled){window.removeEventListener('message',accept);}},12000);
 })();
