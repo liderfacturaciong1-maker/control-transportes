@@ -228,4 +228,4 @@ $('agregarEstadoCitas').onclick=async()=>{if(!rights?.is_admin)return;const nomb
 for(const btn of document.querySelectorAll('[data-add]'))btn.onclick=()=>{const category=btn.dataset.add;option(category,$(category==='socio'?'newSocio':'newEstado').value,false)};
 if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY||!window.supabase){$('loginMsg').textContent='No se pudo inicializar Supabase';return}sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);
 })();
-</script><script src="../permisos/entrada-modulo.js?v=2" data-modulo="atenciones-t4"></script><script src="../ct-session.js?v=4" defer></script><script src="../ct-sso-client.js?v=4" defer></script></body></html>
+</script><script src="../permisos/entrada-modulo.js?v=2" data-modulo="atenciones-t4"></script><script src="../ct-session.js?v=20261116-sox1" defer></script><script src="../ct-sso-client.js?v=20261116-sox1" defer></script></body></html>
