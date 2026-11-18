@@ -1,0 +1,13 @@
+DESPACHOS URBAN - Control Operación CD Girardota
+
+1. En Supabase > SQL Editor, ejecutar despachos-urban/INSTALAR_SUPABASE.sql con un usuario autorizado.
+2. Publicar todos los archivos de este ZIP en la misma web actual (incluida la nueva carpeta despachos-urban).
+3. Ingresar como Administrador. Aparecerá la tarjeta DESPACHOS URBAN.
+4. Entrar en el módulo y, al final de la página, marcar permisos Ver / Agregar / Despachar a los usuarios.
+5. Los usuarios con permiso verán la nueva tarjeta en el menú después de ingresar su PIN.
+6. Para enviar correo, marcar los registros pendientes, pulsar «Enviar correo · Copiar» y pegar con Ctrl+V en su correo.
+7. Para mover registros, seleccionar y pulsar «Despachado». Quedan visibles en el histórico Despachados.
+
+IMPORTANTE: No se ejecutó la migración contra la base de datos real. Hasta realizar el paso 1, el módulo no funcionará.
+Los datos quedan en Supabase. No se emplea localStorage para registros.
+No se envían emails automáticamente.
