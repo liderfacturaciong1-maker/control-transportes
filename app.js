@@ -585,6 +585,13 @@ async function ctSoxCheck(){
    if(!error&&data?.can_access===true)btn.classList.remove('hidden');
  }catch(e){console.warn('SOX Girardota pendiente de migración:',e.message);}
 }
+async function ctUrbanCheck(){
+ const btn=document.getElementById('ctUrbanEntry');if(!btn)return;
+ btn.classList.add('hidden');if(!loginPin||!sb)return;
+ try{const {data,error}=await sb.rpc('ct_urban_rights',{p_pin:loginPin});
+  if(!error&&data?.can_view===true)btn.classList.remove('hidden');
+ }catch(e){console.warn('Despachos Urban requiere configurar su SQL:',e.message)}
+}
 async function ctT4Check(){
  const btn=document.getElementById('ctT4Entry');if(!btn)return;
  btn.classList.add('hidden');
@@ -593,7 +600,7 @@ async function ctT4Check(){
   if(!error&&data?.can_view===true)btn.classList.remove('hidden');
  }catch(err){console.warn('Atenciones T4 aún no configurado:',err)}
 }
-async function showApp(){void ctT4Check();void ctSoxCheck();$("ctReturnsEntry")?.classList.toggle("hidden",!ctReturnsAllowed);$("ctPorteriaBillingEntry")?.classList.toggle("hidden",!ctBillingAllowed);$("ctFinanceEntry")?.classList.toggle("hidden",!ctFinanceAllowed);$("ctValidacionesEntry")?.classList.toggle("hidden",!ctValidacionesAllowed);$("ctPrecintosEntry")?.classList.remove("hidden");$("ctManualRefresh")?.classList.remove("hidden");$("login").classList.add("hidden");$("app").classList.remove("hidden");$("logout").classList.remove("hidden");$("userName").textContent=user.name;$("connection").textContent="● Conectado";if(permissions.can_upload||permissions.is_admin)$("uploadPanel").classList.remove("hidden");if(permissions.can_create_users||permissions.is_admin)$("usersPanel").classList.remove("hidden");if(permissions.can_delete_all_transports||permissions.is_admin)$("deletePanel").classList.remove("hidden");if(permissions.is_admin||permissions.can_create_users){$("checkinPermissionLabel").classList.remove("hidden")}$("historyPanel").classList.toggle("hidden",!permissions.is_admin);setupAdminModuleToggles();setupCheckinCollapses();ctSetupCheckinFilters();ctSetupActionSettings();applyModuleRights();if(permissions.is_admin){$("permissionLabel").classList.remove("hidden");$("createPermissionLabel").classList.remove("hidden");$("deletePermissionLabel").classList.remove("hidden");$("statusPermissionLabels").classList.remove("hidden")}updateRoleOptions();await refresh();await refreshCheckin();await loadSharedCheckin();subscribe();if(permissions.is_admin)loadUsers();if(!canModule("cargo","view"))switchModule(canModule("checkin","view")?"checkin":"brujula");else playCargoSplash();ctOpenRequestedModule()}
+async function showApp(){void ctUrbanCheck();void ctT4Check();void ctSoxCheck();$("ctReturnsEntry")?.classList.toggle("hidden",!ctReturnsAllowed);$("ctPorteriaBillingEntry")?.classList.toggle("hidden",!ctBillingAllowed);$("ctFinanceEntry")?.classList.toggle("hidden",!ctFinanceAllowed);$("ctValidacionesEntry")?.classList.toggle("hidden",!ctValidacionesAllowed);$("ctPrecintosEntry")?.classList.remove("hidden");$("ctManualRefresh")?.classList.remove("hidden");$("login").classList.add("hidden");$("app").classList.remove("hidden");$("logout").classList.remove("hidden");$("userName").textContent=user.name;$("connection").textContent="● Conectado";if(permissions.can_upload||permissions.is_admin)$("uploadPanel").classList.remove("hidden");if(permissions.can_create_users||permissions.is_admin)$("usersPanel").classList.remove("hidden");if(permissions.can_delete_all_transports||permissions.is_admin)$("deletePanel").classList.remove("hidden");if(permissions.is_admin||permissions.can_create_users){$("checkinPermissionLabel").classList.remove("hidden")}$("historyPanel").classList.toggle("hidden",!permissions.is_admin);setupAdminModuleToggles();setupCheckinCollapses();ctSetupCheckinFilters();ctSetupActionSettings();applyModuleRights();if(permissions.is_admin){$("permissionLabel").classList.remove("hidden");$("createPermissionLabel").classList.remove("hidden");$("deletePermissionLabel").classList.remove("hidden");$("statusPermissionLabels").classList.remove("hidden")}updateRoleOptions();await refresh();await refreshCheckin();await loadSharedCheckin();subscribe();if(permissions.is_admin)loadUsers();if(!canModule("cargo","view"))switchModule(canModule("checkin","view")?"checkin":"brujula");else playCargoSplash();ctOpenRequestedModule()}
 // v5.63: borrar solo Viajes en Línea y verificar en el servidor ANTES y DESPUÉS.
 let ctOnlineClearBusy=false;
 function ctUpdateOnlineClearButton(){
