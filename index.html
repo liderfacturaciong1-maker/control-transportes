@@ -281,6 +281,14 @@ a#ctReturnsEntry.hidden,a#ctPorteriaBillingEntry.hidden,a#ctPrecintosEntry.hidde
 .ctFinanceUserToggle{display:none!important}
 .ctReturnsUserToggle{display:inline-flex!important;align-items:center;justify-content:center}
 #ctUserPermissionDrawer.hidden{display:none!important}
+</style><style id="ctInventarioPortadaStyle">
+/* Acceso a inventario en la portada ANTES de iniciar sesión, encima de los logos. */
+.ctInventarioPortada{position:absolute;z-index:14;left:50%;top:22%;transform:translateX(-50%);display:flex;align-items:center;gap:13px;padding:12px 21px;border:2px solid #70dbff;border-radius:20px;background:linear-gradient(135deg,#083151f2,#0b5a8cf2);color:#fff!important;text-decoration:none!important;box-shadow:0 8px 25px #001b35bb,0 0 22px #25baff5c;font-weight:800;white-space:nowrap;transition:transform .15s ease,box-shadow .15s ease;min-width:240px;justify-content:center}
+.ctInventarioPortada:hover,.ctInventarioPortada:focus-visible{transform:translateX(-50%) translateY(-3px);box-shadow:0 8px 30px #001b35bb,0 0 30px #25baffad;outline:3px solid #ffe27a;outline-offset:3px}
+.ctInventarioPortadaIcon{font-size:43px;line-height:1;position:relative;display:inline-flex;align-items:center;justify-content:center}
+.ctInventarioPortadaIcon span{position:absolute;top:9px;left:20px;font-size:10px;line-height:10px;color:#0d3762;text-shadow:0 0 2px #fff;font-weight:900}
+.ctInventarioPortadaText{display:flex;flex-direction:column;gap:2px;font-size:17px}.ctInventarioPortadaText small{font-size:11px;font-weight:600;color:#c9ebff}
+@media(max-width:760px){.ctInventarioPortada{top:26%;min-width:0;width:min(280px,74vw);padding:10px 13px;gap:8px}.ctInventarioPortadaIcon{font-size:34px}.ctInventarioPortadaIcon span{font-size:8px;top:8px;left:17px;line-height:8px}.ctInventarioPortadaText{font-size:14px}.ctInventarioPortadaText small{font-size:10px}}
 </style></head><body><!-- PORTADA v5.36 | Sin logos superpuestos; botones activos -->
 <section aria-label="Bienvenida a Control Operación CD Girardota" class="ctWelcome" id="welcomeScreen">
 <div aria-label="Portada futurista de operación logística conectada en movimiento" class="ctWelcomeStage" role="img">
@@ -292,6 +300,7 @@ a#ctReturnsEntry.hidden,a#ctPorteriaBillingEntry.hidden,a#ctPrecintosEntry.hidde
 <span class="ctHotspotLabel">Logística Inteligente Solution</span>
 <span aria-hidden="true" class="ctHotspotArrow">→</span>
 </button>
+<a id="ctInventarioPortada" class="ctInventarioPortada" href="modulo-inventario/index.html" aria-label="Abrir Módulo Inventario con PIN autorizado" title="Módulo Inventario · Usuarios autorizados"><span class="ctInventarioPortadaIcon" aria-hidden="true">📒<span>1<br>2<br>3</span></span><span class="ctInventarioPortadaText">Módulo Inventario<small>Acceso con permiso</small></span></a>
 <div aria-hidden="true" class="ctTouchHand" id="ctTouchHand"></div>
 <div aria-hidden="true" class="ctTouchPulse" id="ctTouchPulse"></div>
 </div>
