@@ -8,8 +8,23 @@
 .countsTop{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin:9px 0}
 .completeDownload{background:#138553;color:#fff}.countsLayout{display:grid;grid-template-columns:minmax(340px,1fr) minmax(530px,1.2fr);gap:14px;align-items:start;margin-top:15px}
 .countsBox{border:1px solid #c8dfed;border-radius:14px;background:#f7fbfe;padding:15px;min-width:0}.countsBox h3{margin:0 0 12px;color:#174c70;font-size:17px}
-.countForm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.countForm label{display:flex;flex-direction:column;font-size:12px;font-weight:800;color:#1c4b68;gap:5px}.countForm input{height:43px;padding:9px 11px;border:1px solid #b6d1e3;border-radius:9px;min-width:0;width:100%;font:inherit;background:#fff}.countForm .skuField{grid-column:1/-1}.countForm .countDescription{grid-column:1/-1;color:#51758d;font-size:12px;min-height:20px}.countForm .siteField{grid-column:1/-1}.countActions{grid-column:1/-1;display:flex;justify-content:flex-end}.countNow{background:#d12d32;color:white;min-width:130px;font-size:14px}.countNow:hover{background:#b92026}.countsToolbar{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.countsToolbar input{width:min(220px,100%);border:1px solid #bfd5e5;border-radius:8px;padding:9px;font:inherit}.countsWrap{max-height:60vh;overflow:auto;border:1px solid #c6dce9;border-radius:10px;background:#fff}.countsTable{min-width:630px;font-size:12px}.countsTable th{padding:10px 8px}.countsTable td{padding:9px 8px}.countsTable td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}.countsEmpty{text-align:center;color:#57788d;padding:20px!important}.countsInfo{margin:8px 0;color:#58748b;font-size:12px}.countForm input:disabled{background:#e9f0f4}.countsFooter{margin-top:10px;font-size:12px;color:#557187}
-@media(max-width:1050px){.countsLayout{grid-template-columns:1fr}}@media(max-width:560px){.countsBox{padding:10px}.countForm{grid-template-columns:1fr}.countForm .skuField,.countForm .siteField,.countForm .countDescription,.countActions{grid-column:1}}
+.countForm{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.countForm label{display:flex;flex-direction:column;font-size:12px;font-weight:800;color:#1c4b68;gap:5px}.countForm input{height:43px;padding:9px 11px;border:1px solid #b6d1e3;border-radius:9px;min-width:0;width:100%;font:inherit;background:#fff}.countForm .skuField{grid-column:1/-1}.countForm .countDescription{grid-column:1/-1;color:#51758d;font-size:12px;min-height:20px}.countForm .siteField{grid-column:1/-1}.countActions{grid-column:1/-1;display:flex;justify-content:flex-end}.countNow{background:#d12d32;color:white;min-width:130px;font-size:14px}.countNow:hover{background:#b92026}.countsToolbar{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.countsToolbar input{width:min(220px,100%);border:1px solid #bfd5e5;border-radius:8px;padding:9px;font:inherit}.countsWrap{max-height:60vh;overflow:auto;border:1px solid #c6dce9;border-radius:10px;background:#fff}.countsTable{min-width:630px;font-size:12px}.countsTable th{padding:10px 8px}.countsTable td{padding:9px 8px}.countsTable td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}.countsEmpty{text-align:center;color:#57788d;padding:20px!important}.countsInfo{margin:8px 0;color:#58748b;font-size:12px}.countForm input:disabled{background:#e9f0f4}.countsFooter{margin-top:10px;font-size:12px;color:#557187}
+@media(max-width:1050px){.countsLayout{grid-template-columns:1fr}}@media(max-width:700px){
+ .countsLayout{grid-template-columns:minmax(0,1fr);gap:10px}
+ .countsBox{padding:12px}
+ .countForm{grid-template-columns:1fr;gap:12px}
+ .countForm .skuField,.countForm .siteField,.countForm .countDescription,.countActions{grid-column:1}
+ .countForm input{height:52px;font-size:16px}
+ .countActions{justify-content:stretch}
+ .countNow{width:100%;min-height:54px;font-size:17px}
+ .countsToolbar{align-items:stretch}
+ .countsToolbar button{min-height:44px}
+ .countsTop button{width:100%;min-height:48px}
+ .countsWrap{max-height:45vh;-webkit-overflow-scrolling:touch}
+ .subbar{overflow-x:auto;flex-wrap:nowrap;padding-bottom:6px}
+ .subbar .tab{flex:0 0 auto;min-height:44px;font-size:13px}
+ .countForm input:focus{outline:2px solid #1477ae;outline-offset:1px}
+}
 </style></head><body>
 <header><div><h1>📒 Módulo Inventario</h1><small>CD Girardota · Control por SKU</small></div><a href="../index.html">← Control de Transportes</a></header>
 <main><section class="card login" id="loginPanel"><div class="emoji">📒🔢</div><h2>Acceso a Inventario</h2><p>Ingresa con tu PIN de Control de Transportes. El contenido se consulta y guarda en Supabase únicamente con permiso.</p><form id="inventoryLogin"><label for="pin">PIN personal</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" pattern="[0-9]{1,8}" required><button id="enter" type="submit">🔓 Ingresar</button><p id="loginError" class="error" role="alert"></p></form></section>
@@ -25,9 +40,8 @@
       <label class="skuField">SKU<input id="countSku" type="text" maxlength="80" autocomplete="off" placeholder="Escribe el SKU" required></label>
       <div id="countDescription" class="countDescription">Ingresa un SKU para habilitar las cantidades.</div>
       <label>CANT UNDS<input id="countUnits" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
-      <label>CANT<input id="countQty" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
-      <label>CAJAS<input id="countBoxes" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
-      <label>CANTIDAD ESTIBAS<input id="countPallets" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
+      <label>CANT CAJAS<input id="countBoxes" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
+      <label>CANT ESTIBAS<input id="countPallets" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
       <label class="siteField">SITIO (opcional)<input id="countSite" type="text" maxlength="240" placeholder="Escribe el lugar o la novedad" disabled></label>
       <div class="countActions"><button class="countNow" id="countSubmit" type="submit" disabled>CONTAR</button></div>
     </form><p class="countsFooter">Al pulsar CONTAR se guarda el movimiento y se limpia el formulario. Los SKU repetidos se acumulan en el resumen.</p>
@@ -35,7 +49,7 @@
   <section class="countsBox" aria-label="Resumen conteos"><div class="countsToolbar"><h3>📊 RESUMEN CONTEOS · <span id="countSummaryType">PET</span></h3><button id="downloadSummary" class="secondary" type="button">⬇ Descargar resumen Excel</button></div>
     <div class="countsToolbar"><input type="search" id="countSearch" placeholder="Buscar SKU o descripción" aria-label="Buscar en resumen"><strong id="countsTotal" class="pill">0 SKU</strong></div>
     <div class="countsWrap"><table class="countsTable"><thead><tr><th>SKU</th><th>DESCRIPCIÓN</th><th>CANT UN</th><th>CANT CAJ</th><th>CANT EST</th><th>NOVEDAD</th></tr></thead><tbody id="countSummaryRows"></tbody></table></div>
-    <p class="countsInfo">CANT UN acumula «CANT UNDS» + «CANT». CANT CAJ acumula «CAJAS». CANT EST acumula «CANTIDAD ESTIBAS». NOVEDAD reúne los sitios registrados sin duplicarlos. Cada entrada se conserva por separado en Supabase.</p>
+    <p class="countsInfo">CANT UN acumula «CANT UNDS». CANT CAJ acumula «CANT CAJAS». CANT EST acumula «CANT ESTIBAS». NOVEDAD reúne los sitios registrados sin duplicarlos. Cada entrada se conserva por separado en Supabase.</p>
   </section>
 </div>
 <div class="summary"><div class="metric"><b id="metricRows">0</b><span>SKU registrados en esta pestaña</span></div><div class="metric"><b id="metricInBd">0</b><span>SKU encontrados en BD</span></div><div class="metric"><b id="metricMissing">0</b><span>SKU sin coincidencia en BD</span></div></div>
@@ -50,6 +64,7 @@ const $=id=>document.getElementById(id);
 const COLUMNS=['SKU','DESCRIPCION','CANTIDAD UN','CANTIDAD','CA CANTIDAD EST'];
 const TABS=['PFN','PNC','ROTURAS','REEMPAQUE','VERTIMIENTO','ZEXI','BD','CONTEOS'];
 const COUNT_TYPES=['PET','LATA','TW','RN'];
+let countSyncTimer=null,countSyncBusy=false,countSyncOnline=true;
 let sb, pin='', section='PFN',subsection='', rows=[], countSummaries=[], saving=false, visible=new Set(TABS);
 const status=(message,bad=false)=>{const e=$('status');e.textContent=message;e.style.color=bad?'#a82626':'#176193'};
 const key=(sect,sub='')=>sect+'|'+sub;
@@ -64,8 +79,37 @@ const bdMap=()=>new Map(rows.filter(r=>r.seccion==='BD').map(r=>[normalizeSku(r.
 function mk(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
 try{const cfg=window.APP_CONFIG||{};if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY||!window.supabase||!window.XLSX)throw Error('Falta conexión o lector Excel');sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY,{auth:{persistSession:false}})}catch(e){$('loginError').textContent='No se cargó la conexión o el lector de Excel';return}
 async function rpc(name,args){const {data,error}=await sb.rpc(name,{p_pin:pin,...args});if(error)throw Error(error.message||'Error de conexión');return data}
-async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;window.ctNavigationSession?.save(candidate);$('pin').value='';await load();$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');render();}catch(e){pin='';$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
+async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;window.ctNavigationSession?.save(candidate);$('pin').value='';await load();$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');render();startCountSync();}catch(e){pin='';$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
 async function load(){const [data,counts]=await Promise.all([rpc('ct_inventory_rows_list',{}),rpc('ct_inventory_counts_list',{})]);rows=Array.isArray(data)?data:[];countSummaries=Array.isArray(counts)?counts:[];}
+// Sincronización periódica con la base compartida: no requiere habilitar RLS de lectura pública.
+// Se consulta solo el agregado autorizado mediante PIN (RPC), sin exponer movimientos individuales.
+function stopCountSync(){if(countSyncTimer!==null){clearInterval(countSyncTimer);countSyncTimer=null;}}
+async function syncCountSummaries(force=false){
+ if(!pin||countSyncBusy||(!force&&document.visibilityState==='hidden'))return;
+ countSyncBusy=true;
+ try{
+  const fresh=await rpc('ct_inventory_counts_list',{});
+  const next=Array.isArray(fresh)?fresh:[];
+  if(JSON.stringify(next)!==JSON.stringify(countSummaries)){
+   countSummaries=next;
+   if(section==='CONTEOS')renderCountSummary();
+  }
+  countSyncOnline=true;
+  $('syncInfo').textContent='● Conteos sincronizados · aprox. 3 s';
+  $('syncInfo').style.color='#177547';
+ }catch(e){
+  countSyncOnline=false;
+  $('syncInfo').textContent='● Sin conexión · reintentando';
+  $('syncInfo').style.color='#ad2a2a';
+ }finally{countSyncBusy=false;}
+}
+function startCountSync(){
+ stopCountSync();
+ $('syncInfo').textContent='● Actualización automática · 3 s';
+ countSyncTimer=setInterval(()=>syncCountSummaries(),3000);
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&pin)syncCountSummaries(true)});
+window.addEventListener('online',()=>{if(pin)syncCountSummaries(true)});
 function selectTab(tab,sub){section=tab;subsection=tab==='CONTEOS'?(sub||subsection||'PET'):'';$('search').value='';clearCountForm();render();}
 function renderTabs(){const bar=$('mainTabs');bar.replaceChildren();for(const t of TABS){if(!visible.has(t))continue;const b=mk('button','tab'+(section===t?' active':''),t);b.type='button';b.addEventListener('click',()=>selectTab(t));bar.append(b)}const vs=$('visibilityOptions');vs.replaceChildren();for(const t of TABS){const lab=mk('label'),cb=mk('input');cb.type='checkbox';cb.checked=visible.has(t);cb.addEventListener('change',()=>{if(cb.checked)visible.add(t);else if(visible.size>1)visible.delete(t);else{cb.checked=true;status('Debe permanecer visible al menos una pestaña.',true);return}if(!visible.has(section))section=[...visible][0];render()});lab.append(cb,document.createTextNode(' '+t));vs.append(lab)}
 const sbBar=$('conteosTabs');sbBar.classList.toggle('hidden',section!=='CONTEOS');sbBar.replaceChildren();if(section==='CONTEOS')for(const t of COUNT_TYPES){const b=mk('button','tab sub'+(subsection===t?' active':''),t);b.type='button';b.addEventListener('click',()=>selectTab('CONTEOS',t));sbBar.append(b)}}
@@ -77,21 +121,21 @@ function download(data,name){if(!data.length){status('No hay registros para desc
 async function uploadBD(){const file=$('bdFile').files?.[0];if(!file){status('Selecciona un archivo Excel.',true);return}const btn=$('uploadBD');btn.disabled=true;try{const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array'}),sheet=wb.Sheets[wb.SheetNames.includes('BD')?'BD':wb.SheetNames[0]];if(!sheet)throw Error('No se encontró ninguna hoja.');const raw=XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false});if(!raw.length)throw Error('El Excel no contiene registros.');const norm=s=>String(s??'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9]/g,'');const data=[];const seen=new Set();for(const obj of raw){const cols=Object.entries(obj).map(([k,v])=>[norm(k),v]);const get=(...names)=>{for(const n of names){const x=cols.find(([k])=>k===norm(n));if(x)return clean(x[1])}return ''};const sku=normalizeSku(get('SKU','CODIGO SKU','CODIGO'));if(!sku)continue;if(seen.has(sku))throw Error('SKU duplicado dentro del Excel: '+sku);seen.add(sku);data.push({sku,descripcion:get('DESCRIPCION','DESCRIPCIÓN'),cantidad_un:get('CANTIDAD UN','CANTIDAD UNITARIA'),cantidad:get('CANTIDAD'),ca_cantidad_est:get('CA CANTIDAD EST')})}if(!data.length)throw Error('No se encontró la columna SKU con datos.');if(!confirm('Se reemplazarán los '+getRows().length+' registros actuales de BD por '+data.length+' SKU del Excel. Las demás pestañas NO se borrarán. ¿Continuar?'))return;status('Cargando '+data.length+' SKU a la BD compartida…');await rpc('ct_inventory_bd_replace',{p_rows:data});await load();render();$('bdFile').value='';status('BD actualizada: '+data.length+' SKU cargados correctamente.')}catch(e){status('Error al cargar BD: '+e.message,true)}finally{btn.disabled=false}}
 function renderCross(){const tbody=$('crossRows');tbody.replaceChildren();const bd=bdMap();const sku=normalizeSku($('search').value),other=rows.filter(r=>r.seccion!=='BD'&&(!sku||r.sku.toUpperCase().includes(sku)||(r.descripcion||'').toUpperCase().includes(sku))).sort((a,b)=>a.sku.localeCompare(b.sku,'es',{numeric:true}));for(const r of other.slice(0,1500)){const tr=mk('tr'),cells=[r.sku,bd.get(normalizeSku(r.sku))?.descripcion||r.descripcion||'Sin coincidencia BD',r.seccion==='CONTEOS'?'CONTEOS · '+r.subseccion:r.seccion,r.cantidad_un,r.cantidad,r.ca_cantidad_est];for(const v of cells){tr.append(mk('td','',display(v)))}tbody.append(tr)}if(!other.length){const tr=mk('tr'),td=mk('td','', 'Aún no hay registros de otras secciones para cruzar.');td.colSpan=6;tr.append(td);tbody.append(tr)}}
 
-const countInputs=['countUnits','countQty','countBoxes','countPallets','countSite'];
+const countInputs=['countUnits','countBoxes','countPallets','countSite'];
 function countReady(){const sku=normalizeSku($('countSku').value);const enabled=sku.length>0;for(const id of countInputs)$(id).disabled=!enabled;$('countSubmit').disabled=!enabled;const bd=bdMap().get(sku);$('countDescription').textContent=!enabled?'Ingresa un SKU para habilitar las cantidades.':(bd?'Descripción BD: '+(bd.descripcion||'Sin descripción'):'SKU no encontrado en BD; se permite contar y aparecerá sin descripción hasta actualizar BD.');}
 function clearCountForm(){$('countEntryForm').reset();countReady();}
 function currentCountSummary(type=subsection){return countSummaries.filter(r=>r.subseccion===type).sort((a,b)=>String(a.sku).localeCompare(String(b.sku),'es',{numeric:true}));}
 function summaryDescription(r){return bdMap().get(normalizeSku(r.sku))?.descripcion||r.descripcion||'';}
 function renderCountSummary(){if(section!=='CONTEOS')return;$('activeCountType').textContent=subsection;$('countSummaryType').textContent=subsection;const all=currentCountSummary(),term=$('countSearch').value.trim().toLowerCase(),data=all.filter(r=>[r.sku,summaryDescription(r),r.novedad].some(x=>String(x||'').toLowerCase().includes(term)));$('countsTotal').textContent=all.length+' SKU';const body=$('countSummaryRows');body.replaceChildren();for(const r of data){const tr=mk('tr');for(const [i,value] of [r.sku,summaryDescription(r),r.cant_un,r.cant_caj,r.cant_est,r.novedad].entries()){const td=mk('td','',String(value??''));if(i>=2&&i<=4)td.className='num';tr.append(td)}body.append(tr)}if(!data.length){const tr=mk('tr'),td=mk('td','countsEmpty',all.length?'No hay coincidencias.':'No se han registrado conteos en '+subsection+'.');td.colSpan=6;tr.append(td);body.append(tr)}}
 function countNumber(id){const raw=$(id).value.trim().replace(',','.');if(!raw)return 0;const n=Number(raw);if(!Number.isFinite(n)||n<0||n>1e12)throw Error('La cantidad debe ser un número positivo o cero válido.');return n;}
-async function recordCount(e){e.preventDefault();if(section!=='CONTEOS')return;const type=subsection,sku=normalizeSku($('countSku').value);if(!sku){status('Ingresa un SKU.',true);return}const btn=$('countSubmit');try{const units=countNumber('countUnits'),qty=countNumber('countQty'),boxes=countNumber('countBoxes'),pallets=countNumber('countPallets');if(units+qty+boxes+pallets<=0)throw Error('Ingresa al menos una cantidad mayor que cero.');btn.disabled=true;await rpc('ct_inventory_count_add',{p_subseccion:type,p_sku:sku,p_cant_unds:units,p_cant:qty,p_cajas:boxes,p_estibas:pallets,p_sitio:$('countSite').value.trim()});const counts=await rpc('ct_inventory_counts_list',{});countSummaries=Array.isArray(counts)?counts:[];clearCountForm();renderCountSummary();status('Conteo registrado y acumulado: '+sku+' · '+type);$('countSku').focus()}catch(err){status('No se pudo registrar el conteo: '+err.message,true)}finally{countReady()}}
+async function recordCount(e){e.preventDefault();if(section!=='CONTEOS')return;const type=subsection,sku=normalizeSku($('countSku').value);if(!sku){status('Ingresa un SKU.',true);return}const btn=$('countSubmit');try{const units=countNumber('countUnits'),boxes=countNumber('countBoxes'),pallets=countNumber('countPallets');if(units+boxes+pallets<=0)throw Error('Ingresa al menos una cantidad mayor que cero.');btn.disabled=true;await rpc('ct_inventory_count_add',{p_subseccion:type,p_sku:sku,p_cant_unds:units,p_cant:0,p_cajas:boxes,p_estibas:pallets,p_sitio:$('countSite').value.trim()});const counts=await rpc('ct_inventory_counts_list',{});countSummaries=Array.isArray(counts)?counts:[];clearCountForm();renderCountSummary();status('Conteo registrado y acumulado: '+sku+' · '+type);$('countSku').focus();syncCountSummaries(true)}catch(err){status('No se pudo registrar el conteo: '+err.message,true)}finally{countReady()}}
 function summaryExcelRows(type){return currentCountSummary(type).map(r=>({SKU:r.sku,'DESCRIPCIÓN':summaryDescription(r),'CANT UN':Number(r.cant_un)||0,'CANT CAJ':Number(r.cant_caj)||0,'CANT EST':Number(r.cant_est)||0,NOVEDAD:r.novedad||''}))}
 function downloadCountSheets(all){const types=all?COUNT_TYPES:[subsection];const wb=XLSX.utils.book_new();for(const type of types){const arr=summaryExcelRows(type),headers=['SKU','DESCRIPCIÓN','CANT UN','CANT CAJ','CANT EST','NOVEDAD'];const sheet=XLSX.utils.json_to_sheet(arr,{header:headers});if(!arr.length)XLSX.utils.sheet_add_aoa(sheet,[headers],{origin:'A1'});sheet['!cols']=[{wch:18},{wch:44},{wch:16},{wch:16},{wch:16},{wch:38}];XLSX.utils.book_append_sheet(wb,sheet,type)}XLSX.writeFile(wb,all?'Inventario_Conteos_Descarga_Completa.xlsx':'Inventario_Resumen_Conteos_'+subsection+'.xlsx');}
 $('countSku').addEventListener('input',countReady);
 $('countEntryForm').addEventListener('submit',recordCount);
 $('countSearch').addEventListener('input',renderCountSummary);
-$('downloadSummary').addEventListener('click',()=>downloadCountSheets(false));
-$('downloadAllCounts').addEventListener('click',()=>downloadCountSheets(true));
+$('downloadSummary').addEventListener('click',async()=>{await syncCountSummaries(true);downloadCountSheets(false)});
+$('downloadAllCounts').addEventListener('click',async()=>{await syncCountSummaries(true);downloadCountSheets(true)});
 $('inventoryLogin').addEventListener('submit',e=>{e.preventDefault();const p=$('pin').value.trim();if(!/^\d{1,8}$/.test(p)){$('loginError').textContent='PIN inválido.';return}enter(p)});
 $('toggleVisibility').addEventListener('click',()=>$('visibility').classList.toggle('hidden'));
 $('collapseTabs').addEventListener('click',()=>{const bar=$('mainTabs');bar.classList.toggle('hidden');$('collapseTabs').textContent=bar.classList.contains('hidden')?'▾ Mostrar barra':'▴ Ocultar barra'});
@@ -102,7 +146,7 @@ $('downloadCurrent').addEventListener('click',()=>download(getRows(),'Inventario
 $('downloadBD').addEventListener('click',()=>download(rows.filter(r=>r.seccion==='BD'),'Inventario_BD.xlsx'));
 $('uploadBD').addEventListener('click',uploadBD);
 $('crossToggle').addEventListener('click',()=>{$('crossPanel').classList.toggle('hidden');render()});
-$('exit').addEventListener('click',()=>{pin='';window.ctNavigationSession?.clear?.();location.href='../index.html'});
+$('exit').addEventListener('click',()=>{stopCountSync();pin='';window.ctNavigationSession?.clear?.();location.href='../index.html'});
 const cached=window.ctNavigationSession?.get();if(cached&&/^\d{1,8}$/.test(cached))enter(cached);
 })();
 </script></body></html>
