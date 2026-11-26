@@ -330,7 +330,12 @@ async function uploadBD(){const file=$('bdFile').files?.[0];if(!file){status('Se
  if(!data.length)throw Error('No se encontraron SKU en la columna Código.');if(!data.every(r=>r.familia))throw Error('La columna Flia es obligatoria para todos los SKU.');
  if(!confirm('Reemplazar BD con '+data.length+' SKU del Excel? Los conteos y las otras pestañas se conservan.'))return;
  status('Cargando '+data.length+' SKU a BD…');await rpc('ct_inventory_bd_replace_v3',{p_rows:data});await load();render();$('bdFile').value='';status('BD cargada: '+data.length+' SKU con descripción y familia.');
- }catch(e){if(isInventoryPermissionError(e)){renewInventoryLogin('La sesión no coincide con un PIN autorizado. Vuelve a ingresar con tu PIN de administrador y repite la carga de BD.');}else status('No se pudo cargar BD: '+e.message,true)}finally{btn.disabled=false}}
+ }catch(e){
+  // Un error de la RPC de BD no invalida la sesión ni debe borrar el PIN.
+  // Mantener archivo seleccionado para reintento y mostrar error real.
+  const detail=String(e?.message||e||'Error desconocido');
+  status('No se pudo cargar BD: '+detail+(isInventoryPermissionError(e)?' · El servidor rechazó el permiso de esta operación. Comprueba que la aplicación apunta al mismo proyecto Supabase donde validaste el PIN.':''),true);
+ }finally{btn.disabled=false}}
 
 function renderCross(){const tbody=$('crossRows');tbody.replaceChildren();const bd=bdMap();const sku=normalizeSku($('search').value),other=rows.filter(r=>r.seccion!=='BD'&&(!sku||r.sku.toUpperCase().includes(sku)||(r.descripcion||'').toUpperCase().includes(sku))).sort((a,b)=>a.sku.localeCompare(b.sku,'es',{numeric:true}));for(const r of other.slice(0,1500)){const tr=mk('tr'),cells=[r.sku,bd.get(normalizeSku(r.sku))?.descripcion||r.descripcion||'Sin coincidencia BD',r.seccion==='CONTEOS'?'CONTEOS · '+r.subseccion:r.seccion,r.cantidad_un,r.cantidad,r.ca_cantidad_est];for(const v of cells){tr.append(mk('td','',display(v)))}tbody.append(tr)}if(!other.length){const tr=mk('tr'),td=mk('td','', 'Aún no hay registros de otras secciones para cruzar.');td.colSpan=6;tr.append(td);tbody.append(tr)}}
 
@@ -364,7 +369,7 @@ $('toggleVisibility').addEventListener('click',()=>$('visibility').classList.tog
 $('collapseTabs').addEventListener('click',()=>{const bar=$('mainTabs');bar.classList.toggle('hidden');$('collapseTabs').textContent=bar.classList.contains('hidden')?'▾ Mostrar barra':'▴ Ocultar barra'});
 $('search').addEventListener('input',render);
 $('addRow').addEventListener('click',addRow);
-$('refresh').addEventListener('click',async()=>{try{await load();render();status('Información actualizada desde la base compartida.')}catch(e){if(isInventoryPermissionError(e))renewInventoryLogin('La sesión perdió autorización. Ingresa nuevamente con tu PIN de administrador.');else status(e.message,true)}});
+$('refresh').addEventListener('click',async()=>{try{await load();render();status('Información actualizada desde la base compartida.')}catch(e){status('No se pudo actualizar: '+(e?.message||e)+'. La sesión continúa abierta.',true)}});
 $('downloadCurrent').addEventListener('click',()=>download(getRows(),'Inventario_'+(section==='CONTEOS'?subsection:section)+'.xlsx'));
 $('downloadBD').addEventListener('click',downloadBD);
 $('dailyFamily').addEventListener('change',renderDaily);$('dailyDownload').addEventListener('click',downloadDaily);
