@@ -153,6 +153,16 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
  #inventoryPanel .dailyWrap tbody td.daily-empty::before{display:none}
  #inventoryPanel .dailyWrap tbody td:nth-child(2){font-size:12px}
 }
+/* Ajustes autorizados en el resumen y las operaciones */
+.adjust-overlay{position:fixed;inset:0;z-index:99999;background:#0b2847ad;display:grid;place-items:center;padding:12px}
+.adjust-dialog{background:#fff;border-radius:15px;padding:20px;max-width:600px;width:100%;max-height:91dvh;overflow:auto;box-shadow:0 12px 42px #061b3180}
+.adjust-top,.adjust-actions{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.adjust-top h2{margin:0;font-size:21px}.adjust-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}
+.adjust-grid label{font-weight:750;font-size:12px;display:flex;flex-direction:column;gap:5px}
+.adjust-grid input{min-height:44px;width:100%;border:1px solid #b7cfe0;border-radius:8px;padding:9px;font:inherit;font-size:16px}
+.adjust-actions{justify-content:flex-end}.adjust-edit{font-size:10px;min-height:25px;padding:3px 7px;background:#eef6ff;color:#185779;border:1px solid #b8d6e7;border-radius:6px}
+#dailyAdjustToggle{background:#f6e6b9;color:#744400;border:1px solid #dfb861}
+@media(max-width:540px){.adjust-grid{grid-template-columns:1fr 1fr}.adjust-dialog{padding:13px}}
 </style></head><body>
 <header><div><h1>📒 Módulo Inventario</h1><small>CD Girardota · Control por SKU</small></div><a href="../index.html">← Control de Transportes</a></header>
 <main><section class="card login" id="loginPanel"><div class="emoji">📒🔢</div><h2>Acceso a Inventario</h2><p>Ingresa con tu PIN de Control de Transportes. El contenido se consulta y guarda en Supabase únicamente con permiso.</p><form id="inventoryLogin"><label for="pin">PIN personal</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" pattern="[0-9]{1,8}" required><button id="enter" type="submit">🔓 Ingresar</button><p id="loginError" class="error" role="alert"></p></form></section>
@@ -180,7 +190,7 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
     <p class="countsInfo">CANT UN acumula «CANT UNDS». CANT CAJ acumula «CANT CAJAS». CANT EST acumula «CANT ESTIBAS». NOVEDAD reúne los sitios registrados sin duplicarlos. Cada entrada se conserva por separado en Supabase.</p>
   </section>
 </div>
-<div id="dailyPanel" class="hidden"><div class="controls"><label for="dailyFamily"><b>Filtrar familia</b></label><select id="dailyFamily"><option value="TODOS">Todas</option><option value="PET">PET</option><option value="LATA">LATA</option><option value="TW">TW</option><option value="RN">RN</option></select><button type="button" class="secondary" id="dailyDownload">⬇ Descargar resumen del día Excel</button></div><p class="hint">Conteos acumulados por SKU y familia. TOTAL GENERAL suma TOTAL UNIDADES, TOTAL PFN, TOTAL PNC, TOTAL ROTURAS, TOTAL REEMPAQUE y TOTAL VERTIMIENTO. Oculta columnas con el ojo tachado y restáuralas con los botones superiores.</p><div id="dailyHiddenColumns" class="daily-hiddenbar" aria-label="Columnas ocultas"></div><div class="wrap dailyWrap"><table id="dailyTable"><thead id="dailyHead"></thead><tbody id="dailyRows"></tbody></table></div></div>
+<div id="dailyPanel" class="hidden"><div class="controls"><label for="dailyFamily"><b>Filtrar familia</b></label><select id="dailyFamily"><option value="TODOS">Todas</option><option value="PET">PET</option><option value="LATA">LATA</option><option value="TW">TW</option><option value="RN">RN</option></select><button type="button" class="secondary" id="dailyDownload">⬇ Descargar resumen del día Excel</button><button type="button" id="dailyAdjustToggle" class="secondary hidden">✏️ AJUSTAR CONTEOS</button></div><p class="hint">Conteos acumulados por SKU y familia. TOTAL GENERAL suma TOTAL UNIDADES, TOTAL PFN, TOTAL PNC, TOTAL ROTURAS, TOTAL REEMPAQUE y TOTAL VERTIMIENTO. Oculta columnas con el ojo tachado y restáuralas con los botones superiores.</p><p id="dailyAdjustHint" class="hint hidden">Modo ajuste: selecciona «Editar» en el SKU para modificar cinco cantidades. Solo administrador. Las equivalencias ajustadas no modifican la BD maestra.</p><div id="dailyHiddenColumns" class="daily-hiddenbar" aria-label="Columnas ocultas"></div><div class="wrap dailyWrap"><table id="dailyTable"><thead id="dailyHead"></thead><tbody id="dailyRows"></tbody></table></div></div>
 <div class="summary"><div class="metric"><b id="metricRows">0</b><span>SKU registrados en esta pestaña</span></div><div class="metric"><b id="metricInBd">0</b><span>SKU encontrados en BD</span></div><div class="metric"><b id="metricMissing">0</b><span>SKU sin coincidencia en BD</span></div></div>
 <div class="controls"><input type="search" id="search" placeholder="Buscar SKU o descripción" aria-label="Filtrar registros"><button type="button" id="addRow">＋ Agregar SKU</button><button type="button" class="secondary" id="downloadCurrent">⬇ Descargar pestaña Excel</button><button type="button" class="secondary" id="crossToggle">⇄ Ver/ocultar cruce por SKU</button><span id="bdFileTools" class="hidden"><input type="file" id="bdFile" accept=".xlsx,.xls" aria-label="Excel base de datos"><button type="button" id="uploadBD">⬆ Cargar Excel a BD</button><button type="button" class="secondary" id="downloadBD">⬇ Descargar BD</button></span></div>
 <form id="operationForm" class="operationForm hidden" autocomplete="off">
@@ -196,6 +206,21 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
 <div class="wrap"><table><thead><tr><th class="colsku">SKU</th><th class="coldesc">DESCRIPCIÓN</th><th class="colnum">CANT UNDS</th><th class="colnum">CANT CAJ</th><th class="colnum">CANT EST</th><th class="colnum">NOVEDAD</th><th class="colaction">ACCIONES</th></tr></thead><tbody id="gridRows"></tbody></table></div>
 <div id="crossPanel" class="cross hidden"><h3>⇄ Cruce de secciones por SKU</h3><p class="hint">Cada SKU se compara entre las pestañas. Se presentan las cantidades tal como fueron registradas; no se aplica una fórmula automática a «CA CANTIDAD EST».</p><div class="wrap"><table><thead><tr><th>SKU</th><th>DESCRIPCIÓN (BD)</th><th>SECCIÓN</th><th>CANTIDAD UN</th><th>CANTIDAD</th><th>CA CANTIDAD EST</th></tr></thead><tbody id="crossRows"></tbody></table></div></div>
 </div></section></main>
+<div id="adjustOverlay" class="adjust-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="adjustTitle">
+ <form id="adjustForm" class="adjust-dialog">
+  <div class="adjust-top"><h2 id="adjustTitle">✏️ Ajustar cantidades</h2><button type="button" id="adjustClose" class="secondary" aria-label="Cerrar ajuste">✕</button></div>
+  <p id="adjustInfo" class="hint"></p>
+  <div class="adjust-grid">
+   <label>CANT UNDS<input id="adjUnds" type="number" min="0" step="any" inputmode="decimal" required></label>
+   <label>CANT CAJ<input id="adjCaj" type="number" min="0" step="any" inputmode="decimal" required></label>
+   <label>UNDS X CAJ<input id="adjBoxUnits" type="number" min="0" step="any" inputmode="decimal" required></label>
+   <label>CANT EST<input id="adjEst" type="number" min="0" step="any" inputmode="decimal" required></label>
+   <label>UNDS X EST<input id="adjEstUnits" type="number" min="0" step="any" inputmode="decimal" required></label>
+  </div>
+  <p id="adjPreview" class="hint"></p><p id="adjustError" class="error" role="alert"></p>
+  <div class="adjust-actions"><button type="button" class="secondary" id="adjustCancel">Cancelar</button><button type="submit" id="adjustSave">Guardar ajuste</button></div>
+ </form>
+</div>
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
@@ -204,7 +229,7 @@ const TABS=['PFN','PNC','ROTURAS','REEMPAQUE','VERTIMIENTO','ZEXI','BD','CONTEOS
 const OPS=['PFN','PNC','ROTURAS','REEMPAQUE','VERTIMIENTO'];
 const familyOf=x=>{const f=String(x||'').trim().toUpperCase();return f==='LTA'?'LATA':f==='RNBRL'?'RN':f;};
 const COUNT_TYPES=['PET','LATA','TW','RN'];
-let countSyncTimer=null,countSyncBusy=false,countSyncOnline=true,countMutationBusy=false,isInventoryAdmin=false;
+let countSyncTimer=null,countSyncBusy=false,countSyncOnline=true,countMutationBusy=false,isInventoryAdmin=false,adjustMode=false,adjustTarget=null;
 const focusRequested=new URLSearchParams(location.search).get('modo')==='conteo';
 const prefersMobile=window.matchMedia('(max-width: 700px) and (pointer: coarse)').matches;
 let focusCounting=focusRequested||prefersMobile;
@@ -265,7 +290,7 @@ function renewInventoryLogin(message='Ingresa tu PIN de Inventario para revalida
 }
 function isInventoryPermissionError(e){return /sin permiso para inventario|pin sin permiso|pin inválido/i.test(String(e?.message||e||''));}
 
-async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;$('pin').value='';await load();window.ctNavigationSession?.save(candidate);try{isInventoryAdmin=(await rpc('ct_inventory_count_is_admin',{}))===true;}catch(_){isInventoryAdmin=false;}$('clearAllCounts').classList.toggle('hidden',!isInventoryAdmin);$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');if(focusCounting){section='CONTEOS';subsection='PET';document.body.classList.add('focus-count')}render();adjustCountViewport();startCountSync();}catch(e){pin='';window.ctNavigationSession?.clear?.();$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
+async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;$('pin').value='';await load();window.ctNavigationSession?.save(candidate);try{isInventoryAdmin=(await rpc('ct_inventory_count_is_admin',{}))===true;}catch(_){isInventoryAdmin=false;}$('clearAllCounts').classList.toggle('hidden',!isInventoryAdmin);$('dailyAdjustToggle').classList.toggle('hidden',!isInventoryAdmin);$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');if(focusCounting){section='CONTEOS';subsection='PET';document.body.classList.add('focus-count')}render();adjustCountViewport();startCountSync();}catch(e){pin='';window.ctNavigationSession?.clear?.();$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
 async function load(){const [data,counts]=await Promise.all([rpc('ct_inventory_rows_list',{}),rpc('ct_inventory_counts_list',{})]);rows=Array.isArray(data)?data:[];countSummaries=Array.isArray(counts)?counts:[];}
 // Sincronización periódica con la base compartida: no requiere habilitar RLS de lectura pública.
 // Se consulta solo el agregado autorizado mediante PIN (RPC), sin exponer movimientos individuales.
@@ -341,16 +366,16 @@ function render(){
    });td.append(input);tr.append(td);
    // Campos calculados: nunca se guardan como entradas manuales.
    if(OPS.includes(section)&&field==='cantidad'){
-    const v=unitValues(r.sku,numerical(r.cantidad_un),numerical(r.cantidad),numerical(r.ca_cantidad_est));
+    const v=unitValues(r.sku,numerical(r.cantidad_un),numerical(r.cantidad),numerical(r.ca_cantidad_est),r.extra_box_units,r.extra_pallet_units);
     const calc=mk('td','calculated-num',String(v.fromBox));calc.title='CANT CAJ × Factor (BD)';tr.append(calc);
    }
    if(OPS.includes(section)&&field==='ca_cantidad_est'){
-    const v=unitValues(r.sku,numerical(r.cantidad_un),numerical(r.cantidad),numerical(r.ca_cantidad_est));
+    const v=unitValues(r.sku,numerical(r.cantidad_un),numerical(r.cantidad),numerical(r.ca_cantidad_est),r.extra_box_units,r.extra_pallet_units);
     const c1=mk('td','calculated-num',String(v.fromPallet));c1.title='CANT EST × Un x Est (BD)';tr.append(c1);
     const c2=mk('td','calculated-num total-num',String(v.total));c2.title='CANT UNDS + UNDS X CAJ + UNDS X EST';tr.append(c2);
    }
   }
-  const td=mk('td'),del=mk('button','danger','Eliminar');del.type='button';del.addEventListener('click',async()=>{if(!confirm('¿Eliminar SKU '+r.sku+' de '+section+'?'))return;try{await rpc('ct_inventory_row_delete',{p_seccion:r.seccion,p_subseccion:r.subseccion||'',p_sku:r.sku});await load();render();status('Registro eliminado.')}catch(e){status(e.message,true)}});td.append(del);tr.append(td);$('gridRows').append(tr);
+  const td=mk('td');if(OPS.includes(section)&&isInventoryAdmin){const adj=mk('button','adjust-edit','✎ Ajustar');adj.type='button';adj.addEventListener('click',()=>openAdjustment(section,r.sku,''));td.append(adj,document.createTextNode(' '));}const del=mk('button','danger','Eliminar');del.type='button';del.addEventListener('click',async()=>{if(!confirm('¿Eliminar SKU '+r.sku+' de '+section+'?'))return;try{await rpc('ct_inventory_row_delete',{p_seccion:r.seccion,p_subseccion:r.subseccion||'',p_sku:r.sku});await load();render();status('Registro eliminado.')}catch(e){status(e.message,true)}});td.append(del);tr.append(td);$('gridRows').append(tr);
  }
  if(!filtered.length){const tr=mk('tr'),td=mk('td','',data.length?'Sin coincidencias.':'No hay registros.');td.colSpan=labels.length;td.style.padding='20px';tr.append(td);$('gridRows').append(tr)}
  if(!$('crossPanel').classList.contains('hidden'))renderCross();
@@ -360,16 +385,16 @@ function dailyData(){
  const daily=new Map(),bd=bdMap();
  for(const c of countSummaries){const sku=normalizeSku(c.sku),b=bd.get(sku),f=familyOf(b?.familia||c.subseccion),k=sku;
  if(!daily.has(k))daily.set(k,{sku,descripcion:b?.descripcion||c.descripcion||'',familia:f,unds:0,caj:0,est:0,ops:{}});
- const r=daily.get(k);r.unds+=numerical(c.cant_un);r.caj+=numerical(c.cant_caj);r.est+=numerical(c.cant_est);
+ const r=daily.get(k);r.unds+=numerical(c.cant_un);r.caj+=numerical(c.cant_caj);r.est+=numerical(c.cant_est);r.extraBox=(r.extraBox||0)+numerical(c.extra_box_units);r.extraEst=(r.extraEst||0)+numerical(c.extra_pallet_units);
  }
  for(const r of rows){if(!OPS.includes(r.seccion))continue;const target=daily.get(normalizeSku(r.sku));if(!target)continue;
- target.ops[r.seccion]={unds:numerical(r.cantidad_un),caj:numerical(r.cantidad),est:numerical(r.ca_cantidad_est)};
+ target.ops[r.seccion]={unds:numerical(r.cantidad_un),caj:numerical(r.cantidad),est:numerical(r.ca_cantidad_est),extraBox:numerical(r.extra_box_units),extraEst:numerical(r.extra_pallet_units)};
  }
  return [...daily.values()].sort((a,b)=>a.sku.localeCompare(b.sku,'es',{numeric:true}));
 }
 const dailyHeaders=['SKU','DESCRIPCIÓN','CANT UNDS','CANT CAJ','UNDS X CAJA','CANT EST','CANT X EST','TOTAL UNIDADES',...OPS.map(o=>'TOTAL '+o),'TOTAL GENERAL'];
-function unitValues(sku,unds,caj,est){const b=bdMap().get(normalizeSku(sku)),factor=numerical(b?.cantidad_un),perPallet=numerical(b?.un_x_est);const fromBox=caj*factor,fromPallet=est*perPallet;return {fromBox,fromPallet,total:unds+fromBox+fromPallet};}
-function dailyValues(r){const v=unitValues(r.sku,r.unds,r.caj,r.est);const opTotals=OPS.map(o=>unitValues(r.sku,r.ops[o]?.unds??0,r.ops[o]?.caj??0,r.ops[o]?.est??0).total);return [r.sku,r.descripcion,r.unds,r.caj,v.fromBox,r.est,v.fromPallet,v.total,...opTotals,v.total+opTotals.reduce((a,b)=>a+b,0)];}
+function unitValues(sku,unds,caj,est,extraBox=0,extraEst=0){const b=bdMap().get(normalizeSku(sku)),factor=numerical(b?.cantidad_un),perPallet=numerical(b?.un_x_est);const fromBox=caj*factor+numerical(extraBox),fromPallet=est*perPallet+numerical(extraEst);return {fromBox,fromPallet,total:unds+fromBox+fromPallet};}
+function dailyValues(r){const v=unitValues(r.sku,r.unds,r.caj,r.est,r.extraBox||0,r.extraEst||0);const opTotals=OPS.map(o=>unitValues(r.sku,r.ops[o]?.unds??0,r.ops[o]?.caj??0,r.ops[o]?.est??0,r.ops[o]?.extraBox||0,r.ops[o]?.extraEst||0).total);return [r.sku,r.descripcion,r.unds,r.caj,v.fromBox,r.est,v.fromPallet,v.total,...opTotals,v.total+opTotals.reduce((a,b)=>a+b,0)];}
 // Columnas del resumen diario: se pueden ocultar individualmente, sin borrar datos.
 const hiddenDailyColumns=new Set();
 function toggleDailyColumn(i){if(hiddenDailyColumns.has(i))hiddenDailyColumns.delete(i);else{if(hiddenDailyColumns.size>=dailyHeaders.length-1){status('Debe quedar al menos una columna visible.',true);return;}hiddenDailyColumns.add(i)}renderDaily();}
@@ -379,7 +404,7 @@ function renderDaily(){
  $('dailyHead').replaceChildren(tr);$('dailyRows').replaceChildren();
  const hiddenBar=$('dailyHiddenColumns');hiddenBar.replaceChildren();if(hiddenDailyColumns.size){hiddenBar.append(mk('span','', 'Mostrar columnas: '));for(const i of [...hiddenDailyColumns].sort((a,b)=>a-b)){const show=mk('button','daily-show','👁 '+dailyHeaders[i]);show.type='button';show.title='Mostrar columna '+dailyHeaders[i];show.addEventListener('click',()=>toggleDailyColumn(i));hiddenBar.append(show)}}
  const data=dailyData().filter(r=>f==='TODOS'||r.familia===f);
- for(const r of data){const row=mk('tr');const values=dailyValues(r);for(const i of visibleIndices){const cell=mk('td',(i>=8&&i<=12?'daily-operation ':'')+(i===dailyHeaders.length-1?'daily-general':''),String(values[i]??''));cell.dataset.colLabel=dailyHeaders[i];cell.dataset.columnIndex=String(i);row.append(cell)}$('dailyRows').append(row)}
+ for(const r of data){const row=mk('tr');const values=dailyValues(r);for(const i of visibleIndices){const cell=mk('td',(i>=8&&i<=12?'daily-operation ':'')+(i===dailyHeaders.length-1?'daily-general':''),String(values[i]??''));cell.dataset.colLabel=dailyHeaders[i];cell.dataset.columnIndex=String(i);if(i===0&&adjustMode&&isInventoryAdmin){const candidates=countSummaries.filter(x=>normalizeSku(x.sku)===r.sku);const type=candidates.find(x=>x.subseccion===r.familia)?.subseccion||candidates[0]?.subseccion;if(type){const b=mk('button','adjust-edit','✎ Editar');b.type='button';b.addEventListener('click',()=>openAdjustment('CONTEOS',r.sku,type));cell.append(document.createTextNode(' '),b)}}row.append(cell)}$('dailyRows').append(row)}
  if(!data.length){const row=mk('tr'),td=mk('td','daily-empty','Sin conteos de la familia seleccionada');td.colSpan=visibleIndices.length;row.append(td);$('dailyRows').append(row)}
 }
 function downloadDaily(){const f=$('dailyFamily').value,arr=dailyData().filter(r=>f==='TODOS'||r.familia===f);const ws=XLSX.utils.aoa_to_sheet([dailyHeaders,...arr.map(dailyValues)]);ws['!cols']=dailyHeaders.map((_,i)=>({wch:i===1?43:18}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'RESUMEN DEL DIA');XLSX.writeFile(wb,'Resumen_Conteo_Del_Dia_'+f+'.xlsx')}
@@ -389,7 +414,7 @@ async function saveRecord(item,oldSku='',rerender=true){
  try{await rpc('ct_inventory_row_save_v2',{p_seccion:item.seccion,p_subseccion:item.subseccion||'',p_sku:normalizeSku(item.sku),p_descripcion:clean(item.descripcion),p_cantidad_un:clean(item.cantidad_un),p_cantidad:clean(item.cantidad),p_ca_cantidad_est:clean(item.ca_cantidad_est),p_novedad:clean(item.novedad),p_familia:clean(item.familia),p_old_sku:oldSku});await load();if(rerender)render()}finally{saving=false}
 }
 async function addRow(){const sku=normalizeSku(prompt('Ingresa el SKU para '+section+':')||'');if(!sku)return;if(getRows().some(r=>normalizeSku(r.sku)===sku)){status('SKU ya registrado.',true);return;}const b=bdMap().get(sku);if(!b){status('SKU '+sku+' no existe en BD. Primero carga el archivo maestro.',true);return}try{await saveRecord({seccion:section,subseccion:'',sku,descripcion:b.descripcion,cantidad_un:'',cantidad:'',ca_cantidad_est:'',novedad:''});status('SKU '+sku+' agregado.')}catch(e){status(e.message,true)}}
-function excelRows(data){return data.map(r=>{const v=unitValues(r.sku,numerical(r.cantidad_un),numerical(r.cantidad),numerical(r.ca_cantidad_est));return {'SKU':r.sku,'DESCRIPCION':bdDesc(r.sku)||r.descripcion,'CANT UNDS':numerical(r.cantidad_un),'CANT CAJ':numerical(r.cantidad),'UNDS X CAJ':v.fromBox,'CANT EST':numerical(r.ca_cantidad_est),'UNDS X EST':v.fromPallet,'TOTAL UNIDADES':v.total,'NOVEDAD':r.novedad||''}})}
+function excelRows(data){return data.map(r=>{const v=unitValues(r.sku,numerical(r.cantidad_un),numerical(r.cantidad),numerical(r.ca_cantidad_est),r.extra_box_units,r.extra_pallet_units);return {'SKU':r.sku,'DESCRIPCION':bdDesc(r.sku)||r.descripcion,'CANT UNDS':numerical(r.cantidad_un),'CANT CAJ':numerical(r.cantidad),'UNDS X CAJ':v.fromBox,'CANT EST':numerical(r.ca_cantidad_est),'UNDS X EST':v.fromPallet,'TOTAL UNIDADES':v.total,'NOVEDAD':r.novedad||''}})}
 function download(data,name){if(!data.length){status('No hay registros para descargar.',true);return}const wb=XLSX.utils.book_new(),sheet=XLSX.utils.json_to_sheet(excelRows(data),{header:['SKU','DESCRIPCION','CANT UNDS','CANT CAJ','UNDS X CAJ','CANT EST','UNDS X EST','TOTAL UNIDADES','NOVEDAD']});sheet['!cols']=[{wch:18},{wch:52},{wch:18},{wch:18},{wch:20},{wch:18},{wch:20},{wch:20},{wch:32}];XLSX.utils.book_append_sheet(wb,sheet,'Inventario');XLSX.writeFile(wb,name)}
 function downloadBD(){const data=rows.filter(r=>r.seccion==='BD'),headers=['Codigo','Descripcion','Flia','Factor','Estibado 1','Familia Inv','Un x Est'];const wb=XLSX.utils.book_new(),sheet=XLSX.utils.aoa_to_sheet([headers,...data.map(r=>[r.sku,r.descripcion,r.familia||'',r.cantidad_un||'',r.cantidad||'',r.ca_cantidad_est||'',r.un_x_est||''])]);sheet['!cols']=[{wch:16},{wch:48},{wch:14},{wch:14},{wch:16},{wch:18},{wch:16}];XLSX.utils.book_append_sheet(wb,sheet,'BD');XLSX.writeFile(wb,'Inventario_BD.xlsx')}
 async function uploadBD(){const file=$('bdFile').files?.[0];if(!file){status('Selecciona Excel de BD.',true);return}const btn=$('uploadBD');btn.disabled=true;try{const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),sheet=wb.Sheets[wb.SheetNames.includes('BD')?'BD':wb.SheetNames[0]];if(!sheet)throw Error('No se encontró ninguna hoja');const raw=XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false}),norm=x=>String(x??'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9]/g,'');const seen=new Set(),data=[];
@@ -421,13 +446,38 @@ function countReady(){const sku=normalizeSku($('countSku').value),b=bdMap().get(
 function clearCountForm(){$('countEntryForm').reset();countReady();}
 function currentCountSummary(type=subsection){return countSummaries.filter(r=>r.subseccion===type).sort((a,b)=>String(a.sku).localeCompare(String(b.sku),'es',{numeric:true}));}
 function summaryDescription(r){return bdMap().get(normalizeSku(r.sku))?.descripcion||r.descripcion||'';}
-function renderCountSummary(){if(section!=='CONTEOS')return;$('activeCountType').textContent=subsection;$('countSummaryType').textContent=subsection;const all=currentCountSummary(),term=$('countSearch').value.trim().toLowerCase(),data=all.filter(r=>[r.sku,summaryDescription(r),r.novedad].some(x=>String(x||'').toLowerCase().includes(term)));$('countsTotal').textContent=all.length+' SKU';const body=$('countSummaryRows');body.replaceChildren();for(const r of data){const tr=mk('tr');for(const [i,value] of [r.sku,summaryDescription(r),r.cant_un,r.cant_caj,unitValues(r.sku,numerical(r.cant_un),numerical(r.cant_caj),numerical(r.cant_est)).fromBox,r.cant_est,unitValues(r.sku,numerical(r.cant_un),numerical(r.cant_caj),numerical(r.cant_est)).fromPallet,unitValues(r.sku,numerical(r.cant_un),numerical(r.cant_caj),numerical(r.cant_est)).total,r.novedad].entries()){const td=mk('td','',String(value??''));if(i>=2&&i<=7)td.className='num';tr.append(td)}body.append(tr)}if(!data.length){const tr=mk('tr'),td=mk('td','countsEmpty',all.length?'No hay coincidencias.':'No se han registrado conteos en '+subsection+'.');td.colSpan=9;tr.append(td);body.append(tr)}}
+function renderCountSummary(){if(section!=='CONTEOS')return;$('activeCountType').textContent=subsection;$('countSummaryType').textContent=subsection;const all=currentCountSummary(),term=$('countSearch').value.trim().toLowerCase(),data=all.filter(r=>[r.sku,summaryDescription(r),r.novedad].some(x=>String(x||'').toLowerCase().includes(term)));$('countsTotal').textContent=all.length+' SKU';const body=$('countSummaryRows');body.replaceChildren();for(const r of data){const tr=mk('tr');for(const [i,value] of [r.sku,summaryDescription(r),r.cant_un,r.cant_caj,unitValues(r.sku,numerical(r.cant_un),numerical(r.cant_caj),numerical(r.cant_est),r.extra_box_units,r.extra_pallet_units).fromBox,r.cant_est,unitValues(r.sku,numerical(r.cant_un),numerical(r.cant_caj),numerical(r.cant_est),r.extra_box_units,r.extra_pallet_units).fromPallet,unitValues(r.sku,numerical(r.cant_un),numerical(r.cant_caj),numerical(r.cant_est),r.extra_box_units,r.extra_pallet_units).total,r.novedad].entries()){const td=mk('td','',String(value??''));if(i>=2&&i<=7)td.className='num';tr.append(td)}body.append(tr)}if(!data.length){const tr=mk('tr'),td=mk('td','countsEmpty',all.length?'No hay coincidencias.':'No se han registrado conteos en '+subsection+'.');td.colSpan=9;tr.append(td);body.append(tr)}}
 function countNumber(id){const raw=$(id).value.trim().replace(',','.');if(!raw)return 0;const n=Number(raw);if(!Number.isFinite(n)||n<0||n>1e12)throw Error('La cantidad debe ser un número positivo o cero válido.');return n;}
 async function recordCount(e){e.preventDefault();if(section!=='CONTEOS'||countMutationBusy)return;countMutationBusy=true;const type=subsection,sku=normalizeSku($('countSku').value);if(!sku){status('Ingresa un SKU.',true);return}const btn=$('countSubmit');try{const units=countNumber('countUnits'),boxes=countNumber('countBoxes'),pallets=countNumber('countPallets');if(!bdMap().has(sku)||familyOf(bdMap().get(sku).familia)!==type)throw Error('SKU no corresponde a '+type+' según la BD.');if(units+boxes+pallets<=0)throw Error('Ingresa al menos una cantidad mayor que cero.');btn.disabled=true;if(focusCounting){$('countSku').focus({preventScroll:true});adjustCountViewport();}await rpc('ct_inventory_count_add',{p_subseccion:type,p_sku:sku,p_cant_unds:units,p_cant:0,p_cajas:boxes,p_estibas:pallets,p_sitio:$('countSite').value.trim()});const counts=await rpc('ct_inventory_counts_list',{});countSummaries=Array.isArray(counts)?counts:[];clearCountForm();renderCountSummary();status('Conteo registrado y acumulado: '+sku+' · '+type);$('countSku').focus({preventScroll:true});adjustCountViewport();syncCountSummaries(true)}catch(err){status('No se pudo registrar el conteo: '+err.message,true)}finally{countMutationBusy=false;countReady()}}
 async function undoLastCount(){if(countMutationBusy||section!=='CONTEOS')return;const type=subsection;if(!confirm('¿Deshacer tu último conteo registrado en '+type+'? Solo podrás deshacer los últimos 3 movimientos de esta pestaña.'))return;countMutationBusy=true;const btn=$('undoLastCount');btn.disabled=true;try{const result=await rpc('ct_inventory_count_undo_last',{p_subseccion:type});countSummaries=await rpc('ct_inventory_counts_list',{});renderCountSummary();status('Conteo de '+result.sku+' deshecho en '+type+'. Restantes disponibles: '+result.restantes+'.');}catch(e){status('No se pudo deshacer: '+e.message,true)}finally{countMutationBusy=false;btn.disabled=false}}
 async function clearAllCounts(){if(countMutationBusy||!isInventoryAdmin)return;if(!confirm('ATENCIÓN: Se borrarán TODOS los conteos y resúmenes de PET, LATA, TW y RN para iniciar un nuevo conteo. La BD de SKU no se eliminará. ¿Estás seguro?'))return;const text=prompt('Confirmación final: escribe BORRAR TODO para eliminar los conteos de todos los usuarios.');if(text!=='BORRAR TODO'){status('Borrado cancelado.');return;}countMutationBusy=true;const btn=$('clearAllCounts');btn.disabled=true;try{const removed=await rpc('ct_inventory_counts_clear_all',{});countSummaries=await rpc('ct_inventory_counts_list',{});renderCountSummary();clearCountForm();status('Se borraron '+removed+' movimientos de conteo de PET, LATA, TW y RN. Puedes iniciar el nuevo conteo.');}catch(e){status('No se pudo borrar: '+e.message,true)}finally{countMutationBusy=false;btn.disabled=false}}
-function summaryExcelRows(type){return currentCountSummary(type).map(r=>{const unds=numerical(r.cant_un),caj=numerical(r.cant_caj),est=numerical(r.cant_est),v=unitValues(r.sku,unds,caj,est);return {SKU:r.sku,'DESCRIPCIÓN':summaryDescription(r),'CANT UN':unds,'CANT CAJ':caj,'UNDS X CAJA':v.fromBox,'CANT EST':est,'CANT X EST':v.fromPallet,'TOTAL UNIDADES':v.total,NOVEDAD:r.novedad||''}})}
+function summaryExcelRows(type){return currentCountSummary(type).map(r=>{const unds=numerical(r.cant_un),caj=numerical(r.cant_caj),est=numerical(r.cant_est),v=unitValues(r.sku,unds,caj,est,r.extra_box_units,r.extra_pallet_units);return {SKU:r.sku,'DESCRIPCIÓN':summaryDescription(r),'CANT UN':unds,'CANT CAJ':caj,'UNDS X CAJA':v.fromBox,'CANT EST':est,'CANT X EST':v.fromPallet,'TOTAL UNIDADES':v.total,NOVEDAD:r.novedad||''}})}
 function downloadCountSheets(all){const types=all?COUNT_TYPES:[subsection];const wb=XLSX.utils.book_new();for(const type of types){const arr=summaryExcelRows(type),headers=['SKU','DESCRIPCIÓN','CANT UN','CANT CAJ','UNDS X CAJA','CANT EST','CANT X EST','TOTAL UNIDADES','NOVEDAD'];const sheet=XLSX.utils.json_to_sheet(arr,{header:headers});if(!arr.length)XLSX.utils.sheet_add_aoa(sheet,[headers],{origin:'A1'});sheet['!cols']=[{wch:18},{wch:44},{wch:16},{wch:16},{wch:18},{wch:16},{wch:18},{wch:20},{wch:38}];XLSX.utils.book_append_sheet(wb,sheet,type)}XLSX.writeFile(wb,all?'Inventario_Conteos_Descarga_Completa.xlsx':'Inventario_Resumen_Conteos_'+subsection+'.xlsx');}
+function closeAdjustment(){adjustTarget=null;$('adjustOverlay').classList.add('hidden');}
+function openAdjustment(sec,sku,sub=''){
+ if(!isInventoryAdmin){status('Solo los administradores pueden ajustar cantidades.',true);return;}
+ const r=sec==='CONTEOS'?countSummaries.find(x=>x.subseccion===sub&&normalizeSku(x.sku)===normalizeSku(sku)):rows.find(x=>x.seccion===sec&&normalizeSku(x.sku)===normalizeSku(sku));
+ if(!r){status('No se encontró el registro. Actualiza la página.',true);return;}
+ const und=sec==='CONTEOS'?numerical(r.cant_un):numerical(r.cantidad_un);
+ const caj=sec==='CONTEOS'?numerical(r.cant_caj):numerical(r.cantidad);
+ const est=sec==='CONTEOS'?numerical(r.cant_est):numerical(r.ca_cantidad_est);
+ const v=unitValues(sku,und,caj,est,r.extra_box_units,r.extra_pallet_units);
+ adjustTarget={sec,sub,sku};$('adjustTitle').textContent='✏️ Ajustar '+sec+(sub?' · '+sub:'');$('adjustInfo').textContent='SKU '+sku+' · '+(bdDesc(sku)||'')+' · Solo administrador';
+ for(const [id,val] of [['adjUnds',und],['adjCaj',caj],['adjBoxUnits',v.fromBox],['adjEst',est],['adjEstUnits',v.fromPallet]])$(id).value=String(val);
+ $('adjustError').textContent='';$('adjustOverlay').classList.remove('hidden');updateAdjustPreview();
+}
+function updateAdjustPreview(){const ids=['adjUnds','adjBoxUnits','adjEstUnits'];const total=ids.reduce((n,id)=>n+numerical($(id).value),0);$('adjPreview').textContent='TOTAL UNIDADES después del ajuste: '+total.toLocaleString('es-CO')+' · No se cambia Factor ni Un x Est de BD.';}
+for(const id of ['adjUnds','adjCaj','adjBoxUnits','adjEst','adjEstUnits'])$(id).addEventListener('input',updateAdjustPreview);
+$('adjustClose').addEventListener('click',closeAdjustment);$('adjustCancel').addEventListener('click',closeAdjustment);
+$('adjustForm').addEventListener('submit',async e=>{
+ e.preventDefault();if(!adjustTarget||!isInventoryAdmin)return;
+ const vals=['adjUnds','adjCaj','adjBoxUnits','adjEst','adjEstUnits'].map(id=>Number($(id).value));
+ if(vals.some(v=>!Number.isFinite(v)||v<0||v>1e14)){$('adjustError').textContent='Todas las cantidades deben ser números positivos o cero.';return;}
+ const btn=$('adjustSave');btn.disabled=true;
+ try{const a=adjustTarget;await rpc('ct_inventory_adjust_totals',{p_seccion:a.sec,p_subseccion:a.sub,p_sku:a.sku,p_unds:vals[0],p_caj:vals[1],p_box_units:vals[2],p_est:vals[3],p_est_units:vals[4]});await load();closeAdjustment();render();status('Ajuste guardado en Supabase: '+a.sku+' · '+a.sec+'.');}
+ catch(err){$('adjustError').textContent='No se pudo ajustar: '+err.message;}
+ finally{btn.disabled=false;}
+});
 $('focusEnter').addEventListener('click',()=>setFocusMode(true));
 $('focusExit').addEventListener('click',()=>setFocusMode(false));
 
@@ -449,7 +499,7 @@ $('addRow').addEventListener('click',addRow);
 $('refresh').addEventListener('click',async()=>{try{await load();render();status('Información actualizada desde la base compartida.')}catch(e){status('No se pudo actualizar: '+(e?.message||e)+'. La sesión continúa abierta.',true)}});
 $('downloadCurrent').addEventListener('click',()=>download(getRows(),'Inventario_'+(section==='CONTEOS'?subsection:section)+'.xlsx'));
 $('downloadBD').addEventListener('click',downloadBD);
-$('dailyFamily').addEventListener('change',renderDaily);$('dailyDownload').addEventListener('click',downloadDaily);
+$('dailyFamily').addEventListener('change',renderDaily);$('dailyAdjustToggle').addEventListener('click',()=>{if(!isInventoryAdmin)return;adjustMode=!adjustMode;$('dailyAdjustToggle').textContent=adjustMode?'✕ Terminar ajustes':'✏️ AJUSTAR CONTEOS';$('dailyAdjustHint').classList.toggle('hidden',!adjustMode);renderDaily()});$('dailyDownload').addEventListener('click',downloadDaily);
 $('uploadBD').addEventListener('click',uploadBD);
 $('crossToggle').addEventListener('click',()=>{$('crossPanel').classList.toggle('hidden');render()});
 $('renewInventoryLogin').addEventListener('click',()=>renewInventoryLogin());
