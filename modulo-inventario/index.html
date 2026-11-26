@@ -200,7 +200,7 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
     <p class="countsInfo">CANT UN acumula «CANT UNDS». CANT CAJ acumula «CANT CAJAS». CANT EST acumula «CANT ESTIBAS». NOVEDAD reúne los sitios registrados sin duplicarlos. Cada entrada se conserva por separado en Supabase.</p>
   </section>
 </div>
-<div id="dailyPanel" class="hidden"><div class="controls"><label for="dailyFamily"><b>Filtrar familia</b></label><select id="dailyFamily"><option value="TODOS">Todas</option><option value="PET">PET</option><option value="LATA">LATA</option><option value="TW">TW</option><option value="RN">RN</option></select><button type="button" class="secondary" id="dailyDownload">⬇ Descargar resumen del día Excel</button><button type="button" id="dailyAdjustToggle" class="secondary hidden">✏️ AJUSTAR CONTEOS</button></div><p class="hint">Conteos acumulados por SKU y familia. TOTAL GENERAL suma TOTAL UNIDADES, TOTAL PFN, TOTAL PNC, TOTAL ROTURAS, TOTAL REEMPAQUE y TOTAL VERTIMIENTO. Oculta columnas con el ojo tachado y restáuralas con los botones superiores.</p><p id="dailyAdjustHint" class="hint hidden">Modo ajuste: selecciona «Editar» en el SKU para modificar cinco cantidades. Solo administrador. Las equivalencias ajustadas no modifican la BD maestra.</p><div id="dailyHiddenColumns" class="daily-hiddenbar" aria-label="Columnas ocultas"></div><div class="wrap dailyWrap"><table id="dailyTable"><thead id="dailyHead"></thead><tbody id="dailyRows"></tbody></table></div></div>
+<div id="dailyPanel" class="hidden"><div class="controls"><label for="dailyFamily"><b>Filtrar familia</b></label><select id="dailyFamily"><option value="TODOS">Todas</option><option value="PET">PET</option><option value="LATA">LATA</option><option value="TW">TW</option><option value="RN">RN</option></select><button type="button" class="secondary" id="dailyDownload">⬇ Descargar resumen del día Excel</button><button type="button" id="dailyAdjustToggle" class="secondary hidden">✏️ AJUSTAR CONTEOS</button></div><p class="hint">Base del resumen: todos los SKU cargados en ZEXI. Se cruzan las cantidades de CONTEOS, PFN, PNC, ROTURAS, REEMPAQUE, VERTIMIENTO y PARTIDAS por SKU. Los SKU sin movimientos muestran cero. Puedes ocultar columnas con el ojo tachado.</p><p id="dailyAdjustHint" class="hint hidden">Modo ajuste: selecciona «Editar» en el SKU para modificar cinco cantidades. Solo administrador. Las equivalencias ajustadas no modifican la BD maestra.</p><div id="dailyHiddenColumns" class="daily-hiddenbar" aria-label="Columnas ocultas"></div><div class="wrap dailyWrap"><table id="dailyTable"><thead id="dailyHead"></thead><tbody id="dailyRows"></tbody></table></div></div>
 <section id="externalPanel" class="external-panel hidden" aria-label="Carga de archivos ZEXI y PARTIDAS">
  <div class="external-tools"><label for="externalFile">Archivo Excel<input type="file" id="externalFile" accept=".xlsx,.xls"></label>
  <button type="button" id="externalUpload">⬆ Cargar archivo</button><button type="button" id="externalDownload" class="secondary">⬇ Descargar datos</button></div>
@@ -366,10 +366,10 @@ function render(){
  $('crossToggle').classList.toggle('hidden',isDaily||isCount||isExternal);
  if(isCount)renderCountSummary();if(isDaily)renderDaily();
  $('sectionTitle').textContent=isCount?'CONTEOS · '+subsection:section;
- $('sectionHint').textContent=isExternal?(section==='ZEXI'?'Saldo por Material (A) y Total General (H), sin decimales.':'Movimientos firmados por SKU; conversión con Factor (D) y Un x Est (G) de BD.'):isBD?'BD: Código (A), Descripción (B) y Flia (C).':isDaily?'Consolidado por SKU, alimentado por los conteos y las cinco pestañas de novedades.':'Registra cantidades adicionales por SKU: cada ingreso se suma al acumulado existente. La descripción se obtiene de BD.';
+ $('sectionHint').textContent=isExternal?(section==='ZEXI'?'Saldo por Material (A) y Total General (H), sin decimales.':'Movimientos firmados por SKU; conversión con Factor (D) y Un x Est (G) de BD.'):isBD?'BD: Código (A), Descripción (B) y Flia (C).':isDaily?'Consolidado con todos los SKU de ZEXI, alimentado por los conteos y las cinco pestañas de novedades.':'Registra cantidades adicionales por SKU: cada ingreso se suma al acumulado existente. La descripción se obtiene de BD.';
  $('bdFileTools').classList.toggle('hidden',!isBD);$('operationForm').classList.toggle('hidden',!OPS.includes(section));$('operationName').textContent=section;
  const data=getRows(),bd=bdMap(),term=$('search').value.toLowerCase().trim(),filtered=data.filter(r=>[r.sku,bdDesc(r.sku),r.descripcion].some(v=>String(v||'').toLowerCase().includes(term)));
- $('sectionCount').textContent=isExternal?((section==='ZEXI'?zexiData:partidasData).length+' registros'):((isDaily?new Set(countSummaries.map(r=>r.sku)).size:data.length)+' SKU');
+ $('sectionCount').textContent=isExternal?((section==='ZEXI'?zexiData:partidasData).length+' registros'):((isDaily?dailyData().length:data.length)+' SKU');
  $('metricRows').textContent=data.length;$('metricInBd').textContent=data.filter(r=>bd.has(normalizeSku(r.sku))).length;$('metricMissing').textContent=data.filter(r=>!bd.has(normalizeSku(r.sku))).length;
  const head=document.querySelector('#inventoryPanel .card > .wrap thead tr');head.replaceChildren();
  const labels=isBD?['CÓDIGO','DESCRIPCIÓN','FLIA','FACTOR','ESTIBADO 1','FAMILIA INV','ACCIONES']:section==='ZEXI'?['SKU','DESCRIPCIÓN','CANTIDAD UN','CANTIDAD','CA CANTIDAD EST','ACCIONES']:['SKU','DESCRIPCIÓN','CANT UNDS','CANT CAJ','UNDS X CAJ','CANT EST','UNDS X EST','TOTAL UNIDADES','NOVEDAD','ACCIONES'];
@@ -406,17 +406,42 @@ function render(){
 }
 function numerical(s){const n=Number(String(s??'0').replace(',','.'));return Number.isFinite(n)?n:0;}
 function dailyData(){
- const daily=new Map(),bd=bdMap();
- for(const c of countSummaries){const sku=normalizeSku(c.sku),b=bd.get(sku),f=familyOf(b?.familia||c.subseccion),k=sku;
- if(!daily.has(k))daily.set(k,{sku,descripcion:b?.descripcion||c.descripcion||'',familia:f,unds:0,caj:0,est:0,ops:{}});
- const r=daily.get(k);r.unds+=numerical(c.cant_un);r.caj+=numerical(c.cant_caj);r.est+=numerical(c.cant_est);r.extraBox=(r.extraBox||0)+numerical(c.extra_box_units);r.extraEst=(r.extraEst||0)+numerical(c.extra_pallet_units);
+ // ZEXI es el catálogo base del resumen diario: mostrar TODOS sus SKU,
+ // aunque aún no haya movimientos en CONTEOS o en operaciones.
+ const daily=new Map(), bd=bdMap();
+ for(const z of zexiData){
+  const sku=normalizeSku(z.sku);
+  if(!sku)continue;
+  const base=bd.get(sku);
+  if(!daily.has(sku))daily.set(sku,{
+   sku,
+   descripcion:base?.descripcion||z.descripcion||'',
+   familia:familyOf(base?.familia||''),
+   unds:0,caj:0,est:0,extraBox:0,extraEst:0,ops:{}
+  });
  }
- for(const r of rows){if(!OPS.includes(r.seccion))continue;const target=daily.get(normalizeSku(r.sku));if(!target)continue;
- target.ops[r.seccion]={unds:numerical(r.cantidad_un),caj:numerical(r.cantidad),est:numerical(r.ca_cantidad_est),extraBox:numerical(r.extra_box_units),extraEst:numerical(r.extra_pallet_units)};
+ for(const c of countSummaries){
+  const sku=normalizeSku(c.sku),r=daily.get(sku);
+  if(!r)continue;
+  if(!r.familia)r.familia=familyOf(c.subseccion);
+  r.unds+=numerical(c.cant_un);
+  r.caj+=numerical(c.cant_caj);
+  r.est+=numerical(c.cant_est);
+  r.extraBox+=numerical(c.extra_box_units);
+  r.extraEst+=numerical(c.extra_pallet_units);
+ }
+ for(const row of rows){
+  if(!OPS.includes(row.seccion))continue;
+  const target=daily.get(normalizeSku(row.sku));
+  if(!target)continue;
+  target.ops[row.seccion]={
+   unds:numerical(row.cantidad_un),caj:numerical(row.cantidad),est:numerical(row.ca_cantidad_est),
+   extraBox:numerical(row.extra_box_units),extraEst:numerical(row.extra_pallet_units)
+  };
  }
  return [...daily.values()].sort((a,b)=>a.sku.localeCompare(b.sku,'es',{numeric:true}));
 }
-const dailyHeaders=['SKU','DESCRIPCIÓN','CANT UNDS','CANT CAJ','UNDS X CAJA','CANT EST','CANT X EST','TOTAL UNIDADES',...OPS.map(o=>'TOTAL '+o),'TOTAL GENERAL','ZEXI','PARTIDAS (+)','PARTIDAS (-)','RESUMEN','FALTANTE','FALTANTE EST','FALTANTE CAJ','FALTANTE UNDS'];
+const dailyHeaders=['SKU ZEXI','DESCRIPCIÓN','CANT UNDS','CANT CAJ','UNDS X CAJA','CANT EST','CANT X EST','TOTAL UNIDADES',...OPS.map(o=>'TOTAL '+o),'TOTAL GENERAL','ZEXI','PARTIDAS (+)','PARTIDAS (-)','RESUMEN','FALTANTE','FALTANTE EST','FALTANTE CAJ','FALTANTE UNDS'];
 function unitValues(sku,unds,caj,est,extraBox=0,extraEst=0){const b=bdMap().get(normalizeSku(sku)),factor=numerical(b?.cantidad_un),perPallet=numerical(b?.un_x_est);const fromBox=caj*factor+numerical(extraBox),fromPallet=est*perPallet+numerical(extraEst);return {fromBox,fromPallet,total:unds+fromBox+fromPallet};}
 function partidasTotals(){const out=new Map();for(const r of partidasData){const sku=normalizeSku(r.sku),t=unitValues(sku,numerical(r.cant_unds),numerical(r.cant_caj),numerical(r.cant_est)).total;const rec=out.get(sku)||{pos:0,neg:0};if(t>=0)rec.pos+=t;else rec.neg+=Math.abs(t);out.set(sku,rec);}return out;}
 // Descomposición firmada de la diferencia contra ZEXI. Prioridad: estibas,
@@ -454,7 +479,7 @@ function renderDaily(){
  const hiddenBar=$('dailyHiddenColumns');hiddenBar.replaceChildren();if(hiddenDailyColumns.size){hiddenBar.append(mk('span','', 'Mostrar columnas: '));for(const i of [...hiddenDailyColumns].sort((a,b)=>a-b)){const show=mk('button','daily-show','👁 '+dailyHeaders[i]);show.type='button';show.title='Mostrar columna '+dailyHeaders[i];show.addEventListener('click',()=>toggleDailyColumn(i));hiddenBar.append(show)}}
  const data=dailyData().filter(r=>f==='TODOS'||r.familia===f);const partIndex=partidasTotals(),zIndex=new Map(zexiData.map(x=>[normalizeSku(x.sku),x]));
  for(const r of data){const row=mk('tr');const values=dailyValues(r,partIndex,zIndex);for(const i of visibleIndices){const cell=mk('td',(i>=8&&i<=12?'daily-operation ':'')+(i>=14&&i<=16?'daily-external ':'')+(i===13?'daily-general':'')+(i>=17?'daily-balance':''),String(values[i]??''));cell.dataset.colLabel=dailyHeaders[i];cell.dataset.columnIndex=String(i);if(i===0&&adjustMode&&isInventoryAdmin){const candidates=countSummaries.filter(x=>normalizeSku(x.sku)===r.sku);const type=candidates.find(x=>x.subseccion===r.familia)?.subseccion||candidates[0]?.subseccion;if(type){const b=mk('button','adjust-edit','✎ Editar');b.type='button';b.addEventListener('click',()=>openAdjustment('CONTEOS',r.sku,type));cell.append(document.createTextNode(' '),b)}}row.append(cell)}$('dailyRows').append(row)}
- if(!data.length){const row=mk('tr'),td=mk('td','daily-empty','Sin conteos de la familia seleccionada');td.colSpan=visibleIndices.length;row.append(td);$('dailyRows').append(row)}
+ if(!data.length){const row=mk('tr'),td=mk('td','daily-empty',zexiData.length?'Sin SKU ZEXI de la familia seleccionada':'Primero carga el archivo en la pestaña ZEXI');td.colSpan=visibleIndices.length;row.append(td);$('dailyRows').append(row)}
 }
 function downloadDaily(){const f=$('dailyFamily').value,arr=dailyData().filter(r=>f==='TODOS'||r.familia===f);const partIndex=partidasTotals(),zIndex=new Map(zexiData.map(x=>[normalizeSku(x.sku),x]));const ws=XLSX.utils.aoa_to_sheet([dailyHeaders,...arr.map(r=>dailyValues(r,partIndex,zIndex))]);ws['!cols']=dailyHeaders.map((_,i)=>({wch:i===1?43:18}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'RESUMEN DEL DIA');XLSX.writeFile(wb,'Resumen_Conteo_Del_Dia_'+f+'.xlsx')}
 
