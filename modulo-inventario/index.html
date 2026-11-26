@@ -163,6 +163,8 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
 .adjust-actions{justify-content:flex-end}.adjust-edit{font-size:10px;min-height:25px;padding:3px 7px;background:#eef6ff;color:#185779;border:1px solid #b8d6e7;border-radius:6px}
 #dailyAdjustToggle{background:#f6e6b9;color:#744400;border:1px solid #dfb861}
 @media(max-width:540px){.adjust-grid{grid-template-columns:1fr 1fr}.adjust-dialog{padding:13px}}
+
+.external-panel{border:1px solid #c8dfed;border-radius:13px;background:#f7fbfe;padding:14px;margin:14px 0}.external-tools{display:flex;flex-wrap:wrap;align-items:end;gap:10px}.external-tools label{font-size:12px;font-weight:750;color:#174e73}.external-tools input{display:block;margin-top:5px;max-width:310px}.external-wrap{margin-top:12px;max-height:57vh}.external-wrap table{min-width:800px}.external-wrap td{text-align:center;font-weight:650}.daily-external-head{background:#366e91!important;color:#fff!important}.daily-external{background:#eaf4fb!important;font-weight:750}
 </style></head><body>
 <header><div><h1>📒 Módulo Inventario</h1><small>CD Girardota · Control por SKU</small></div><a href="../index.html">← Control de Transportes</a></header>
 <main><section class="card login" id="loginPanel"><div class="emoji">📒🔢</div><h2>Acceso a Inventario</h2><p>Ingresa con tu PIN de Control de Transportes. El contenido se consulta y guarda en Supabase únicamente con permiso.</p><form id="inventoryLogin"><label for="pin">PIN personal</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" pattern="[0-9]{1,8}" required><button id="enter" type="submit">🔓 Ingresar</button><p id="loginError" class="error" role="alert"></p></form></section>
@@ -191,6 +193,11 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
   </section>
 </div>
 <div id="dailyPanel" class="hidden"><div class="controls"><label for="dailyFamily"><b>Filtrar familia</b></label><select id="dailyFamily"><option value="TODOS">Todas</option><option value="PET">PET</option><option value="LATA">LATA</option><option value="TW">TW</option><option value="RN">RN</option></select><button type="button" class="secondary" id="dailyDownload">⬇ Descargar resumen del día Excel</button><button type="button" id="dailyAdjustToggle" class="secondary hidden">✏️ AJUSTAR CONTEOS</button></div><p class="hint">Conteos acumulados por SKU y familia. TOTAL GENERAL suma TOTAL UNIDADES, TOTAL PFN, TOTAL PNC, TOTAL ROTURAS, TOTAL REEMPAQUE y TOTAL VERTIMIENTO. Oculta columnas con el ojo tachado y restáuralas con los botones superiores.</p><p id="dailyAdjustHint" class="hint hidden">Modo ajuste: selecciona «Editar» en el SKU para modificar cinco cantidades. Solo administrador. Las equivalencias ajustadas no modifican la BD maestra.</p><div id="dailyHiddenColumns" class="daily-hiddenbar" aria-label="Columnas ocultas"></div><div class="wrap dailyWrap"><table id="dailyTable"><thead id="dailyHead"></thead><tbody id="dailyRows"></tbody></table></div></div>
+<section id="externalPanel" class="external-panel hidden" aria-label="Carga de archivos ZEXI y PARTIDAS">
+ <div class="external-tools"><label for="externalFile">Archivo Excel<input type="file" id="externalFile" accept=".xlsx,.xls"></label>
+ <button type="button" id="externalUpload">⬆ Cargar archivo</button><button type="button" id="externalDownload" class="secondary">⬇ Descargar datos</button></div>
+ <p id="externalHelp" class="hint"></p><div id="externalPreview" class="wrap external-wrap"></div>
+</section>
 <div class="summary"><div class="metric"><b id="metricRows">0</b><span>SKU registrados en esta pestaña</span></div><div class="metric"><b id="metricInBd">0</b><span>SKU encontrados en BD</span></div><div class="metric"><b id="metricMissing">0</b><span>SKU sin coincidencia en BD</span></div></div>
 <div class="controls"><input type="search" id="search" placeholder="Buscar SKU o descripción" aria-label="Filtrar registros"><button type="button" id="addRow">＋ Agregar SKU</button><button type="button" class="secondary" id="downloadCurrent">⬇ Descargar pestaña Excel</button><button type="button" class="secondary" id="crossToggle">⇄ Ver/ocultar cruce por SKU</button><span id="bdFileTools" class="hidden"><input type="file" id="bdFile" accept=".xlsx,.xls" aria-label="Excel base de datos"><button type="button" id="uploadBD">⬆ Cargar Excel a BD</button><button type="button" class="secondary" id="downloadBD">⬇ Descargar BD</button></span></div>
 <form id="operationForm" class="operationForm hidden" autocomplete="off">
@@ -225,11 +232,12 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const COLUMNS=['SKU','DESCRIPCION','CANT UNDS','CANT CAJ','CANT EST','NOVEDAD'];
-const TABS=['PFN','PNC','ROTURAS','REEMPAQUE','VERTIMIENTO','ZEXI','BD','CONTEOS','RESUMEN CONTEO DEL DIA'];
+const TABS=['PFN','PNC','ROTURAS','REEMPAQUE','VERTIMIENTO','ZEXI','BD','PARTIDAS','CONTEOS','RESUMEN CONTEO DEL DIA'];
 const OPS=['PFN','PNC','ROTURAS','REEMPAQUE','VERTIMIENTO'];
 const familyOf=x=>{const f=String(x||'').trim().toUpperCase();return f==='LTA'?'LATA':f==='RNBRL'?'RN':f;};
 const COUNT_TYPES=['PET','LATA','TW','RN'];
 let countSyncTimer=null,countSyncBusy=false,countSyncOnline=true,countMutationBusy=false,isInventoryAdmin=false,adjustMode=false,adjustTarget=null;
+let zexiData=[],partidasData=[];
 const focusRequested=new URLSearchParams(location.search).get('modo')==='conteo';
 const prefersMobile=window.matchMedia('(max-width: 700px) and (pointer: coarse)').matches;
 let focusCounting=focusRequested||prefersMobile;
@@ -291,7 +299,11 @@ function renewInventoryLogin(message='Ingresa tu PIN de Inventario para revalida
 function isInventoryPermissionError(e){return /sin permiso para inventario|pin sin permiso|pin inválido/i.test(String(e?.message||e||''));}
 
 async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;$('pin').value='';await load();window.ctNavigationSession?.save(candidate);try{isInventoryAdmin=(await rpc('ct_inventory_count_is_admin',{}))===true;}catch(_){isInventoryAdmin=false;}$('clearAllCounts').classList.toggle('hidden',!isInventoryAdmin);$('dailyAdjustToggle').classList.toggle('hidden',!isInventoryAdmin);$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');if(focusCounting){section='CONTEOS';subsection='PET';document.body.classList.add('focus-count')}render();adjustCountViewport();startCountSync();}catch(e){pin='';window.ctNavigationSession?.clear?.();$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
-async function load(){const [data,counts]=await Promise.all([rpc('ct_inventory_rows_list',{}),rpc('ct_inventory_counts_list',{})]);rows=Array.isArray(data)?data:[];countSummaries=Array.isArray(counts)?counts:[];}
+async function load(){
+ const [data,counts,ext]=await Promise.all([rpc('ct_inventory_rows_list',{}),rpc('ct_inventory_counts_list',{}),rpc('ct_inventory_external_list',{})]);
+ rows=Array.isArray(data)?data:[];countSummaries=Array.isArray(counts)?counts:[];
+ zexiData=Array.isArray(ext?.zexi)?ext.zexi:[];partidasData=Array.isArray(ext?.partidas)?ext.partidas:[];
+}
 // Sincronización periódica con la base compartida: no requiere habilitar RLS de lectura pública.
 // Se consulta solo el agregado autorizado mediante PIN (RPC), sin exponer movimientos individuales.
 function stopCountSync(){if(countSyncTimer!==null){clearInterval(countSyncTimer);countSyncTimer=null;}}
@@ -306,7 +318,10 @@ async function syncCountSummaries(force=false){
    if(section==='CONTEOS')renderCountSummary();
   }
   if(section==='RESUMEN CONTEO DEL DIA'||OPS.includes(section)){
- const freshRows=await rpc('ct_inventory_rows_list',{}),nextRows=Array.isArray(freshRows)?freshRows:[];
+  const [freshRows,ext]=await Promise.all([rpc('ct_inventory_rows_list',{}),rpc('ct_inventory_external_list',{})]);
+  const nextRows=Array.isArray(freshRows)?freshRows:[];
+  const nextZ=Array.isArray(ext?.zexi)?ext.zexi:[],nextP=Array.isArray(ext?.partidas)?ext.partidas:[];
+  if(JSON.stringify(nextZ)!==JSON.stringify(zexiData)||JSON.stringify(nextP)!==JSON.stringify(partidasData)){zexiData=nextZ;partidasData=nextP;if(section==='RESUMEN CONTEO DEL DIA')renderDaily();else if(section==='ZEXI'||section==='PARTIDAS')renderExternal();}
  if(JSON.stringify(nextRows)!==JSON.stringify(rows)){rows=nextRows;if(section==='RESUMEN CONTEO DEL DIA')renderDaily();else if(!document.activeElement?.closest?.('#operationForm,#gridRows'))render();}
  }
   countSyncOnline=true;
@@ -325,27 +340,28 @@ function startCountSync(){
 }
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&pin)syncCountSummaries(true)});
 window.addEventListener('online',()=>{if(pin)syncCountSummaries(true)});
-function selectTab(tab,sub){section=tab;subsection=tab==='CONTEOS'?(sub||subsection||'PET'):'';$('search').value='';clearCountForm();render();}
+function selectTab(tab,sub){if($('externalFile'))$('externalFile').value='';section=tab;subsection=tab==='CONTEOS'?(sub||subsection||'PET'):'';$('search').value='';clearCountForm();render();}
 function renderTabs(){const bar=$('mainTabs');bar.replaceChildren();for(const t of TABS){if(!visible.has(t))continue;const b=mk('button','tab'+(section===t?' active':''),t);b.type='button';b.addEventListener('click',()=>selectTab(t));bar.append(b)}const vs=$('visibilityOptions');vs.replaceChildren();for(const t of TABS){const lab=mk('label'),cb=mk('input');cb.type='checkbox';cb.checked=visible.has(t);cb.addEventListener('change',()=>{if(cb.checked)visible.add(t);else if(visible.size>1)visible.delete(t);else{cb.checked=true;status('Debe permanecer visible al menos una pestaña.',true);return}if(!visible.has(section))section=[...visible][0];render()});lab.append(cb,document.createTextNode(' '+t));vs.append(lab)}
 const sbBar=$('conteosTabs');sbBar.classList.toggle('hidden',section!=='CONTEOS');sbBar.replaceChildren();if(section==='CONTEOS')for(const t of COUNT_TYPES){const b=mk('button','tab sub'+(subsection===t?' active':''),t);b.type='button';b.addEventListener('click',()=>selectTab('CONTEOS',t));sbBar.append(b)}}
 function render(){
  renderTabs();renderFocusTabs();
- const isCount=section==='CONTEOS', isDaily=section==='RESUMEN CONTEO DEL DIA',isBD=section==='BD';
+ const isCount=section==='CONTEOS', isDaily=section==='RESUMEN CONTEO DEL DIA',isBD=section==='BD',isExternal=section==='ZEXI'||section==='PARTIDAS';
+ $('externalPanel').classList.toggle('hidden',!isExternal);if(isExternal)renderExternal();
  $('dailyPanel').classList.toggle('hidden',!isDaily);
  $('countsWorkspace').classList.toggle('hidden',!isCount);$('countAllDownload').classList.toggle('hidden',!isCount);
- $('addRow').classList.toggle('hidden',isCount||isDaily||isBD);
- $('downloadCurrent').classList.toggle('hidden',isCount||isDaily||isBD);
- $('bdHint').classList.toggle('hidden',isCount||isDaily);
- document.querySelector('.summary').classList.toggle('hidden',isCount||isDaily);
- document.querySelector('#inventoryPanel .card > .wrap').classList.toggle('hidden',isCount||isDaily);
- $('search').classList.toggle('hidden',isDaily||isCount);
- $('crossToggle').classList.toggle('hidden',isDaily||isCount);
+ $('addRow').classList.toggle('hidden',isCount||isDaily||isBD||isExternal);
+ $('downloadCurrent').classList.toggle('hidden',isCount||isDaily||isBD||isExternal);
+ $('bdHint').classList.toggle('hidden',isCount||isDaily||isExternal);
+ document.querySelector('.summary').classList.toggle('hidden',isCount||isDaily||isExternal);
+ document.querySelector('#inventoryPanel .card > .wrap').classList.toggle('hidden',isCount||isDaily||isExternal);
+ $('search').classList.toggle('hidden',isDaily||isCount||isExternal);
+ $('crossToggle').classList.toggle('hidden',isDaily||isCount||isExternal);
  if(isCount)renderCountSummary();if(isDaily)renderDaily();
  $('sectionTitle').textContent=isCount?'CONTEOS · '+subsection:section;
- $('sectionHint').textContent=isBD?'BD: Código (A), Descripción (B) y Flia (C).':isDaily?'Consolidado por SKU, alimentado por los conteos y las cinco pestañas de novedades.':'Registra cantidades adicionales por SKU: cada ingreso se suma al acumulado existente. La descripción se obtiene de BD.';
+ $('sectionHint').textContent=isExternal?(section==='ZEXI'?'Saldo por Material (A) y Total General (H), sin decimales.':'Movimientos firmados por SKU; conversión con Factor (D) y Un x Est (G) de BD.'):isBD?'BD: Código (A), Descripción (B) y Flia (C).':isDaily?'Consolidado por SKU, alimentado por los conteos y las cinco pestañas de novedades.':'Registra cantidades adicionales por SKU: cada ingreso se suma al acumulado existente. La descripción se obtiene de BD.';
  $('bdFileTools').classList.toggle('hidden',!isBD);$('operationForm').classList.toggle('hidden',!OPS.includes(section));$('operationName').textContent=section;
  const data=getRows(),bd=bdMap(),term=$('search').value.toLowerCase().trim(),filtered=data.filter(r=>[r.sku,bdDesc(r.sku),r.descripcion].some(v=>String(v||'').toLowerCase().includes(term)));
- $('sectionCount').textContent=(isDaily?new Set(countSummaries.map(r=>r.sku)).size:data.length)+' SKU';
+ $('sectionCount').textContent=isExternal?((section==='ZEXI'?zexiData:partidasData).length+' registros'):((isDaily?new Set(countSummaries.map(r=>r.sku)).size:data.length)+' SKU');
  $('metricRows').textContent=data.length;$('metricInBd').textContent=data.filter(r=>bd.has(normalizeSku(r.sku))).length;$('metricMissing').textContent=data.filter(r=>!bd.has(normalizeSku(r.sku))).length;
  const head=document.querySelector('#inventoryPanel .card > .wrap thead tr');head.replaceChildren();
  const labels=isBD?['CÓDIGO','DESCRIPCIÓN','FLIA','FACTOR','ESTIBADO 1','FAMILIA INV','ACCIONES']:section==='ZEXI'?['SKU','DESCRIPCIÓN','CANTIDAD UN','CANTIDAD','CA CANTIDAD EST','ACCIONES']:['SKU','DESCRIPCIÓN','CANT UNDS','CANT CAJ','UNDS X CAJ','CANT EST','UNDS X EST','TOTAL UNIDADES','NOVEDAD','ACCIONES'];
@@ -392,23 +408,43 @@ function dailyData(){
  }
  return [...daily.values()].sort((a,b)=>a.sku.localeCompare(b.sku,'es',{numeric:true}));
 }
-const dailyHeaders=['SKU','DESCRIPCIÓN','CANT UNDS','CANT CAJ','UNDS X CAJA','CANT EST','CANT X EST','TOTAL UNIDADES',...OPS.map(o=>'TOTAL '+o),'TOTAL GENERAL'];
+const dailyHeaders=['SKU','DESCRIPCIÓN','CANT UNDS','CANT CAJ','UNDS X CAJA','CANT EST','CANT X EST','TOTAL UNIDADES',...OPS.map(o=>'TOTAL '+o),'TOTAL GENERAL','ZEXI','PARTIDAS (+)','PARTIDAS (-)'];
 function unitValues(sku,unds,caj,est,extraBox=0,extraEst=0){const b=bdMap().get(normalizeSku(sku)),factor=numerical(b?.cantidad_un),perPallet=numerical(b?.un_x_est);const fromBox=caj*factor+numerical(extraBox),fromPallet=est*perPallet+numerical(extraEst);return {fromBox,fromPallet,total:unds+fromBox+fromPallet};}
-function dailyValues(r){const v=unitValues(r.sku,r.unds,r.caj,r.est,r.extraBox||0,r.extraEst||0);const opTotals=OPS.map(o=>unitValues(r.sku,r.ops[o]?.unds??0,r.ops[o]?.caj??0,r.ops[o]?.est??0,r.ops[o]?.extraBox||0,r.ops[o]?.extraEst||0).total);return [r.sku,r.descripcion,r.unds,r.caj,v.fromBox,r.est,v.fromPallet,v.total,...opTotals,v.total+opTotals.reduce((a,b)=>a+b,0)];}
+function partidasTotals(){const out=new Map();for(const r of partidasData){const sku=normalizeSku(r.sku),t=unitValues(sku,numerical(r.cant_unds),numerical(r.cant_caj),numerical(r.cant_est)).total;const rec=out.get(sku)||{pos:0,neg:0};if(t>=0)rec.pos+=t;else rec.neg+=t;out.set(sku,rec);}return out;}
+function dailyValues(r,parts=partidasTotals(),zMap=new Map(zexiData.map(x=>[normalizeSku(x.sku),x]))){const v=unitValues(r.sku,r.unds,r.caj,r.est,r.extraBox||0,r.extraEst||0);const opTotals=OPS.map(o=>unitValues(r.sku,r.ops[o]?.unds??0,r.ops[o]?.caj??0,r.ops[o]?.est??0,r.ops[o]?.extraBox||0,r.ops[o]?.extraEst||0).total);const z=zMap.get(r.sku);const partida=parts.get(r.sku);return [r.sku,r.descripcion,r.unds,r.caj,v.fromBox,r.est,v.fromPallet,v.total,...opTotals,v.total+opTotals.reduce((a,b)=>a+b,0),z?numerical(z.total_general):0,partida?.pos||0,partida?.neg||0];}
 // Columnas del resumen diario: se pueden ocultar individualmente, sin borrar datos.
 const hiddenDailyColumns=new Set();
 function toggleDailyColumn(i){if(hiddenDailyColumns.has(i))hiddenDailyColumns.delete(i);else{if(hiddenDailyColumns.size>=dailyHeaders.length-1){status('Debe quedar al menos una columna visible.',true);return;}hiddenDailyColumns.add(i)}renderDaily();}
 function renderDaily(){
  const f=$('dailyFamily').value, visibleIndices=dailyHeaders.map((_,i)=>i).filter(i=>!hiddenDailyColumns.has(i));
- const tr=mk('tr');for(const i of visibleIndices){const th=mk('th','daily-colhead'+(i>=8&&i<=12?' daily-operation-head':'')+(i===dailyHeaders.length-1?' daily-general-head':''));const eye=mk('button','daily-eye','◉');eye.type='button';eye.title='Ocultar '+dailyHeaders[i];eye.setAttribute('aria-label','Ocultar columna '+dailyHeaders[i]);eye.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 10.7a2 2 0 0 0 2.7 2.7"/><path d="M9.9 5.2a10.8 10.8 0 0 1 2.1-.2c5 0 9 4 10 7a13.1 13.1 0 0 1-3.2 4.6M6.5 6.5A13.4 13.4 0 0 0 2 12c1 3 5 7 10 7 1.6 0 3.1-.4 4.4-1"/></svg>';eye.addEventListener('click',()=>toggleDailyColumn(i));th.dataset.columnIndex=String(i);th.append(eye,mk('span','',dailyHeaders[i]));tr.append(th)}
+ const tr=mk('tr');for(const i of visibleIndices){const th=mk('th','daily-colhead'+(i>=8&&i<=12?' daily-operation-head':'')+(i>=14?' daily-external-head':'')+(i===13?' daily-general-head':''));const eye=mk('button','daily-eye','◉');eye.type='button';eye.title='Ocultar '+dailyHeaders[i];eye.setAttribute('aria-label','Ocultar columna '+dailyHeaders[i]);eye.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 10.7a2 2 0 0 0 2.7 2.7"/><path d="M9.9 5.2a10.8 10.8 0 0 1 2.1-.2c5 0 9 4 10 7a13.1 13.1 0 0 1-3.2 4.6M6.5 6.5A13.4 13.4 0 0 0 2 12c1 3 5 7 10 7 1.6 0 3.1-.4 4.4-1"/></svg>';eye.addEventListener('click',()=>toggleDailyColumn(i));th.dataset.columnIndex=String(i);th.append(eye,mk('span','',dailyHeaders[i]));tr.append(th)}
  $('dailyHead').replaceChildren(tr);$('dailyRows').replaceChildren();
  const hiddenBar=$('dailyHiddenColumns');hiddenBar.replaceChildren();if(hiddenDailyColumns.size){hiddenBar.append(mk('span','', 'Mostrar columnas: '));for(const i of [...hiddenDailyColumns].sort((a,b)=>a-b)){const show=mk('button','daily-show','👁 '+dailyHeaders[i]);show.type='button';show.title='Mostrar columna '+dailyHeaders[i];show.addEventListener('click',()=>toggleDailyColumn(i));hiddenBar.append(show)}}
- const data=dailyData().filter(r=>f==='TODOS'||r.familia===f);
- for(const r of data){const row=mk('tr');const values=dailyValues(r);for(const i of visibleIndices){const cell=mk('td',(i>=8&&i<=12?'daily-operation ':'')+(i===dailyHeaders.length-1?'daily-general':''),String(values[i]??''));cell.dataset.colLabel=dailyHeaders[i];cell.dataset.columnIndex=String(i);if(i===0&&adjustMode&&isInventoryAdmin){const candidates=countSummaries.filter(x=>normalizeSku(x.sku)===r.sku);const type=candidates.find(x=>x.subseccion===r.familia)?.subseccion||candidates[0]?.subseccion;if(type){const b=mk('button','adjust-edit','✎ Editar');b.type='button';b.addEventListener('click',()=>openAdjustment('CONTEOS',r.sku,type));cell.append(document.createTextNode(' '),b)}}row.append(cell)}$('dailyRows').append(row)}
+ const data=dailyData().filter(r=>f==='TODOS'||r.familia===f);const partIndex=partidasTotals(),zIndex=new Map(zexiData.map(x=>[normalizeSku(x.sku),x]));
+ for(const r of data){const row=mk('tr');const values=dailyValues(r,partIndex,zIndex);for(const i of visibleIndices){const cell=mk('td',(i>=8&&i<=12?'daily-operation ':'')+(i>=14?'daily-external ':'')+(i===13?'daily-general':''),String(values[i]??''));cell.dataset.colLabel=dailyHeaders[i];cell.dataset.columnIndex=String(i);if(i===0&&adjustMode&&isInventoryAdmin){const candidates=countSummaries.filter(x=>normalizeSku(x.sku)===r.sku);const type=candidates.find(x=>x.subseccion===r.familia)?.subseccion||candidates[0]?.subseccion;if(type){const b=mk('button','adjust-edit','✎ Editar');b.type='button';b.addEventListener('click',()=>openAdjustment('CONTEOS',r.sku,type));cell.append(document.createTextNode(' '),b)}}row.append(cell)}$('dailyRows').append(row)}
  if(!data.length){const row=mk('tr'),td=mk('td','daily-empty','Sin conteos de la familia seleccionada');td.colSpan=visibleIndices.length;row.append(td);$('dailyRows').append(row)}
 }
-function downloadDaily(){const f=$('dailyFamily').value,arr=dailyData().filter(r=>f==='TODOS'||r.familia===f);const ws=XLSX.utils.aoa_to_sheet([dailyHeaders,...arr.map(dailyValues)]);ws['!cols']=dailyHeaders.map((_,i)=>({wch:i===1?43:18}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'RESUMEN DEL DIA');XLSX.writeFile(wb,'Resumen_Conteo_Del_Dia_'+f+'.xlsx')}
+function downloadDaily(){const f=$('dailyFamily').value,arr=dailyData().filter(r=>f==='TODOS'||r.familia===f);const partIndex=partidasTotals(),zIndex=new Map(zexiData.map(x=>[normalizeSku(x.sku),x]));const ws=XLSX.utils.aoa_to_sheet([dailyHeaders,...arr.map(r=>dailyValues(r,partIndex,zIndex))]);ws['!cols']=dailyHeaders.map((_,i)=>({wch:i===1?43:18}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'RESUMEN DEL DIA');XLSX.writeFile(wb,'Resumen_Conteo_Del_Dia_'+f+'.xlsx')}
 
+// Cargue independiente: nunca reemplaza BD ni borra conteos.
+function excelNorm(x){return String(x??'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9]/g,'');}
+function excelGet(obj,...names){const entries=Object.entries(obj).map(([k,v])=>[excelNorm(k),v]);for(const name of names){const found=entries.find(([k])=>k===excelNorm(name));if(found)return found[1];}return '';}
+function signedExcelNumber(value){if(value===null||value===undefined||String(value).trim()==='')return 0;if(typeof value==='number'){if(!Number.isFinite(value))throw Error('Cantidad no numérica');return value;}let v=String(value).trim().replace(/\s/g,'');if(v.includes(',')&&v.includes('.')){v=v.lastIndexOf(',')>v.lastIndexOf('.')?v.replace(/\./g,'').replace(',','.'):v.replace(/,/g,'');}else if(v.includes(','))v=v.replace(',','.');else if(/^[-+]?\d{1,3}(\.\d{3})+$/.test(v))v=v.replace(/\./g,'');const n=Number(v);if(!Number.isFinite(n))throw Error('Cantidad inválida: '+value);return n;}
+function renderExternal(){
+ const isZ=section==='ZEXI',data=isZ?zexiData:partidasData,root=$('externalPreview');
+ $('externalHelp').textContent=isZ?'Carga Hoja de cálculo en Basis: Material (A), descripción (B), Total General (H). Se conserva la parte entera del total; los decimales no se incluyen.':'Carga Partidas Diarias: Transporte/Documento (A), SKU (B), Cant unds (C), Cant Caj (D), Cant Est (E). Los valores negativos se conservan. UNDS X CAJ y UNDS X EST usan la BD.';
+ $('externalUpload').disabled=!isInventoryAdmin;
+ root.replaceChildren();const tbl=mk('table');const head=mk('thead'),tr=mk('tr');const cols=isZ?['SKU','DESCRIPCIÓN','TOTAL GENERAL (H)']:['TRANSPORTE/DOCUMENTO','SKU','DESCRIPCIÓN','CANT UNDS','CANT CAJ','UNDS X CAJ','CANT EST','UNDS X EST','TOTAL UNDS','NOVEDAD'];for(const h of cols)tr.append(mk('th','',h));head.append(tr);tbl.append(head);const body=mk('tbody');
+ for(const d of data){const row=mk('tr'),v=isZ?[d.sku,bdDesc(d.sku)||d.descripcion,d.total_general]:(()=>{const c=unitValues(d.sku,numerical(d.cant_unds),numerical(d.cant_caj),numerical(d.cant_est));return [d.documento,d.sku,bdDesc(d.sku)||'',d.cant_unds,d.cant_caj,c.fromBox,d.cant_est,c.fromPallet,c.total,d.novedad||''];})();for(const cell of v)row.append(mk('td','',String(cell??'')));body.append(row)}if(!data.length){const row=mk('tr'),cell=mk('td','','Aún no se ha cargado archivo.');cell.colSpan=cols.length;row.append(cell);body.append(row)}tbl.append(body);root.append(tbl);
+ $('sectionCount').textContent=data.length+' registros';
+}
+async function uploadExternal(){const file=$('externalFile').files?.[0];if(!file){status('Selecciona el Excel.',true);return;}if(!isInventoryAdmin){status('Solo el administrador puede reemplazar el archivo.',true);return;}const sec=section;if(sec!=='ZEXI'&&sec!=='PARTIDAS')return;const button=$('externalUpload');button.disabled=true;try{
+ const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),sheet=wb.Sheets[wb.SheetNames[0]],raw=XLSX.utils.sheet_to_json(sheet,{defval:'',raw:true});const data=[];const seen=new Set();
+ for(const obj of raw){if(sec==='ZEXI'){const sku=normalizeSku(excelGet(obj,'MATERIAL','SKU','CODIGO'));if(!sku)continue;if(seen.has(sku))throw Error('SKU duplicado en ZEXI: '+sku);seen.add(sku);const num=signedExcelNumber(excelGet(obj,'TOTAL GENERAL'));data.push({sku,descripcion:String(excelGet(obj,'DESCRIPCION DEL MATERIAL','DESCRIPCION')||''),total_general:Math.trunc(num)});}else{const sku=normalizeSku(excelGet(obj,'SKU','CODIGO'));if(!sku)continue;data.push({documento:String(excelGet(obj,'TRANSPORTE/DOCUMENTO')||''),sku,cant_unds:signedExcelNumber(excelGet(obj,'CANT UNDS')),cant_caj:signedExcelNumber(excelGet(obj,'CANT CAJ')),cant_est:signedExcelNumber(excelGet(obj,'CANT EST')),novedad:String(excelGet(obj,'NOVEDAD','OBSERVACION','__EMPTY','')||'')});}}
+ if(!data.length)throw Error('No se encontraron datos de SKU. Revisa los encabezados del archivo.');if(!confirm('¿Reemplazar SOLO los registros de '+sec+' con '+data.length+' filas? No se modificará BD ni los conteos.'))return;
+ status('Importando '+data.length+' filas a '+sec+'…');await rpc('ct_inventory_external_replace',{p_seccion:sec,p_rows:data});await load();render();$('externalFile').value='';status('Carga de '+sec+' completada: '+data.length+' filas.');
+ }catch(e){status('Error al cargar '+sec+': '+e.message,true)}finally{button.disabled=false;}}
+function downloadExternal(){const isZ=section==='ZEXI',data=isZ?zexiData:partidasData;if(!data.length){status('Sin registros para descargar.',true);return;}const headers=isZ?['SKU','DESCRIPCIÓN','TOTAL GENERAL']:['TRANSPORTE/DOCUMENTO','SKU','DESCRIPCIÓN','CANT UNDS','CANT CAJ','UNDS X CAJ','CANT EST','UNDS X EST','TOTAL UNDS','NOVEDAD'];const arr=data.map(r=>isZ?[r.sku,bdDesc(r.sku)||r.descripcion,r.total_general]:(()=>{const v=unitValues(r.sku,numerical(r.cant_unds),numerical(r.cant_caj),numerical(r.cant_est));return [r.documento,r.sku,bdDesc(r.sku),r.cant_unds,r.cant_caj,v.fromBox,r.cant_est,v.fromPallet,v.total,r.novedad||'']})());const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet([headers,...arr]);ws['!cols']=headers.map((_,i)=>({wch:i===2?42:20}));XLSX.utils.book_append_sheet(wb,ws,section);XLSX.writeFile(wb,'Inventario_'+section+'.xlsx');}
 async function saveRecord(item,oldSku='',rerender=true){
  if(saving)throw Error('Ya se está guardando otro registro.');saving=true;
  try{await rpc('ct_inventory_row_save_v2',{p_seccion:item.seccion,p_subseccion:item.subseccion||'',p_sku:normalizeSku(item.sku),p_descripcion:clean(item.descripcion),p_cantidad_un:clean(item.cantidad_un),p_cantidad:clean(item.cantidad),p_ca_cantidad_est:clean(item.ca_cantidad_est),p_novedad:clean(item.novedad),p_familia:clean(item.familia),p_old_sku:oldSku});await load();if(rerender)render()}finally{saving=false}
@@ -501,6 +537,7 @@ $('downloadCurrent').addEventListener('click',()=>download(getRows(),'Inventario
 $('downloadBD').addEventListener('click',downloadBD);
 $('dailyFamily').addEventListener('change',renderDaily);$('dailyAdjustToggle').addEventListener('click',()=>{if(!isInventoryAdmin)return;adjustMode=!adjustMode;$('dailyAdjustToggle').textContent=adjustMode?'✕ Terminar ajustes':'✏️ AJUSTAR CONTEOS';$('dailyAdjustHint').classList.toggle('hidden',!adjustMode);renderDaily()});$('dailyDownload').addEventListener('click',downloadDaily);
 $('uploadBD').addEventListener('click',uploadBD);
+$('externalUpload').addEventListener('click',uploadExternal);$('externalDownload').addEventListener('click',downloadExternal);
 $('crossToggle').addEventListener('click',()=>{$('crossPanel').classList.toggle('hidden');render()});
 $('renewInventoryLogin').addEventListener('click',()=>renewInventoryLogin());
 $('exit').addEventListener('click',()=>{stopCountSync();pin='';window.ctNavigationSession?.clear?.();location.href='../index.html'});
