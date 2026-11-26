@@ -173,6 +173,13 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
 @media(max-width:900px){
  #inventoryPanel .dailyWrap tbody td.daily-balance::before{color:#164a63}
 }
+
+/* Indicadores de faltantes: agregados de los SKU visibles según filtro FLIA. */
+.daily-missing-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 14px}
+.daily-missing-metric{min-width:0;border:1px solid #c5dce8;background:#edf6fb;border-radius:12px;padding:11px 14px;text-align:center}
+.daily-missing-metric strong{display:block;font-size:clamp(18px,2vw,26px);line-height:1.25;color:#144c6b;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.daily-missing-metric span{display:block;font-size:11px;font-weight:800;letter-spacing:.02em;color:#446e84;margin-bottom:4px}
+@media(max-width:540px){.daily-missing-metrics{gap:6px}.daily-missing-metric{padding:9px 5px}.daily-missing-metric strong{font-size:clamp(15px,4vw,20px)}.daily-missing-metric span{font-size:9px}}
 </style></head><body>
 <header><div><h1>📒 Módulo Inventario</h1><small>CD Girardota · Control por SKU</small></div><a href="../index.html">← Control de Transportes</a></header>
 <main><section class="card login" id="loginPanel"><div class="emoji">📒🔢</div><h2>Acceso a Inventario</h2><p>Ingresa con tu PIN de Control de Transportes. El contenido se consulta y guarda en Supabase únicamente con permiso.</p><form id="inventoryLogin"><label for="pin">PIN personal</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" pattern="[0-9]{1,8}" required><button id="enter" type="submit">🔓 Ingresar</button><p id="loginError" class="error" role="alert"></p></form></section>
@@ -200,7 +207,11 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
     <p class="countsInfo">CANT UN acumula «CANT UNDS». CANT CAJ acumula «CANT CAJAS». CANT EST acumula «CANT ESTIBAS». NOVEDAD reúne los sitios registrados sin duplicarlos. Cada entrada se conserva por separado en Supabase.</p>
   </section>
 </div>
-<div id="dailyPanel" class="hidden"><div class="controls"><label for="dailyFamily"><b>Filtrar familia</b></label><select id="dailyFamily" aria-label="Filtrar SKU según la columna FLIA de BD"><option value="TODOS">Todas las familias</option></select><button type="button" class="secondary" id="dailyDownload">⬇ Descargar resumen del día Excel</button><button type="button" id="dailyAdjustToggle" class="secondary hidden">✏️ AJUSTAR CONTEOS</button></div><p class="hint">Base del resumen: todos los SKU cargados en ZEXI. El filtro de familias utiliza FLIA de BD; los SKU sin FLIA solo se muestran en Todas las familias. Se cruzan las cantidades de CONTEOS, PFN, PNC, ROTURAS, REEMPAQUE, VERTIMIENTO y PARTIDAS por SKU. Los SKU sin movimientos muestran cero. Puedes ocultar columnas con el ojo tachado.</p><p id="dailyAdjustHint" class="hint hidden">Modo ajuste: selecciona «Editar» en el SKU para modificar cinco cantidades. Solo administrador. Las equivalencias ajustadas no modifican la BD maestra.</p><div id="dailyHiddenColumns" class="daily-hiddenbar" aria-label="Columnas ocultas"></div><div class="wrap dailyWrap"><table id="dailyTable"><thead id="dailyHead"></thead><tbody id="dailyRows"></tbody></table></div></div>
+<div id="dailyPanel" class="hidden"><div class="controls"><label for="dailyFamily"><b>Filtrar familia</b></label><select id="dailyFamily" aria-label="Filtrar SKU según la columna FLIA de BD"><option value="TODOS">Todas las familias</option></select><button type="button" class="secondary" id="dailyDownload">⬇ Descargar resumen del día Excel</button><button type="button" id="dailyAdjustToggle" class="secondary hidden">✏️ AJUSTAR CONTEOS</button></div><p class="hint">Base del resumen: todos los SKU cargados en ZEXI. El filtro de familias utiliza FLIA de BD; los SKU sin FLIA solo se muestran en Todas las familias. Se cruzan las cantidades de CONTEOS, PFN, PNC, ROTURAS, REEMPAQUE, VERTIMIENTO y PARTIDAS por SKU. Los SKU sin movimientos muestran cero. Puedes ocultar columnas con el ojo tachado.</p><p id="dailyAdjustHint" class="hint hidden">Modo ajuste: selecciona «Editar» en el SKU para modificar cinco cantidades. Solo administrador. Las equivalencias ajustadas no modifican la BD maestra.</p><div id="dailyMissingMetrics" class="daily-missing-metrics" aria-label="Acumulados de faltantes de la familia filtrada" aria-live="polite">
+ <div class="daily-missing-metric"><span>FALTANTE UNDS</span><strong id="dailyMissingUnits">0</strong></div>
+ <div class="daily-missing-metric"><span>FALTANTE CAJ</span><strong id="dailyMissingBoxes">0</strong></div>
+ <div class="daily-missing-metric"><span>FALTANTE EST</span><strong id="dailyMissingPallets">0</strong></div>
+</div><div id="dailyHiddenColumns" class="daily-hiddenbar" aria-label="Columnas ocultas"></div><div class="wrap dailyWrap"><table id="dailyTable"><thead id="dailyHead"></thead><tbody id="dailyRows"></tbody></table></div></div>
 <section id="externalPanel" class="external-panel hidden" aria-label="Carga de archivos ZEXI y PARTIDAS">
  <div class="external-tools"><label for="externalFile">Archivo Excel<input type="file" id="externalFile" accept=".xlsx,.xls"></label>
  <button type="button" id="externalUpload">⬆ Cargar archivo</button><button type="button" id="externalDownload" class="secondary">⬇ Descargar datos</button></div>
@@ -494,7 +505,19 @@ function renderDaily(){
  $('dailyHead').replaceChildren(tr);$('dailyRows').replaceChildren();
  const hiddenBar=$('dailyHiddenColumns');hiddenBar.replaceChildren();if(hiddenDailyColumns.size){hiddenBar.append(mk('span','', 'Mostrar columnas: '));for(const i of [...hiddenDailyColumns].sort((a,b)=>a-b)){const show=mk('button','daily-show','👁 '+dailyHeaders[i]);show.type='button';show.title='Mostrar columna '+dailyHeaders[i];show.addEventListener('click',()=>toggleDailyColumn(i));hiddenBar.append(show)}}
  const data=filteredDailyData();const partIndex=partidasTotals(),zIndex=new Map(zexiData.map(x=>[normalizeSku(x.sku),x]));
- for(const r of data){const row=mk('tr');const values=dailyValues(r,partIndex,zIndex);for(const i of visibleIndices){const cell=mk('td',(i>=8&&i<=12?'daily-operation ':'')+(i>=14&&i<=16?'daily-external ':'')+(i===13?'daily-general':'')+(i>=17?'daily-balance':''),String(values[i]??''));cell.dataset.colLabel=dailyHeaders[i];cell.dataset.columnIndex=String(i);if(i===0&&adjustMode&&isInventoryAdmin){const candidates=countSummaries.filter(x=>normalizeSku(x.sku)===r.sku);const type=candidates.find(x=>x.subseccion===r.familia)?.subseccion||candidates[0]?.subseccion;if(type){const b=mk('button','adjust-edit','✎ Editar');b.type='button';b.addEventListener('click',()=>openAdjustment('CONTEOS',r.sku,type));cell.append(document.createTextNode(' '),b)}}row.append(cell)}$('dailyRows').append(row)}
+ // Sumar solo los SKU visibles por el filtro de FLIA, incluso si las columnas están ocultas.
+ const totals={units:0,boxes:0,pallets:0};
+ const computedRows=data.map(r=>({row:r,values:dailyValues(r,partIndex,zIndex)}));
+ for(const item of computedRows){
+  totals.pallets+=numerical(item.values[19]);
+  totals.boxes+=numerical(item.values[20]);
+  totals.units+=numerical(item.values[21]);
+ }
+ const formatMissing=n=>new Intl.NumberFormat('es-CO',{maximumFractionDigits:6}).format(Number(n.toFixed(6)));
+ $('dailyMissingUnits').textContent=formatMissing(totals.units);
+ $('dailyMissingBoxes').textContent=formatMissing(totals.boxes);
+ $('dailyMissingPallets').textContent=formatMissing(totals.pallets);
+ for(const item of computedRows){const r=item.row;const values=item.values;const row=mk('tr');for(const i of visibleIndices){const cell=mk('td',(i>=8&&i<=12?'daily-operation ':'')+(i>=14&&i<=16?'daily-external ':'')+(i===13?'daily-general':'')+(i>=17?'daily-balance':''),String(values[i]??''));cell.dataset.colLabel=dailyHeaders[i];cell.dataset.columnIndex=String(i);if(i===0&&adjustMode&&isInventoryAdmin){const candidates=countSummaries.filter(x=>normalizeSku(x.sku)===r.sku);const type=candidates.find(x=>x.subseccion===r.familia)?.subseccion||candidates[0]?.subseccion;if(type){const b=mk('button','adjust-edit','✎ Editar');b.type='button';b.addEventListener('click',()=>openAdjustment('CONTEOS',r.sku,type));cell.append(document.createTextNode(' '),b)}}row.append(cell)}$('dailyRows').append(row)}
  if(!data.length){const row=mk('tr'),td=mk('td','daily-empty',zexiData.length?'Sin SKU ZEXI de la familia seleccionada':'Primero carga el archivo en la pestaña ZEXI');td.colSpan=visibleIndices.length;row.append(td);$('dailyRows').append(row)}
 }
 function downloadDaily(){const arr=filteredDailyData(),f=$('dailyFamily').value;const partIndex=partidasTotals(),zIndex=new Map(zexiData.map(x=>[normalizeSku(x.sku),x]));const ws=XLSX.utils.aoa_to_sheet([dailyHeaders,...arr.map(r=>dailyValues(r,partIndex,zIndex))]);ws['!cols']=dailyHeaders.map((_,i)=>({wch:i===1?43:18}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'RESUMEN DEL DIA');XLSX.writeFile(wb,'Resumen_Conteo_Del_Dia_'+f+'.xlsx')}
