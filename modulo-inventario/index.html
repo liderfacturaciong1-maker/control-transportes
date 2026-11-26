@@ -206,6 +206,8 @@ const bySku=new Map();
 const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const getRows=()=>rows.filter(r=>key(r.seccion,r.subseccion||'')===currentKey()).sort((a,b)=>a.sku.localeCompare(b.sku,'es',{numeric:true}));
 const bdMap=()=>new Map(rows.filter(r=>r.seccion==='BD').map(r=>[normalizeSku(r.sku),r]));
+// Descripción maestra de BD, usada por la grilla, filtros y exportaciones.
+const bdDesc=sku=>bdMap().get(normalizeSku(sku))?.descripcion||'';
 function mk(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
 try{const cfg=window.APP_CONFIG||{};if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY||!window.supabase||!window.XLSX)throw Error('Falta conexión o lector Excel');sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY,{auth:{persistSession:false}})}catch(e){$('loginError').textContent='No se cargó la conexión o el lector de Excel';return}
 async function rpc(name,args){const {data,error}=await sb.rpc(name,{p_pin:pin,...args});if(error)throw Error(error.message||'Error de conexión');return data}
@@ -334,7 +336,17 @@ async function uploadBD(){const file=$('bdFile').files?.[0];if(!file){status('Se
   // Un error de la RPC de BD no invalida la sesión ni debe borrar el PIN.
   // Mantener archivo seleccionado para reintento y mostrar error real.
   const detail=String(e?.message||e||'Error desconocido');
-  status('No se pudo cargar BD: '+detail+(isInventoryPermissionError(e)?' · El servidor rechazó el permiso de esta operación. Comprueba que la aplicación apunta al mismo proyecto Supabase donde validaste el PIN.':''),true);
+  let diagnosis='';
+  if(isInventoryPermissionError(e)){
+   // Una respuesta positiva aquí verifica la sesión real usada por el navegador.
+   try{
+    const {data:allowed,error:checkError}=await sb.rpc('ct_inventory_can_access',{p_pin:pin});
+    if(checkError)diagnosis=' · No se pudo verificar el permiso actual.';
+    else if(allowed===true)diagnosis=' · El PIN de esta sesión está autorizado; el rechazo ocurre al guardar BD. Revisa la RPC de importación en Supabase.';
+    else diagnosis=' · El PIN de esta sesión no está autorizado en este proyecto Supabase. Usa Revalidar acceso.';
+   }catch(_){diagnosis=' · No se pudo comprobar la autorización.';}
+  }
+  status('No se pudo cargar BD: '+detail+diagnosis,true);
  }finally{btn.disabled=false}}
 
 function renderCross(){const tbody=$('crossRows');tbody.replaceChildren();const bd=bdMap();const sku=normalizeSku($('search').value),other=rows.filter(r=>r.seccion!=='BD'&&(!sku||r.sku.toUpperCase().includes(sku)||(r.descripcion||'').toUpperCase().includes(sku))).sort((a,b)=>a.sku.localeCompare(b.sku,'es',{numeric:true}));for(const r of other.slice(0,1500)){const tr=mk('tr'),cells=[r.sku,bd.get(normalizeSku(r.sku))?.descripcion||r.descripcion||'Sin coincidencia BD',r.seccion==='CONTEOS'?'CONTEOS · '+r.subseccion:r.seccion,r.cantidad_un,r.cantidad,r.ca_cantidad_est];for(const v of cells){tr.append(mk('td','',display(v)))}tbody.append(tr)}if(!other.length){const tr=mk('tr'),td=mk('td','', 'Aún no hay registros de otras secciones para cruzar.');td.colSpan=6;tr.append(td);tbody.append(tr)}}
