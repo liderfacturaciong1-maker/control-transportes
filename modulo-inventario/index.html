@@ -112,8 +112,16 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
 /* Totales por operación derivados de BD: lectura únicamente */
 #inventoryPanel .calculated-num{white-space:nowrap;text-align:right;font-weight:750;font-variant-numeric:tabular-nums;background:#ecf6fa;color:#125575;padding:10px 12px}
 #inventoryPanel .total-num{background:#dff2eb;color:#0a6743}
-#inventoryPanel .dailyWrap th:nth-child(n+9):nth-child(-n+13){background:#0d765a;color:#fff}
-#inventoryPanel .dailyWrap td:nth-child(n+9):nth-child(-n+13){font-weight:800;color:#106744;background:#edf9f3}
+#inventoryPanel .dailyWrap th{min-width:120px}#inventoryPanel .dailyWrap th.daily-colhead{vertical-align:top}#inventoryPanel .dailyWrap th.daily-general-head{background:#de790d;color:white}
+#inventoryPanel .dailyWrap td.daily-general{background:#fff0d9;color:#8d4500;font-weight:850}
+/* Control de visibilidad de columnas del resumen diario */
+.daily-colhead{white-space:normal!important;text-align:center!important;min-width:118px!important}
+.daily-colhead span{display:block;white-space:nowrap;font-size:11px}
+.daily-eye{display:inline-flex;align-items:center;justify-content:center;background:#ffffff23;color:inherit;border:1px solid #ffffff65;padding:2px 6px;min-height:25px;border-radius:7px;margin-bottom:5px}
+.daily-eye:hover{background:#ffffff50}
+.daily-hiddenbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:8px 0;color:#315976;font-size:12px}
+.daily-hiddenbar:empty{display:none}
+.daily-show{background:#e8f4fb;color:#174e73;border:1px solid #bcd4e3;padding:6px 9px;font-size:11px;min-height:30px}
 </style></head><body>
 <header><div><h1>📒 Módulo Inventario</h1><small>CD Girardota · Control por SKU</small></div><a href="../index.html">← Control de Transportes</a></header>
 <main><section class="card login" id="loginPanel"><div class="emoji">📒🔢</div><h2>Acceso a Inventario</h2><p>Ingresa con tu PIN de Control de Transportes. El contenido se consulta y guarda en Supabase únicamente con permiso.</p><form id="inventoryLogin"><label for="pin">PIN personal</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" pattern="[0-9]{1,8}" required><button id="enter" type="submit">🔓 Ingresar</button><p id="loginError" class="error" role="alert"></p></form></section>
@@ -141,18 +149,18 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
     <p class="countsInfo">CANT UN acumula «CANT UNDS». CANT CAJ acumula «CANT CAJAS». CANT EST acumula «CANT ESTIBAS». NOVEDAD reúne los sitios registrados sin duplicarlos. Cada entrada se conserva por separado en Supabase.</p>
   </section>
 </div>
-<div id="dailyPanel" class="hidden"><div class="controls"><label for="dailyFamily"><b>Filtrar familia</b></label><select id="dailyFamily"><option value="TODOS">Todas</option><option value="PET">PET</option><option value="LATA">LATA</option><option value="TW">TW</option><option value="RN">RN</option></select><button type="button" class="secondary" id="dailyDownload">⬇ Descargar resumen del día Excel</button></div><p class="hint">Conteos acumulados por SKU y familia. Después de TOTAL UNIDADES aparecen los cinco totales operativos, calculados con Factor y Un x Est de BD; más a la derecha está el detalle de cantidades.</p><div class="wrap dailyWrap"><table id="dailyTable"><thead id="dailyHead"></thead><tbody id="dailyRows"></tbody></table></div></div>
+<div id="dailyPanel" class="hidden"><div class="controls"><label for="dailyFamily"><b>Filtrar familia</b></label><select id="dailyFamily"><option value="TODOS">Todas</option><option value="PET">PET</option><option value="LATA">LATA</option><option value="TW">TW</option><option value="RN">RN</option></select><button type="button" class="secondary" id="dailyDownload">⬇ Descargar resumen del día Excel</button></div><p class="hint">Conteos acumulados por SKU y familia. TOTAL GENERAL suma TOTAL UNIDADES, TOTAL PFN, TOTAL PNC, TOTAL ROTURAS, TOTAL REEMPAQUE y TOTAL VERTIMIENTO. Oculta columnas con el ojo tachado y restáuralas con los botones superiores.</p><div id="dailyHiddenColumns" class="daily-hiddenbar" aria-label="Columnas ocultas"></div><div class="wrap dailyWrap"><table id="dailyTable"><thead id="dailyHead"></thead><tbody id="dailyRows"></tbody></table></div></div>
 <div class="summary"><div class="metric"><b id="metricRows">0</b><span>SKU registrados en esta pestaña</span></div><div class="metric"><b id="metricInBd">0</b><span>SKU encontrados en BD</span></div><div class="metric"><b id="metricMissing">0</b><span>SKU sin coincidencia en BD</span></div></div>
 <div class="controls"><input type="search" id="search" placeholder="Buscar SKU o descripción" aria-label="Filtrar registros"><button type="button" id="addRow">＋ Agregar SKU</button><button type="button" class="secondary" id="downloadCurrent">⬇ Descargar pestaña Excel</button><button type="button" class="secondary" id="crossToggle">⇄ Ver/ocultar cruce por SKU</button><span id="bdFileTools" class="hidden"><input type="file" id="bdFile" accept=".xlsx,.xls" aria-label="Excel base de datos"><button type="button" id="uploadBD">⬆ Cargar Excel a BD</button><button type="button" class="secondary" id="downloadBD">⬇ Descargar BD</button></span></div>
 <form id="operationForm" class="operationForm hidden" autocomplete="off">
- <div class="operationTitle">＋ Registrar cantidades · <span id="operationName">PFN</span></div>
+ <div class="operationTitle">＋ Sumar cantidades · <span id="operationName">PFN</span></div>
  <label>SKU<input id="opSku" type="text" placeholder="Ingresa el SKU" inputmode="numeric" required maxlength="80"></label>
  <div class="operationDescription" id="opDescription" role="status">Ingresa un SKU para consultar la descripción en BD.</div>
  <label>CANT UNDS<input id="opUnd" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
  <label>CANT CAJ<input id="opCaj" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
  <label>CANT EST<input id="opEst" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
  <label>NOVEDAD (opcional)<input id="opNovedad" type="text" maxlength="240" placeholder="Escribe la novedad"></label>
- <button type="submit" id="opSave">Guardar cantidades</button>
+ <button type="submit" id="opSave">＋ ACUMULAR CANTIDADES</button>
  </form><p class="hint" id="bdHint">Los registros se guardan por sección y se relacionan por SKU con la pestaña BD. La descripción y la cantidad unitaria de BD se sugieren al agregar un SKU, pero no se sobreescriben datos ya ingresados.</p><p id="status" class="status" role="status"></p>
 <div class="wrap"><table><thead><tr><th class="colsku">SKU</th><th class="coldesc">DESCRIPCIÓN</th><th class="colnum">CANT UNDS</th><th class="colnum">CANT CAJ</th><th class="colnum">CANT EST</th><th class="colnum">NOVEDAD</th><th class="colaction">ACCIONES</th></tr></thead><tbody id="gridRows"></tbody></table></div>
 <div id="crossPanel" class="cross hidden"><h3>⇄ Cruce de secciones por SKU</h3><p class="hint">Cada SKU se compara entre las pestañas. Se presentan las cantidades tal como fueron registradas; no se aplica una fórmula automática a «CA CANTIDAD EST».</p><div class="wrap"><table><thead><tr><th>SKU</th><th>DESCRIPCIÓN (BD)</th><th>SECCIÓN</th><th>CANTIDAD UN</th><th>CANTIDAD</th><th>CA CANTIDAD EST</th></tr></thead><tbody id="crossRows"></tbody></table></div></div>
@@ -278,7 +286,7 @@ function render(){
  $('crossToggle').classList.toggle('hidden',isDaily||isCount);
  if(isCount)renderCountSummary();if(isDaily)renderDaily();
  $('sectionTitle').textContent=isCount?'CONTEOS · '+subsection:section;
- $('sectionHint').textContent=isBD?'BD: Código (A), Descripción (B) y Flia (C).':isDaily?'Consolidado por SKU, alimentado por los conteos y las cinco pestañas de novedades.':'Registra SKU y cantidades directamente en el formulario; la descripción se obtiene de BD.';
+ $('sectionHint').textContent=isBD?'BD: Código (A), Descripción (B) y Flia (C).':isDaily?'Consolidado por SKU, alimentado por los conteos y las cinco pestañas de novedades.':'Registra cantidades adicionales por SKU: cada ingreso se suma al acumulado existente. La descripción se obtiene de BD.';
  $('bdFileTools').classList.toggle('hidden',!isBD);$('operationForm').classList.toggle('hidden',!OPS.includes(section));$('operationName').textContent=section;
  const data=getRows(),bd=bdMap(),term=$('search').value.toLowerCase().trim(),filtered=data.filter(r=>[r.sku,bdDesc(r.sku),r.descripcion].some(v=>String(v||'').toLowerCase().includes(term)));
  $('sectionCount').textContent=(isDaily?new Set(countSummaries.map(r=>r.sku)).size:data.length)+' SKU';
@@ -328,10 +336,21 @@ function dailyData(){
  }
  return [...daily.values()].sort((a,b)=>a.sku.localeCompare(b.sku,'es',{numeric:true}));
 }
-const dailyHeaders=['SKU','DESCRIPCIÓN','CANT UNDS','CANT CAJ','UNDS X CAJA','CANT EST','CANT X EST','TOTAL UNIDADES',...OPS.map(o=>'TOTAL '+o),...OPS.flatMap(o=>[o+' CANT UND',o+' CANT CAJ',o+' CANT EST'])];
+const dailyHeaders=['SKU','DESCRIPCIÓN','CANT UNDS','CANT CAJ','UNDS X CAJA','CANT EST','CANT X EST','TOTAL UNIDADES',...OPS.map(o=>'TOTAL '+o),'TOTAL GENERAL'];
 function unitValues(sku,unds,caj,est){const b=bdMap().get(normalizeSku(sku)),factor=numerical(b?.cantidad_un),perPallet=numerical(b?.un_x_est);const fromBox=caj*factor,fromPallet=est*perPallet;return {fromBox,fromPallet,total:unds+fromBox+fromPallet};}
-function dailyValues(r){const v=unitValues(r.sku,r.unds,r.caj,r.est);return [r.sku,r.descripcion,r.unds,r.caj,v.fromBox,r.est,v.fromPallet,v.total,...OPS.map(o=>unitValues(r.sku,r.ops[o]?.unds??0,r.ops[o]?.caj??0,r.ops[o]?.est??0).total),...OPS.flatMap(o=>[r.ops[o]?.unds??0,r.ops[o]?.caj??0,r.ops[o]?.est??0])];}
-function renderDaily(){const f=$('dailyFamily').value;const tr=mk('tr');for(const h of dailyHeaders)tr.append(mk('th','',h));$('dailyHead').replaceChildren(tr);$('dailyRows').replaceChildren();const data=dailyData().filter(r=>f==='TODOS'||r.familia===f);for(const r of data){const row=mk('tr');for(const v of dailyValues(r))row.append(mk('td','',String(v??'')));$('dailyRows').append(row)}if(!data.length){const row=mk('tr'),td=mk('td','','Sin conteos de la familia seleccionada');td.colSpan=dailyHeaders.length;row.append(td);$('dailyRows').append(row)}}
+function dailyValues(r){const v=unitValues(r.sku,r.unds,r.caj,r.est);const opTotals=OPS.map(o=>unitValues(r.sku,r.ops[o]?.unds??0,r.ops[o]?.caj??0,r.ops[o]?.est??0).total);return [r.sku,r.descripcion,r.unds,r.caj,v.fromBox,r.est,v.fromPallet,v.total,...opTotals,v.total+opTotals.reduce((a,b)=>a+b,0)];}
+// Columnas del resumen diario: se pueden ocultar individualmente, sin borrar datos.
+const hiddenDailyColumns=new Set();
+function toggleDailyColumn(i){if(hiddenDailyColumns.has(i))hiddenDailyColumns.delete(i);else{if(hiddenDailyColumns.size>=dailyHeaders.length-1){status('Debe quedar al menos una columna visible.',true);return;}hiddenDailyColumns.add(i)}renderDaily();}
+function renderDaily(){
+ const f=$('dailyFamily').value, visibleIndices=dailyHeaders.map((_,i)=>i).filter(i=>!hiddenDailyColumns.has(i));
+ const tr=mk('tr');for(const i of visibleIndices){const th=mk('th','daily-colhead'+(i===dailyHeaders.length-1?' daily-general-head':''));const eye=mk('button','daily-eye','◉');eye.type='button';eye.title='Ocultar '+dailyHeaders[i];eye.setAttribute('aria-label','Ocultar columna '+dailyHeaders[i]);eye.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 10.7a2 2 0 0 0 2.7 2.7"/><path d="M9.9 5.2a10.8 10.8 0 0 1 2.1-.2c5 0 9 4 10 7a13.1 13.1 0 0 1-3.2 4.6M6.5 6.5A13.4 13.4 0 0 0 2 12c1 3 5 7 10 7 1.6 0 3.1-.4 4.4-1"/></svg>';eye.addEventListener('click',()=>toggleDailyColumn(i));th.append(eye,mk('span','',dailyHeaders[i]));tr.append(th)}
+ $('dailyHead').replaceChildren(tr);$('dailyRows').replaceChildren();
+ const hiddenBar=$('dailyHiddenColumns');hiddenBar.replaceChildren();if(hiddenDailyColumns.size){hiddenBar.append(mk('span','', 'Mostrar columnas: '));for(const i of [...hiddenDailyColumns].sort((a,b)=>a-b)){const show=mk('button','daily-show','👁 '+dailyHeaders[i]);show.type='button';show.title='Mostrar columna '+dailyHeaders[i];show.addEventListener('click',()=>toggleDailyColumn(i));hiddenBar.append(show)}}
+ const data=dailyData().filter(r=>f==='TODOS'||r.familia===f);
+ for(const r of data){const row=mk('tr');const values=dailyValues(r);for(const i of visibleIndices){const cell=mk('td',i===dailyHeaders.length-1?'daily-general':'',String(values[i]??''));row.append(cell)}$('dailyRows').append(row)}
+ if(!data.length){const row=mk('tr'),td=mk('td','','Sin conteos de la familia seleccionada');td.colSpan=visibleIndices.length;row.append(td);$('dailyRows').append(row)}
+}
 function downloadDaily(){const f=$('dailyFamily').value,arr=dailyData().filter(r=>f==='TODOS'||r.familia===f);const ws=XLSX.utils.aoa_to_sheet([dailyHeaders,...arr.map(dailyValues)]);ws['!cols']=dailyHeaders.map((_,i)=>({wch:i===1?43:18}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'RESUMEN DEL DIA');XLSX.writeFile(wb,'Resumen_Conteo_Del_Dia_'+f+'.xlsx')}
 
 async function saveRecord(item,oldSku='',rerender=true){
@@ -383,7 +402,7 @@ $('focusExit').addEventListener('click',()=>setFocusMode(false));
 
 function opUpdateDesc(){const sku=normalizeSku($('opSku').value),bd=bdMap().get(sku);$('opDescription').textContent=!sku?'Ingresa un SKU para consultar la descripción en BD.':bd?'✓ '+bd.descripcion:'⚠ SKU no encontrado en BD. Carga la BD antes de registrarlo.';$('opDescription').style.color=sku&&!bd?'#b3261e':'#215d7e';$('opSave').disabled=!bd;}
 $('opSku').addEventListener('input',opUpdateDesc);
-$('operationForm').addEventListener('submit',async e=>{e.preventDefault();if(!OPS.includes(section))return;const sku=normalizeSku($('opSku').value),bd=bdMap().get(sku);if(!bd){status('SKU no encontrado en BD.',true);return;}const parse=id=>{const x=$(id).value.trim().replace(',','.');if(!x)return 0;const n=Number(x);if(!Number.isFinite(n)||n<0||n>1e12)throw Error('Cantidad inválida: '+id);return n;};const btn=$('opSave');try{const und=parse('opUnd'),caj=parse('opCaj'),est=parse('opEst');if(und+caj+est===0)throw Error('Registra al menos una cantidad mayor que cero.');btn.disabled=true;const existing=getRows().find(r=>normalizeSku(r.sku)===sku);await saveRecord({seccion:section,subseccion:'',sku,descripcion:bd.descripcion,cantidad_un:String(und),cantidad:String(caj),ca_cantidad_est:String(est),novedad:$('opNovedad').value.trim(),familia:''},existing?.sku||'');$('operationForm').reset();opUpdateDesc();status('Cantidades guardadas correctamente para SKU '+sku+' en '+section+'.');}catch(err){status('No se pudieron guardar las cantidades: '+err.message,true);}finally{btn.disabled=false;}});
+$('operationForm').addEventListener('submit',async e=>{e.preventDefault();if(!OPS.includes(section))return;const sku=normalizeSku($('opSku').value),bd=bdMap().get(sku);if(!bd){status('SKU no encontrado en BD.',true);return;}const parse=id=>{const x=$(id).value.trim().replace(',','.');if(!x)return 0;const n=Number(x);if(!Number.isFinite(n)||n<0||n>1e12)throw Error('Cantidad inválida: '+id);return n;};const btn=$('opSave');try{const und=parse('opUnd'),caj=parse('opCaj'),est=parse('opEst');if(und+caj+est===0)throw Error('Registra al menos una cantidad mayor que cero.');btn.disabled=true;await rpc('ct_inventory_operation_add',{p_seccion:section,p_sku:sku,p_unds:und,p_cajas:caj,p_estibas:est,p_novedad:$('opNovedad').value.trim()});await load();render();$('operationForm').reset();opUpdateDesc();status('Cantidades acumuladas para SKU '+sku+' en '+section+'.');}catch(err){status('No se pudieron guardar las cantidades: '+err.message,true);}finally{btn.disabled=false;}});
 $('countSku').addEventListener('input',countReady);
 $('countEntryForm').addEventListener('submit',recordCount);
 $('undoLastCount').addEventListener('click',undoLastCount);
