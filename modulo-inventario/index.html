@@ -122,6 +122,37 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
 .daily-hiddenbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:8px 0;color:#315976;font-size:12px}
 .daily-hiddenbar:empty{display:none}
 .daily-show{background:#e8f4fb;color:#174e73;border:1px solid #bcd4e3;padding:6px 9px;font-size:11px;min-height:30px}
+
+/* Resumen del día: tabla completa sin scroll horizontal en escritorio. */
+#inventoryPanel .dailyWrap{width:100%;max-width:100%;overflow-x:hidden;overflow-y:auto;max-height:75vh}
+#inventoryPanel .dailyWrap table{width:100%!important;min-width:0!important;table-layout:fixed;border-collapse:collapse;font-size:clamp(9px,.72vw,12px)}
+#inventoryPanel .dailyWrap th,#inventoryPanel .dailyWrap td{min-width:0!important;width:auto;max-width:0;padding:9px 3px;text-align:center!important;vertical-align:middle;font-weight:800!important;overflow-wrap:anywhere;word-break:normal;white-space:normal}
+#inventoryPanel .dailyWrap th.daily-colhead{padding:6px 2px;min-width:0!important;vertical-align:middle}
+#inventoryPanel .dailyWrap th.daily-colhead span{display:block;white-space:normal!important;font-size:clamp(8px,.68vw,11px);line-height:1.17;hyphens:auto}
+#inventoryPanel .dailyWrap th.daily-colhead:first-child,#inventoryPanel .dailyWrap td:first-child{width:5.5%}
+#inventoryPanel .dailyWrap th.daily-colhead:nth-child(2),#inventoryPanel .dailyWrap td:nth-child(2){width:14%}
+#inventoryPanel .dailyWrap th.daily-colhead:not(:first-child):not(:nth-child(2)),#inventoryPanel .dailyWrap td:not(:first-child):not(:nth-child(2)){width:auto}
+#inventoryPanel .dailyWrap td:nth-child(2){font-size:clamp(9px,.7vw,12px);line-height:1.3}
+#inventoryPanel .dailyWrap .daily-eye{min-height:22px;padding:2px 4px;margin:0 auto 4px;max-width:100%;font-size:11px}
+#inventoryPanel .dailyWrap th.daily-operation-head{background:#168454;color:#fff}
+#inventoryPanel .dailyWrap td.daily-operation{background:#e4f5eb;color:#11613e;font-weight:850!important}
+#inventoryPanel .dailyWrap th.daily-general-head{background:#dd790c;color:#fff}
+#inventoryPanel .dailyWrap td.daily-general{background:#fff0d9;color:#8d4500;font-weight:900!important}
+/* En móviles una fila pasa a tarjeta vertical, sin perder datos ni obligar desplazamiento lateral. */
+@media(max-width:900px){
+ #inventoryPanel .dailyWrap{max-height:none;overflow:visible}
+ #inventoryPanel .dailyWrap table{display:block;width:100%;min-width:0!important;table-layout:auto}
+ #inventoryPanel .dailyWrap thead{display:none}
+ #inventoryPanel .dailyWrap tbody{display:grid;grid-template-columns:1fr;gap:12px;padding:8px;background:#f0f6fa}
+ #inventoryPanel .dailyWrap tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:0;background:white!important;border:1px solid #bfd5e4;border-radius:13px;overflow:hidden}
+ #inventoryPanel .dailyWrap tbody td{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%!important;max-width:100%!important;min-width:0!important;padding:11px 5px;text-align:center!important;border-bottom:1px solid #e0eaf1;overflow-wrap:anywhere;font-size:13px}
+ #inventoryPanel .dailyWrap tbody td::before{content:attr(data-col-label);display:block;color:#245975;font-weight:850;font-size:10px;line-height:1.2}
+ #inventoryPanel .dailyWrap tbody td.daily-operation::before{color:#11613e}
+ #inventoryPanel .dailyWrap tbody td.daily-general::before{color:#8d4500}
+ #inventoryPanel .dailyWrap tbody td.daily-empty{grid-column:1/-1;display:block}
+ #inventoryPanel .dailyWrap tbody td.daily-empty::before{display:none}
+ #inventoryPanel .dailyWrap tbody td:nth-child(2){font-size:12px}
+}
 </style></head><body>
 <header><div><h1>📒 Módulo Inventario</h1><small>CD Girardota · Control por SKU</small></div><a href="../index.html">← Control de Transportes</a></header>
 <main><section class="card login" id="loginPanel"><div class="emoji">📒🔢</div><h2>Acceso a Inventario</h2><p>Ingresa con tu PIN de Control de Transportes. El contenido se consulta y guarda en Supabase únicamente con permiso.</p><form id="inventoryLogin"><label for="pin">PIN personal</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" pattern="[0-9]{1,8}" required><button id="enter" type="submit">🔓 Ingresar</button><p id="loginError" class="error" role="alert"></p></form></section>
@@ -344,12 +375,12 @@ const hiddenDailyColumns=new Set();
 function toggleDailyColumn(i){if(hiddenDailyColumns.has(i))hiddenDailyColumns.delete(i);else{if(hiddenDailyColumns.size>=dailyHeaders.length-1){status('Debe quedar al menos una columna visible.',true);return;}hiddenDailyColumns.add(i)}renderDaily();}
 function renderDaily(){
  const f=$('dailyFamily').value, visibleIndices=dailyHeaders.map((_,i)=>i).filter(i=>!hiddenDailyColumns.has(i));
- const tr=mk('tr');for(const i of visibleIndices){const th=mk('th','daily-colhead'+(i===dailyHeaders.length-1?' daily-general-head':''));const eye=mk('button','daily-eye','◉');eye.type='button';eye.title='Ocultar '+dailyHeaders[i];eye.setAttribute('aria-label','Ocultar columna '+dailyHeaders[i]);eye.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 10.7a2 2 0 0 0 2.7 2.7"/><path d="M9.9 5.2a10.8 10.8 0 0 1 2.1-.2c5 0 9 4 10 7a13.1 13.1 0 0 1-3.2 4.6M6.5 6.5A13.4 13.4 0 0 0 2 12c1 3 5 7 10 7 1.6 0 3.1-.4 4.4-1"/></svg>';eye.addEventListener('click',()=>toggleDailyColumn(i));th.append(eye,mk('span','',dailyHeaders[i]));tr.append(th)}
+ const tr=mk('tr');for(const i of visibleIndices){const th=mk('th','daily-colhead'+(i>=8&&i<=12?' daily-operation-head':'')+(i===dailyHeaders.length-1?' daily-general-head':''));const eye=mk('button','daily-eye','◉');eye.type='button';eye.title='Ocultar '+dailyHeaders[i];eye.setAttribute('aria-label','Ocultar columna '+dailyHeaders[i]);eye.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 10.7a2 2 0 0 0 2.7 2.7"/><path d="M9.9 5.2a10.8 10.8 0 0 1 2.1-.2c5 0 9 4 10 7a13.1 13.1 0 0 1-3.2 4.6M6.5 6.5A13.4 13.4 0 0 0 2 12c1 3 5 7 10 7 1.6 0 3.1-.4 4.4-1"/></svg>';eye.addEventListener('click',()=>toggleDailyColumn(i));th.dataset.columnIndex=String(i);th.append(eye,mk('span','',dailyHeaders[i]));tr.append(th)}
  $('dailyHead').replaceChildren(tr);$('dailyRows').replaceChildren();
  const hiddenBar=$('dailyHiddenColumns');hiddenBar.replaceChildren();if(hiddenDailyColumns.size){hiddenBar.append(mk('span','', 'Mostrar columnas: '));for(const i of [...hiddenDailyColumns].sort((a,b)=>a-b)){const show=mk('button','daily-show','👁 '+dailyHeaders[i]);show.type='button';show.title='Mostrar columna '+dailyHeaders[i];show.addEventListener('click',()=>toggleDailyColumn(i));hiddenBar.append(show)}}
  const data=dailyData().filter(r=>f==='TODOS'||r.familia===f);
- for(const r of data){const row=mk('tr');const values=dailyValues(r);for(const i of visibleIndices){const cell=mk('td',i===dailyHeaders.length-1?'daily-general':'',String(values[i]??''));row.append(cell)}$('dailyRows').append(row)}
- if(!data.length){const row=mk('tr'),td=mk('td','','Sin conteos de la familia seleccionada');td.colSpan=visibleIndices.length;row.append(td);$('dailyRows').append(row)}
+ for(const r of data){const row=mk('tr');const values=dailyValues(r);for(const i of visibleIndices){const cell=mk('td',(i>=8&&i<=12?'daily-operation ':'')+(i===dailyHeaders.length-1?'daily-general':''),String(values[i]??''));cell.dataset.colLabel=dailyHeaders[i];cell.dataset.columnIndex=String(i);row.append(cell)}$('dailyRows').append(row)}
+ if(!data.length){const row=mk('tr'),td=mk('td','daily-empty','Sin conteos de la familia seleccionada');td.colSpan=visibleIndices.length;row.append(td);$('dailyRows').append(row)}
 }
 function downloadDaily(){const f=$('dailyFamily').value,arr=dailyData().filter(r=>f==='TODOS'||r.familia===f);const ws=XLSX.utils.aoa_to_sheet([dailyHeaders,...arr.map(dailyValues)]);ws['!cols']=dailyHeaders.map((_,i)=>({wch:i===1?43:18}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'RESUMEN DEL DIA');XLSX.writeFile(wb,'Resumen_Conteo_Del_Dia_'+f+'.xlsx')}
 
