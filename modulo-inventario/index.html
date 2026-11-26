@@ -112,7 +112,7 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
 </style></head><body>
 <header><div><h1>📒 Módulo Inventario</h1><small>CD Girardota · Control por SKU</small></div><a href="../index.html">← Control de Transportes</a></header>
 <main><section class="card login" id="loginPanel"><div class="emoji">📒🔢</div><h2>Acceso a Inventario</h2><p>Ingresa con tu PIN de Control de Transportes. El contenido se consulta y guarda en Supabase únicamente con permiso.</p><form id="inventoryLogin"><label for="pin">PIN personal</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" pattern="[0-9]{1,8}" required><button id="enter" type="submit">🔓 Ingresar</button><p id="loginError" class="error" role="alert"></p></form></section>
-<section id="inventoryPanel" class="hidden"><div id="focusHead" class="focusHead" aria-label="Modo conteo rápido"><div class="focusHeadTop"><div><div class="focusTitle">📒 Conteo rápido</div><small>Inventario · CD Girardota</small></div><button type="button" id="focusExit" class="secondary focusExit">Ver tablero completo</button></div><nav id="focusTabs" class="focusTabs" aria-label="Seleccionar tipo de conteo"></nav></div><div class="toolbar"><span class="caption">📋 Seguimiento de inventario por operación</span><div class="actions"><button class="secondary" id="toggleVisibility" type="button">👁 Mostrar/ocultar pestañas</button><button class="secondary" id="collapseTabs" type="button">▴ Ocultar barra</button><button class="focusModeBtn" id="focusEnter" type="button">📱 Modo conteo</button><button class="outline" id="refresh" type="button">↻ Actualizar</button><button class="danger" id="exit" type="button">Salir</button></div></div>
+<section id="inventoryPanel" class="hidden"><div id="focusHead" class="focusHead" aria-label="Modo conteo rápido"><div class="focusHeadTop"><div><div class="focusTitle">📒 Conteo rápido</div><small>Inventario · CD Girardota</small></div><button type="button" id="focusExit" class="secondary focusExit">Ver tablero completo</button></div><nav id="focusTabs" class="focusTabs" aria-label="Seleccionar tipo de conteo"></nav></div><div class="toolbar"><span class="caption">📋 Seguimiento de inventario por operación</span><div class="actions"><button class="secondary" id="toggleVisibility" type="button">👁 Mostrar/ocultar pestañas</button><button class="secondary" id="collapseTabs" type="button">▴ Ocultar barra</button><button class="focusModeBtn" id="focusEnter" type="button">📱 Modo conteo</button><button class="outline" id="refresh" type="button">↻ Actualizar</button><button class="secondary" id="renewInventoryLogin" type="button">🔐 Revalidar acceso</button><button class="danger" id="exit" type="button">Salir</button></div></div>
 <div id="visibility" class="visibility hidden"><strong>Selecciona qué pestañas quieres ver:</strong><div id="visibilityOptions"></div><p class="hint">Este ajuste modifica solo tu vista; no elimina los datos ni cambia los permisos.</p></div>
 <nav id="mainTabs" class="tabbar" aria-label="Secciones de Inventario"></nav>
 <div class="card"><div class="sectionhead"><div><h2 id="sectionTitle">PFN</h2><p class="hint" id="sectionHint">Registros organizados por SKU</p></div><div class="pills"><span class="pill" id="sectionCount">0 registros</span><span class="pill" id="syncInfo">Base compartida</span></div></div>
@@ -209,7 +209,17 @@ const bdMap=()=>new Map(rows.filter(r=>r.seccion==='BD').map(r=>[normalizeSku(r.
 function mk(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
 try{const cfg=window.APP_CONFIG||{};if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY||!window.supabase||!window.XLSX)throw Error('Falta conexión o lector Excel');sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY,{auth:{persistSession:false}})}catch(e){$('loginError').textContent='No se cargó la conexión o el lector de Excel';return}
 async function rpc(name,args){const {data,error}=await sb.rpc(name,{p_pin:pin,...args});if(error)throw Error(error.message||'Error de conexión');return data}
-async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;window.ctNavigationSession?.save(candidate);$('pin').value='';await load();try{isInventoryAdmin=(await rpc('ct_inventory_count_is_admin',{}))===true;}catch(_){isInventoryAdmin=false;}$('clearAllCounts').classList.toggle('hidden',!isInventoryAdmin);$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');if(focusCounting){section='CONTEOS';subsection='PET';document.body.classList.add('focus-count')}render();adjustCountViewport();startCountSync();}catch(e){pin='';$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
+// Reautenticación ante PIN caducado o sesión heredada de otro módulo.
+function renewInventoryLogin(message='Ingresa tu PIN de Inventario para revalidar el acceso.'){
+ stopCountSync(); pin=''; window.ctNavigationSession?.clear?.();
+ $('inventoryPanel').classList.add('hidden'); $('loginPanel').classList.remove('hidden');
+ document.body.classList.remove('focus-count','keyboard-open');
+ $('loginError').textContent=message;
+ $('pin').value=''; $('pin').focus();
+}
+function isInventoryPermissionError(e){return /sin permiso para inventario|pin sin permiso|pin inválido/i.test(String(e?.message||e||''));}
+
+async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;$('pin').value='';await load();window.ctNavigationSession?.save(candidate);try{isInventoryAdmin=(await rpc('ct_inventory_count_is_admin',{}))===true;}catch(_){isInventoryAdmin=false;}$('clearAllCounts').classList.toggle('hidden',!isInventoryAdmin);$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');if(focusCounting){section='CONTEOS';subsection='PET';document.body.classList.add('focus-count')}render();adjustCountViewport();startCountSync();}catch(e){pin='';window.ctNavigationSession?.clear?.();$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
 async function load(){const [data,counts]=await Promise.all([rpc('ct_inventory_rows_list',{}),rpc('ct_inventory_counts_list',{})]);rows=Array.isArray(data)?data:[];countSummaries=Array.isArray(counts)?counts:[];}
 // Sincronización periódica con la base compartida: no requiere habilitar RLS de lectura pública.
 // Se consulta solo el agregado autorizado mediante PIN (RPC), sin exponer movimientos individuales.
@@ -320,7 +330,7 @@ async function uploadBD(){const file=$('bdFile').files?.[0];if(!file){status('Se
  if(!data.length)throw Error('No se encontraron SKU en la columna Código.');if(!data.every(r=>r.familia))throw Error('La columna Flia es obligatoria para todos los SKU.');
  if(!confirm('Reemplazar BD con '+data.length+' SKU del Excel? Los conteos y las otras pestañas se conservan.'))return;
  status('Cargando '+data.length+' SKU a BD…');await rpc('ct_inventory_bd_replace_v3',{p_rows:data});await load();render();$('bdFile').value='';status('BD cargada: '+data.length+' SKU con descripción y familia.');
- }catch(e){status('No se pudo cargar BD: '+e.message,true)}finally{btn.disabled=false}}
+ }catch(e){if(isInventoryPermissionError(e)){renewInventoryLogin('La sesión no coincide con un PIN autorizado. Vuelve a ingresar con tu PIN de administrador y repite la carga de BD.');}else status('No se pudo cargar BD: '+e.message,true)}finally{btn.disabled=false}}
 
 function renderCross(){const tbody=$('crossRows');tbody.replaceChildren();const bd=bdMap();const sku=normalizeSku($('search').value),other=rows.filter(r=>r.seccion!=='BD'&&(!sku||r.sku.toUpperCase().includes(sku)||(r.descripcion||'').toUpperCase().includes(sku))).sort((a,b)=>a.sku.localeCompare(b.sku,'es',{numeric:true}));for(const r of other.slice(0,1500)){const tr=mk('tr'),cells=[r.sku,bd.get(normalizeSku(r.sku))?.descripcion||r.descripcion||'Sin coincidencia BD',r.seccion==='CONTEOS'?'CONTEOS · '+r.subseccion:r.seccion,r.cantidad_un,r.cantidad,r.ca_cantidad_est];for(const v of cells){tr.append(mk('td','',display(v)))}tbody.append(tr)}if(!other.length){const tr=mk('tr'),td=mk('td','', 'Aún no hay registros de otras secciones para cruzar.');td.colSpan=6;tr.append(td);tbody.append(tr)}}
 
@@ -354,13 +364,15 @@ $('toggleVisibility').addEventListener('click',()=>$('visibility').classList.tog
 $('collapseTabs').addEventListener('click',()=>{const bar=$('mainTabs');bar.classList.toggle('hidden');$('collapseTabs').textContent=bar.classList.contains('hidden')?'▾ Mostrar barra':'▴ Ocultar barra'});
 $('search').addEventListener('input',render);
 $('addRow').addEventListener('click',addRow);
-$('refresh').addEventListener('click',async()=>{try{await load();render();status('Información actualizada desde la base compartida.')}catch(e){status(e.message,true)}});
+$('refresh').addEventListener('click',async()=>{try{await load();render();status('Información actualizada desde la base compartida.')}catch(e){if(isInventoryPermissionError(e))renewInventoryLogin('La sesión perdió autorización. Ingresa nuevamente con tu PIN de administrador.');else status(e.message,true)}});
 $('downloadCurrent').addEventListener('click',()=>download(getRows(),'Inventario_'+(section==='CONTEOS'?subsection:section)+'.xlsx'));
 $('downloadBD').addEventListener('click',downloadBD);
 $('dailyFamily').addEventListener('change',renderDaily);$('dailyDownload').addEventListener('click',downloadDaily);
 $('uploadBD').addEventListener('click',uploadBD);
 $('crossToggle').addEventListener('click',()=>{$('crossPanel').classList.toggle('hidden');render()});
+$('renewInventoryLogin').addEventListener('click',()=>renewInventoryLogin());
 $('exit').addEventListener('click',()=>{stopCountSync();pin='';window.ctNavigationSession?.clear?.();location.href='../index.html'});
-const cached=window.ctNavigationSession?.get();if(cached&&/^\d{1,8}$/.test(cached))enter(cached);
+// Se requiere PIN explícito al abrir Inventario para evitar reutilizar otro usuario en caché.
+window.ctNavigationSession?.clear?.();
 })();
 </script></body></html>
