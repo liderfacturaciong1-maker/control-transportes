@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Módulo Inventario · CD Girardota</title>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"><title>Módulo Inventario · CD Girardota</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="../vendor/xlsx.min.js"></script><script src="../config.js"></script><script src="../ct-session.js"></script>
 <style>
 :root{font-family:system-ui,-apple-system,'Segoe UI',Arial,sans-serif;color:#193d56}*{box-sizing:border-box}body{margin:0;background:#f0f6fa;min-height:100vh}header{background:linear-gradient(110deg,#0d2d46,#176193);color:white;padding:14px clamp(14px,3vw,40px);display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}header h1{font-size:clamp(21px,2.3vw,29px);margin:0}header small{display:block;color:#d1e8f7;margin-top:4px}header a{padding:9px 13px;background:#eaf6fd;color:#174563;text-decoration:none;border-radius:10px;font-weight:700}main{max-width:1580px;margin:16px auto;padding:0 18px 40px}.card{background:white;border:1px solid #ccdfeb;border-radius:16px;padding:20px;box-shadow:0 9px 22px #193e5910}.login{max-width:460px;margin:9vh auto;text-align:center;padding:28px}.login .emoji{font-size:62px}.login p{color:#59768c}.login label{display:block;text-align:left;font-weight:700;margin:17px 0 8px}.login input{width:100%;padding:12px;font:inherit;border:1px solid #b2cbdc;border-radius:9px}button{background:#1477ae;color:white;border:0;border-radius:9px;padding:9px 13px;font:inherit;font-size:13px;font-weight:750;cursor:pointer;min-height:36px}button:disabled{opacity:.55;cursor:not-allowed}.secondary{color:#164c70;background:#e8f4fb}.danger{background:#b53333}.outline{background:#fff;border:1px solid #a9cbdc;color:#164c70}.hidden,[hidden]{display:none!important}.error{color:#b62424;min-height:22px}.toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px}.toolbar .caption{font-weight:750;color:#245976}.toolbar .actions{display:flex;gap:7px;flex-wrap:wrap}.tabbar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:10px;border-radius:13px;border:1px solid #d3e3ee;background:#fff;margin-bottom:9px}.tab{padding:8px 11px;min-height:31px;border-radius:7px;border:1px solid #bcd4e3;background:#f2f8fc;color:#1b526f;font-size:12px;font-weight:800;letter-spacing:.1px}.tab.active{background:#176998;color:white;border-color:#176998}.tab.sub{background:#ecf5f9}.tab.sub.active{background:#168454;border-color:#168454;color:white}.visibility{background:#fff;border:1px dashed #a2c9df;border-radius:12px;padding:12px;margin-bottom:12px}.visibility label{display:inline-flex;align-items:center;gap:5px;margin:5px 12px 5px 0;font-size:13px;font-weight:650}.visibility input{accent-color:#176998}.subbar{display:flex;gap:7px;flex-wrap:wrap;margin:11px 0 17px}.sectionhead{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}.sectionhead h2{margin:0;font-size:23px}.summary{display:grid;grid-template-columns:repeat(3,minmax(160px,1fr));gap:10px;margin:15px 0}.metric{background:#eff7fc;border:1px solid #d0e3ef;padding:12px 15px;border-radius:12px}.metric b{font-size:23px;display:block;color:#176193}.metric span{font-size:12px;color:#52728b}.controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0}.controls input[type=search]{width:min(310px,100%);padding:10px;border:1px solid #bfd7e7;border-radius:8px;font:inherit;font-size:13px}.controls input[type=file]{max-width:250px;font-size:12px}.wrap{width:100%;overflow:auto;max-height:62vh;border:1px solid #cddfea;border-radius:11px}table{border-collapse:collapse;width:100%;min-width:850px;font-size:13px}th{position:sticky;top:0;text-align:left;background:#174e73;color:white;padding:12px;z-index:1;white-space:nowrap}td{border-bottom:1px solid #e0ecf3;padding:5px 8px}tbody tr:nth-child(even){background:#f5f9fc}td input{width:100%;border:1px solid transparent;background:transparent;border-radius:6px;padding:8px;font:inherit;color:inherit;min-width:70px}td input:focus{background:#fff;border-color:#2693d3;outline:2px solid #d0eafa}td input[readonly]{color:#54718a;background:#edf4f7}.colsku{min-width:125px;width:16%}.coldesc{min-width:250px;width:35%}.colnum{min-width:130px;width:15%}.colaction{width:108px}td .inline-actions{display:flex;gap:5px}td button{padding:7px 8px;min-height:30px}p.hint{font-size:12px;color:#57748a;line-height:1.5;margin:11px 0}.status{min-height:21px;font-size:13px;font-weight:700;color:#176193}.cross{margin-top:16px}.cross h3{font-size:17px;margin:3px 0 8px}.cross .wrap{max-height:290px}.cross table{min-width:700px;font-size:12px}.cross td{padding:8px}.sourceTag{font-size:11px;color:#52758b}.pills{display:flex;gap:6px;flex-wrap:wrap}.pill{background:#e3f2fb;border-radius:7px;padding:5px 8px;color:#245a7b;font-weight:650;font-size:12px} @media(max-width:650px){main{padding:0 8px}.card{padding:12px}.summary{grid-template-columns:1fr}.sectionhead h2{font-size:19px}.tab{font-size:11px;padding:7px 9px}.controls input[type=search]{width:100%}}
@@ -71,8 +71,41 @@ body.focus-count .focusExit{font-size:12px;min-height:36px;padding:7px 10px}
  body.focus-count #countSubmit,body.focus-count #undoLastCount{grid-column:1}
 }
 @media(max-width:360px){body.focus-count .countForm label{font-size:10px}body.focus-count .focusTitle{font-size:16px}}
-/* El teclado nativo ocupa su propio espacio: sin barra inferior fija que tape campos. */
-html{scroll-padding-bottom:20vh}body.focus-count input{scroll-margin-block:60px 26vh}
+/* Conteo móvil: la página nunca se escala cuando aparece el teclado nativo. */
+html{width:100%;overflow-x:hidden;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body.focus-count{width:100%;overflow-x:hidden}
+body.focus-count #inventoryPanel{min-width:0;width:100%}
+body.focus-count #focusHead{position:sticky;top:0;z-index:5}
+body.focus-count input,body.focus-count button{touch-action:manipulation}
+body.focus-count .countForm input{font-size:16px!important} /* Evita zoom automático de Safari */
+body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
+@media(max-width:700px){
+ body.focus-count main{height:var(--conteo-visible-height,100dvh);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-bottom:env(safe-area-inset-bottom)}
+ body.focus-count .countsBox{padding:8px 10px 16px}
+ body.focus-count #focusHead{padding:7px 10px 8px}
+ body.focus-count .focusTabs{margin-top:6px;gap:5px}
+ body.focus-count .focusTabs button{min-height:38px;font-size:12px;padding:6px}
+ body.focus-count .focusTitle{font-size:15px}
+ body.focus-count .focusExit{min-height:30px;font-size:10px;padding:5px 7px}
+ body.focus-count .countsBox h3{font-size:14px;margin:0 0 7px}
+ body.focus-count .countForm{gap:7px 6px}
+ body.focus-count .countForm label{gap:3px;font-size:11px}
+ body.focus-count .countForm input{height:45px;padding:7px 9px}
+ body.focus-count #countSku{height:49px;font-size:17px!important}
+ body.focus-count #countDescription{min-height:13px;font-size:10px;line-height:1.25}
+ body.focus-count #countSubmit{min-height:45px;font-size:16px}
+ body.focus-count #undoLastCount{min-height:37px}
+ body.focus-count .countsFooter{display:none}
+ body.focus-count #status{font-size:11px}
+ body.focus-count.keyboard-open .focusHead small{display:none}
+ body.focus-count.keyboard-open .countsBox{padding-top:6px}
+ body.focus-count.keyboard-open .countForm{gap:5px 6px}
+ body.focus-count.keyboard-open .countForm input{height:40px}
+ body.focus-count.keyboard-open #countSku{height:43px}
+ body.focus-count.keyboard-open #countSubmit{min-height:42px}
+ body.focus-count.keyboard-open #undoLastCount{min-height:34px}
+}
+
 </style></head><body>
 <header><div><h1>📒 Módulo Inventario</h1><small>CD Girardota · Control por SKU</small></div><a href="../index.html">← Control de Transportes</a></header>
 <main><section class="card login" id="loginPanel"><div class="emoji">📒🔢</div><h2>Acceso a Inventario</h2><p>Ingresa con tu PIN de Control de Transportes. El contenido se consulta y guarda en Supabase únicamente con permiso.</p><form id="inventoryLogin"><label for="pin">PIN personal</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" pattern="[0-9]{1,8}" required><button id="enter" type="submit">🔓 Ingresar</button><p id="loginError" class="error" role="alert"></p></form></section>
@@ -85,11 +118,11 @@ html{scroll-padding-bottom:20vh}body.focus-count input{scroll-margin-block:60px 
 <div id="countsWorkspace" class="countsLayout hidden">
   <section class="countsBox" aria-label="Ingreso de conteos"><h3>🔢 Registrar conteo · <span id="activeCountType">PET</span></h3>
     <form id="countEntryForm" class="countForm">
-      <label class="skuField">SKU<input id="countSku" type="text" maxlength="80" autocomplete="off" placeholder="Escribe el SKU" required></label>
+      <label class="skuField">SKU<input id="countSku" type="text" inputmode="numeric" enterkeyhint="next" maxlength="80" autocomplete="off" placeholder="Escribe el SKU" required></label>
       <div id="countDescription" class="countDescription">Ingresa un SKU para habilitar las cantidades.</div>
-      <label>CANT UNDS<input id="countUnits" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
-      <label>CANT CAJAS<input id="countBoxes" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
-      <label>CANT ESTIBAS<input id="countPallets" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
+      <label>CANT UNDS<input id="countUnits" enterkeyhint="next" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
+      <label>CANT CAJAS<input id="countBoxes" enterkeyhint="next" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
+      <label>CANT ESTIBAS<input id="countPallets" enterkeyhint="done" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
       <label class="siteField">SITIO (opcional)<input id="countSite" type="text" maxlength="240" placeholder="Escribe el lugar o la novedad" disabled></label>
       <div class="countActions"><button class="countNow" id="countSubmit" type="submit" disabled>CONTAR</button><button class="countUndo" id="undoLastCount" type="button">↶ Deshacer último conteo</button><button class="countClear hidden" id="clearAllCounts" type="button">🗑 BORRAR TODO</button></div>
     </form><p class="countsFooter">Al pulsar CONTAR se guarda el movimiento y se limpia el formulario. Los SKU repetidos se acumulan en el resumen.</p>
@@ -116,7 +149,36 @@ let countSyncTimer=null,countSyncBusy=false,countSyncOnline=true,countMutationBu
 const focusRequested=new URLSearchParams(location.search).get('modo')==='conteo';
 const prefersMobile=window.matchMedia('(max-width: 700px) and (pointer: coarse)').matches;
 let focusCounting=focusRequested||prefersMobile;
-function setFocusMode(on){focusCounting=!!on;document.body.classList.toggle('focus-count',focusCounting);if(focusCounting&&section!=='CONTEOS')selectTab('CONTEOS',subsection||'PET');else render();window.scrollTo({top:0,behavior:'instant'});}
+// VisualViewport detecta la altura que realmente queda por encima del teclado Android/iOS.
+// No se dibuja un teclado artificial: se conserva el teclado nativo mientras un campo tenga foco.
+let countViewportBaseline=0;
+let countViewportFrame=0;
+function adjustCountViewport(){
+ if(!focusCounting)return;
+ if(countViewportFrame)cancelAnimationFrame(countViewportFrame);
+ countViewportFrame=requestAnimationFrame(()=>{
+  const vp=window.visualViewport;
+  const h=Math.round(vp?vp.height:window.innerHeight);
+  const root=document.documentElement;
+  root.style.setProperty('--conteo-visible-height',h+'px');
+  const active=document.activeElement;
+  const typing=!!active&&active.matches?.('#countEntryForm input');
+  if(!typing||h>countViewportBaseline)countViewportBaseline=Math.max(countViewportBaseline,h);
+  const keyboard=typing&&countViewportBaseline-h>125;
+  document.body.classList.toggle('keyboard-open',keyboard);
+  if(keyboard&&active){
+   const rect=active.getBoundingClientRect();
+   if(rect.bottom>h-12||rect.top<66)active.scrollIntoView({block:'nearest',behavior:'instant'});
+  }
+ });
+}
+window.visualViewport?.addEventListener('resize',adjustCountViewport);
+window.visualViewport?.addEventListener('scroll',adjustCountViewport);
+window.addEventListener('resize',adjustCountViewport);
+window.addEventListener('orientationchange',()=>{countViewportBaseline=0;adjustCountViewport()});
+$('countEntryForm').addEventListener('focusin',adjustCountViewport);
+$('countEntryForm').addEventListener('focusout',()=>requestAnimationFrame(adjustCountViewport));
+function setFocusMode(on){focusCounting=!!on;document.body.classList.toggle('focus-count',focusCounting);if(focusCounting&&section!=='CONTEOS')selectTab('CONTEOS',subsection||'PET');else render();window.scrollTo({top:0,behavior:'instant'});adjustCountViewport();}
 function renderFocusTabs(){const bar=$('focusTabs');bar.replaceChildren();for(const t of COUNT_TYPES){const b=mk('button',subsection===t?'active':'',t);b.type='button';b.setAttribute('aria-pressed',String(subsection===t));b.addEventListener('click',()=>{selectTab('CONTEOS',t);window.scrollTo({top:0,behavior:'instant'});});bar.append(b);}}
 let sb, pin='', section='PFN',subsection='', rows=[], countSummaries=[], saving=false, visible=new Set(TABS);
 const status=(message,bad=false)=>{const e=$('status');e.textContent=message;e.style.color=bad?'#a82626':'#176193'};
@@ -132,7 +194,7 @@ const bdMap=()=>new Map(rows.filter(r=>r.seccion==='BD').map(r=>[normalizeSku(r.
 function mk(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
 try{const cfg=window.APP_CONFIG||{};if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY||!window.supabase||!window.XLSX)throw Error('Falta conexión o lector Excel');sb=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY,{auth:{persistSession:false}})}catch(e){$('loginError').textContent='No se cargó la conexión o el lector de Excel';return}
 async function rpc(name,args){const {data,error}=await sb.rpc(name,{p_pin:pin,...args});if(error)throw Error(error.message||'Error de conexión');return data}
-async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;window.ctNavigationSession?.save(candidate);$('pin').value='';await load();try{isInventoryAdmin=(await rpc('ct_inventory_count_is_admin',{}))===true;}catch(_){isInventoryAdmin=false;}$('clearAllCounts').classList.toggle('hidden',!isInventoryAdmin);$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');if(focusCounting){section='CONTEOS';subsection='PET';document.body.classList.add('focus-count')}render();startCountSync();}catch(e){pin='';$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
+async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;window.ctNavigationSession?.save(candidate);$('pin').value='';await load();try{isInventoryAdmin=(await rpc('ct_inventory_count_is_admin',{}))===true;}catch(_){isInventoryAdmin=false;}$('clearAllCounts').classList.toggle('hidden',!isInventoryAdmin);$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');if(focusCounting){section='CONTEOS';subsection='PET';document.body.classList.add('focus-count')}render();adjustCountViewport();startCountSync();}catch(e){pin='';$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
 async function load(){const [data,counts]=await Promise.all([rpc('ct_inventory_rows_list',{}),rpc('ct_inventory_counts_list',{})]);rows=Array.isArray(data)?data:[];countSummaries=Array.isArray(counts)?counts:[];}
 // Sincronización periódica con la base compartida: no requiere habilitar RLS de lectura pública.
 // Se consulta solo el agregado autorizado mediante PIN (RPC), sin exponer movimientos individuales.
@@ -181,7 +243,7 @@ function currentCountSummary(type=subsection){return countSummaries.filter(r=>r.
 function summaryDescription(r){return bdMap().get(normalizeSku(r.sku))?.descripcion||r.descripcion||'';}
 function renderCountSummary(){if(section!=='CONTEOS')return;$('activeCountType').textContent=subsection;$('countSummaryType').textContent=subsection;const all=currentCountSummary(),term=$('countSearch').value.trim().toLowerCase(),data=all.filter(r=>[r.sku,summaryDescription(r),r.novedad].some(x=>String(x||'').toLowerCase().includes(term)));$('countsTotal').textContent=all.length+' SKU';const body=$('countSummaryRows');body.replaceChildren();for(const r of data){const tr=mk('tr');for(const [i,value] of [r.sku,summaryDescription(r),r.cant_un,r.cant_caj,r.cant_est,r.novedad].entries()){const td=mk('td','',String(value??''));if(i>=2&&i<=4)td.className='num';tr.append(td)}body.append(tr)}if(!data.length){const tr=mk('tr'),td=mk('td','countsEmpty',all.length?'No hay coincidencias.':'No se han registrado conteos en '+subsection+'.');td.colSpan=6;tr.append(td);body.append(tr)}}
 function countNumber(id){const raw=$(id).value.trim().replace(',','.');if(!raw)return 0;const n=Number(raw);if(!Number.isFinite(n)||n<0||n>1e12)throw Error('La cantidad debe ser un número positivo o cero válido.');return n;}
-async function recordCount(e){e.preventDefault();if(section!=='CONTEOS'||countMutationBusy)return;countMutationBusy=true;const type=subsection,sku=normalizeSku($('countSku').value);if(!sku){status('Ingresa un SKU.',true);return}const btn=$('countSubmit');try{const units=countNumber('countUnits'),boxes=countNumber('countBoxes'),pallets=countNumber('countPallets');if(units+boxes+pallets<=0)throw Error('Ingresa al menos una cantidad mayor que cero.');btn.disabled=true;await rpc('ct_inventory_count_add',{p_subseccion:type,p_sku:sku,p_cant_unds:units,p_cant:0,p_cajas:boxes,p_estibas:pallets,p_sitio:$('countSite').value.trim()});const counts=await rpc('ct_inventory_counts_list',{});countSummaries=Array.isArray(counts)?counts:[];clearCountForm();renderCountSummary();status('Conteo registrado y acumulado: '+sku+' · '+type);$('countSku').focus();syncCountSummaries(true)}catch(err){status('No se pudo registrar el conteo: '+err.message,true)}finally{countMutationBusy=false;countReady()}}
+async function recordCount(e){e.preventDefault();if(section!=='CONTEOS'||countMutationBusy)return;countMutationBusy=true;const type=subsection,sku=normalizeSku($('countSku').value);if(!sku){status('Ingresa un SKU.',true);return}const btn=$('countSubmit');try{const units=countNumber('countUnits'),boxes=countNumber('countBoxes'),pallets=countNumber('countPallets');if(units+boxes+pallets<=0)throw Error('Ingresa al menos una cantidad mayor que cero.');btn.disabled=true;if(focusCounting){$('countSku').focus({preventScroll:true});adjustCountViewport();}await rpc('ct_inventory_count_add',{p_subseccion:type,p_sku:sku,p_cant_unds:units,p_cant:0,p_cajas:boxes,p_estibas:pallets,p_sitio:$('countSite').value.trim()});const counts=await rpc('ct_inventory_counts_list',{});countSummaries=Array.isArray(counts)?counts:[];clearCountForm();renderCountSummary();status('Conteo registrado y acumulado: '+sku+' · '+type);$('countSku').focus({preventScroll:true});adjustCountViewport();syncCountSummaries(true)}catch(err){status('No se pudo registrar el conteo: '+err.message,true)}finally{countMutationBusy=false;countReady()}}
 async function undoLastCount(){if(countMutationBusy||section!=='CONTEOS')return;const type=subsection;if(!confirm('¿Deshacer tu último conteo registrado en '+type+'? Solo podrás deshacer los últimos 3 movimientos de esta pestaña.'))return;countMutationBusy=true;const btn=$('undoLastCount');btn.disabled=true;try{const result=await rpc('ct_inventory_count_undo_last',{p_subseccion:type});countSummaries=await rpc('ct_inventory_counts_list',{});renderCountSummary();status('Conteo de '+result.sku+' deshecho en '+type+'. Restantes disponibles: '+result.restantes+'.');}catch(e){status('No se pudo deshacer: '+e.message,true)}finally{countMutationBusy=false;btn.disabled=false}}
 async function clearAllCounts(){if(countMutationBusy||!isInventoryAdmin)return;if(!confirm('ATENCIÓN: Se borrarán TODOS los conteos y resúmenes de PET, LATA, TW y RN para iniciar un nuevo conteo. La BD de SKU no se eliminará. ¿Estás seguro?'))return;const text=prompt('Confirmación final: escribe BORRAR TODO para eliminar los conteos de todos los usuarios.');if(text!=='BORRAR TODO'){status('Borrado cancelado.');return;}countMutationBusy=true;const btn=$('clearAllCounts');btn.disabled=true;try{const removed=await rpc('ct_inventory_counts_clear_all',{});countSummaries=await rpc('ct_inventory_counts_list',{});renderCountSummary();clearCountForm();status('Se borraron '+removed+' movimientos de conteo de PET, LATA, TW y RN. Puedes iniciar el nuevo conteo.');}catch(e){status('No se pudo borrar: '+e.message,true)}finally{countMutationBusy=false;btn.disabled=false}}
 function summaryExcelRows(type){return currentCountSummary(type).map(r=>({SKU:r.sku,'DESCRIPCIÓN':summaryDescription(r),'CANT UN':Number(r.cant_un)||0,'CANT CAJ':Number(r.cant_caj)||0,'CANT EST':Number(r.cant_est)||0,NOVEDAD:r.novedad||''}))}
