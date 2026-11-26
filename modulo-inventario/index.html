@@ -165,6 +165,14 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
 @media(max-width:540px){.adjust-grid{grid-template-columns:1fr 1fr}.adjust-dialog{padding:13px}}
 
 .external-panel{border:1px solid #c8dfed;border-radius:13px;background:#f7fbfe;padding:14px;margin:14px 0}.external-tools{display:flex;flex-wrap:wrap;align-items:end;gap:10px}.external-tools label{font-size:12px;font-weight:750;color:#174e73}.external-tools input{display:block;margin-top:5px;max-width:310px}.external-wrap{margin-top:12px;max-height:57vh}.external-wrap table{min-width:800px}.external-wrap td{text-align:center;font-weight:650}.daily-external-head{background:#366e91!important;color:#fff!important}.daily-external{background:#eaf4fb!important;font-weight:750}
+
+/* Resumen de saldos y faltantes por SKU: encabezados y valores identificables. */
+#inventoryPanel .dailyWrap th.daily-balance-head{background:#196989;color:#fff}
+#inventoryPanel .dailyWrap td.daily-balance{background:#e9f5fa;color:#164a63;font-weight:900!important}
+#inventoryPanel .dailyWrap td.daily-balance[data-col-label="FALTANTE"]{background:#fff1df;color:#8d4900}
+@media(max-width:900px){
+ #inventoryPanel .dailyWrap tbody td.daily-balance::before{color:#164a63}
+}
 </style></head><body>
 <header><div><h1>📒 Módulo Inventario</h1><small>CD Girardota · Control por SKU</small></div><a href="../index.html">← Control de Transportes</a></header>
 <main><section class="card login" id="loginPanel"><div class="emoji">📒🔢</div><h2>Acceso a Inventario</h2><p>Ingresa con tu PIN de Control de Transportes. El contenido se consulta y guarda en Supabase únicamente con permiso.</p><form id="inventoryLogin"><label for="pin">PIN personal</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" pattern="[0-9]{1,8}" required><button id="enter" type="submit">🔓 Ingresar</button><p id="loginError" class="error" role="alert"></p></form></section>
@@ -408,20 +416,44 @@ function dailyData(){
  }
  return [...daily.values()].sort((a,b)=>a.sku.localeCompare(b.sku,'es',{numeric:true}));
 }
-const dailyHeaders=['SKU','DESCRIPCIÓN','CANT UNDS','CANT CAJ','UNDS X CAJA','CANT EST','CANT X EST','TOTAL UNIDADES',...OPS.map(o=>'TOTAL '+o),'TOTAL GENERAL','ZEXI','PARTIDAS (+)','PARTIDAS (-)'];
+const dailyHeaders=['SKU','DESCRIPCIÓN','CANT UNDS','CANT CAJ','UNDS X CAJA','CANT EST','CANT X EST','TOTAL UNIDADES',...OPS.map(o=>'TOTAL '+o),'TOTAL GENERAL','ZEXI','PARTIDAS (+)','PARTIDAS (-)','RESUMEN','FALTANTE','FALTANTE EST','FALTANTE CAJ','FALTANTE UNDS'];
 function unitValues(sku,unds,caj,est,extraBox=0,extraEst=0){const b=bdMap().get(normalizeSku(sku)),factor=numerical(b?.cantidad_un),perPallet=numerical(b?.un_x_est);const fromBox=caj*factor+numerical(extraBox),fromPallet=est*perPallet+numerical(extraEst);return {fromBox,fromPallet,total:unds+fromBox+fromPallet};}
-function partidasTotals(){const out=new Map();for(const r of partidasData){const sku=normalizeSku(r.sku),t=unitValues(sku,numerical(r.cant_unds),numerical(r.cant_caj),numerical(r.cant_est)).total;const rec=out.get(sku)||{pos:0,neg:0};if(t>=0)rec.pos+=t;else rec.neg+=t;out.set(sku,rec);}return out;}
-function dailyValues(r,parts=partidasTotals(),zMap=new Map(zexiData.map(x=>[normalizeSku(x.sku),x]))){const v=unitValues(r.sku,r.unds,r.caj,r.est,r.extraBox||0,r.extraEst||0);const opTotals=OPS.map(o=>unitValues(r.sku,r.ops[o]?.unds??0,r.ops[o]?.caj??0,r.ops[o]?.est??0,r.ops[o]?.extraBox||0,r.ops[o]?.extraEst||0).total);const z=zMap.get(r.sku);const partida=parts.get(r.sku);return [r.sku,r.descripcion,r.unds,r.caj,v.fromBox,r.est,v.fromPallet,v.total,...opTotals,v.total+opTotals.reduce((a,b)=>a+b,0),z?numerical(z.total_general):0,partida?.pos||0,partida?.neg||0];}
+function partidasTotals(){const out=new Map();for(const r of partidasData){const sku=normalizeSku(r.sku),t=unitValues(sku,numerical(r.cant_unds),numerical(r.cant_caj),numerical(r.cant_est)).total;const rec=out.get(sku)||{pos:0,neg:0};if(t>=0)rec.pos+=t;else rec.neg+=Math.abs(t);out.set(sku,rec);}return out;}
+// Descomposición firmada de la diferencia contra ZEXI. Prioridad: estibas,
+// luego cajas y finalmente unidades sueltas. La BD nunca se modifica.
+function splitMissingUnits(sku,missing){
+ const b=bdMap().get(normalizeSku(sku));
+ const perPallet=numerical(b?.un_x_est),perBox=numerical(b?.cantidad_un);
+ const sign=missing<0?-1:1;
+ let remaining=Math.abs(missing);
+ const pallets=perPallet>0?Math.floor((remaining+1e-9)/perPallet):0;
+ remaining=Math.max(0,remaining-pallets*perPallet);
+ const boxes=perBox>0?Math.floor((remaining+1e-9)/perBox):0;
+ remaining=Math.max(0,remaining-boxes*perBox);
+ return {pallets:sign*pallets,boxes:sign*boxes,units:sign*Number(remaining.toFixed(6))};
+}
+function dailyValues(r,parts=partidasTotals(),zMap=new Map(zexiData.map(x=>[normalizeSku(x.sku),x]))){
+ const v=unitValues(r.sku,r.unds,r.caj,r.est,r.extraBox||0,r.extraEst||0);
+ const opTotals=OPS.map(o=>unitValues(r.sku,r.ops[o]?.unds??0,r.ops[o]?.caj??0,r.ops[o]?.est??0,r.ops[o]?.extraBox||0,r.ops[o]?.extraEst||0).total);
+ const totalGeneral=v.total-opTotals.reduce((a,b)=>a+b,0);
+ const z=zMap.get(r.sku);
+ const zexi=z?numerical(z.total_general):0;
+ const partida=parts.get(r.sku),pos=partida?.pos||0,neg=partida?.neg||0;
+ const resumen=totalGeneral+pos-neg;
+ const faltante=resumen-zexi;
+ const split=splitMissingUnits(r.sku,faltante);
+ return [r.sku,r.descripcion,r.unds,r.caj,v.fromBox,r.est,v.fromPallet,v.total,...opTotals,totalGeneral,zexi,pos,neg,resumen,faltante,split.pallets,split.boxes,split.units];
+}
 // Columnas del resumen diario: se pueden ocultar individualmente, sin borrar datos.
 const hiddenDailyColumns=new Set();
 function toggleDailyColumn(i){if(hiddenDailyColumns.has(i))hiddenDailyColumns.delete(i);else{if(hiddenDailyColumns.size>=dailyHeaders.length-1){status('Debe quedar al menos una columna visible.',true);return;}hiddenDailyColumns.add(i)}renderDaily();}
 function renderDaily(){
  const f=$('dailyFamily').value, visibleIndices=dailyHeaders.map((_,i)=>i).filter(i=>!hiddenDailyColumns.has(i));
- const tr=mk('tr');for(const i of visibleIndices){const th=mk('th','daily-colhead'+(i>=8&&i<=12?' daily-operation-head':'')+(i>=14?' daily-external-head':'')+(i===13?' daily-general-head':''));const eye=mk('button','daily-eye','◉');eye.type='button';eye.title='Ocultar '+dailyHeaders[i];eye.setAttribute('aria-label','Ocultar columna '+dailyHeaders[i]);eye.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 10.7a2 2 0 0 0 2.7 2.7"/><path d="M9.9 5.2a10.8 10.8 0 0 1 2.1-.2c5 0 9 4 10 7a13.1 13.1 0 0 1-3.2 4.6M6.5 6.5A13.4 13.4 0 0 0 2 12c1 3 5 7 10 7 1.6 0 3.1-.4 4.4-1"/></svg>';eye.addEventListener('click',()=>toggleDailyColumn(i));th.dataset.columnIndex=String(i);th.append(eye,mk('span','',dailyHeaders[i]));tr.append(th)}
+ const tr=mk('tr');for(const i of visibleIndices){const th=mk('th','daily-colhead'+(i>=8&&i<=12?' daily-operation-head':'')+(i>=14&&i<=16?' daily-external-head':'')+(i===13?' daily-general-head':'')+(i>=17?' daily-balance-head':''));const eye=mk('button','daily-eye','◉');eye.type='button';eye.title='Ocultar '+dailyHeaders[i];eye.setAttribute('aria-label','Ocultar columna '+dailyHeaders[i]);eye.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 10.7a2 2 0 0 0 2.7 2.7"/><path d="M9.9 5.2a10.8 10.8 0 0 1 2.1-.2c5 0 9 4 10 7a13.1 13.1 0 0 1-3.2 4.6M6.5 6.5A13.4 13.4 0 0 0 2 12c1 3 5 7 10 7 1.6 0 3.1-.4 4.4-1"/></svg>';eye.addEventListener('click',()=>toggleDailyColumn(i));th.dataset.columnIndex=String(i);th.append(eye,mk('span','',dailyHeaders[i]));tr.append(th)}
  $('dailyHead').replaceChildren(tr);$('dailyRows').replaceChildren();
  const hiddenBar=$('dailyHiddenColumns');hiddenBar.replaceChildren();if(hiddenDailyColumns.size){hiddenBar.append(mk('span','', 'Mostrar columnas: '));for(const i of [...hiddenDailyColumns].sort((a,b)=>a-b)){const show=mk('button','daily-show','👁 '+dailyHeaders[i]);show.type='button';show.title='Mostrar columna '+dailyHeaders[i];show.addEventListener('click',()=>toggleDailyColumn(i));hiddenBar.append(show)}}
  const data=dailyData().filter(r=>f==='TODOS'||r.familia===f);const partIndex=partidasTotals(),zIndex=new Map(zexiData.map(x=>[normalizeSku(x.sku),x]));
- for(const r of data){const row=mk('tr');const values=dailyValues(r,partIndex,zIndex);for(const i of visibleIndices){const cell=mk('td',(i>=8&&i<=12?'daily-operation ':'')+(i>=14?'daily-external ':'')+(i===13?'daily-general':''),String(values[i]??''));cell.dataset.colLabel=dailyHeaders[i];cell.dataset.columnIndex=String(i);if(i===0&&adjustMode&&isInventoryAdmin){const candidates=countSummaries.filter(x=>normalizeSku(x.sku)===r.sku);const type=candidates.find(x=>x.subseccion===r.familia)?.subseccion||candidates[0]?.subseccion;if(type){const b=mk('button','adjust-edit','✎ Editar');b.type='button';b.addEventListener('click',()=>openAdjustment('CONTEOS',r.sku,type));cell.append(document.createTextNode(' '),b)}}row.append(cell)}$('dailyRows').append(row)}
+ for(const r of data){const row=mk('tr');const values=dailyValues(r,partIndex,zIndex);for(const i of visibleIndices){const cell=mk('td',(i>=8&&i<=12?'daily-operation ':'')+(i>=14&&i<=16?'daily-external ':'')+(i===13?'daily-general':'')+(i>=17?'daily-balance':''),String(values[i]??''));cell.dataset.colLabel=dailyHeaders[i];cell.dataset.columnIndex=String(i);if(i===0&&adjustMode&&isInventoryAdmin){const candidates=countSummaries.filter(x=>normalizeSku(x.sku)===r.sku);const type=candidates.find(x=>x.subseccion===r.familia)?.subseccion||candidates[0]?.subseccion;if(type){const b=mk('button','adjust-edit','✎ Editar');b.type='button';b.addEventListener('click',()=>openAdjustment('CONTEOS',r.sku,type));cell.append(document.createTextNode(' '),b)}}row.append(cell)}$('dailyRows').append(row)}
  if(!data.length){const row=mk('tr'),td=mk('td','daily-empty','Sin conteos de la familia seleccionada');td.colSpan=visibleIndices.length;row.append(td);$('dailyRows').append(row)}
 }
 function downloadDaily(){const f=$('dailyFamily').value,arr=dailyData().filter(r=>f==='TODOS'||r.familia===f);const partIndex=partidasTotals(),zIndex=new Map(zexiData.map(x=>[normalizeSku(x.sku),x]));const ws=XLSX.utils.aoa_to_sheet([dailyHeaders,...arr.map(r=>dailyValues(r,partIndex,zIndex))]);ws['!cols']=dailyHeaders.map((_,i)=>({wch:i===1?43:18}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'RESUMEN DEL DIA');XLSX.writeFile(wb,'Resumen_Conteo_Del_Dia_'+f+'.xlsx')}
