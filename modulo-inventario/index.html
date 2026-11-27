@@ -119,6 +119,39 @@ body.focus-count #countSku{font-size:17px!important}
 body.focus-count .countForm{min-width:0}
 body.focus-count #countsWorkspace,body.focus-count .countsBox{width:100%;max-width:100%;min-width:0}
 @media(max-width:700px){body.focus-count .skuKeyboardTools{margin-bottom:-4px}body.focus-count #countEntryForm input{font-size:16px!important}}
+
+/* Conteo rápido v2: cuadrícula y viewport estables con teclado nativo. */
+body.focus-count,body.focus-count main,body.focus-count #inventoryPanel,
+body.focus-count #inventoryPanel>.card,body.focus-count #countsWorkspace,
+body.focus-count .countsLayout,body.focus-count .countsBox,
+body.focus-count .countForm{min-width:0!important;max-width:100%!important;width:100%!important;box-sizing:border-box}
+body.focus-count{margin:0!important;overflow-x:clip!important}
+body.focus-count #focusHead{max-width:100%;overflow:hidden}
+body.focus-count .focusTabs{width:100%;min-width:0;grid-template-columns:repeat(4,minmax(0,1fr))}
+body.focus-count .focusTabs button{min-width:0;max-width:100%;width:100%;padding-inline:4px;white-space:nowrap}
+body.focus-count .countForm{grid-template-columns:repeat(3,minmax(0,1fr));min-width:0;overflow:visible}
+body.focus-count .countForm label{min-width:0;max-width:100%}
+body.focus-count #countEntryForm input{box-sizing:border-box;min-width:0;max-width:100%;font-size:16px!important;letter-spacing:normal}
+body.focus-count #countSku{font-size:17px!important}
+body.focus-count .skuKeyboardTools{min-width:0}
+@media(max-width:700px){
+ body.focus-count #focusHead{width:100%;padding:6px 8px}
+ body.focus-count .focusTabs{gap:4px}
+ body.focus-count .focusTabs button{font-size:12px;min-height:37px}
+ body.focus-count .countsBox{padding:7px 8px 12px}
+ body.focus-count .countsBox h3{font-size:14px;margin-bottom:8px}
+ body.focus-count .countForm{gap:7px 5px}
+ body.focus-count .countForm input{height:43px}
+ body.focus-count #countSku{height:46px}
+ body.focus-count #countSubmit{min-height:45px}
+ body.focus-count .skuKeyboardTools{margin-bottom:0}
+ body.focus-count.keyboard-open .countForm{gap:5px 5px}
+ body.focus-count.keyboard-open .focusTabs button{min-height:33px}
+ body.focus-count.keyboard-open #countSku{height:42px}
+ body.focus-count.keyboard-open .countForm input{height:38px}
+ body.focus-count.keyboard-open #countSubmit{min-height:41px}
+ body.focus-count.keyboard-open #undoLastCount{min-height:32px}
+}
 /* Totales por operación derivados de BD: lectura únicamente */
 #inventoryPanel .calculated-num{white-space:nowrap;text-align:right;font-weight:750;font-variant-numeric:tabular-nums;background:#ecf6fa;color:#125575;padding:10px 12px}
 #inventoryPanel .total-num{background:#dff2eb;color:#0a6743}
@@ -304,6 +337,18 @@ let historyRecords=[],historyLoaded=false,historyBusy=false,historyRenderRows=[]
 const focusRequested=new URLSearchParams(location.search).get('modo')==='conteo';
 const prefersMobile=window.matchMedia('(max-width: 700px) and (pointer: coarse)').matches;
 let focusCounting=focusRequested||prefersMobile;
+// Bloquear zoom de página SOLO al usar Conteo rápido, manteniendo el zoom
+// normal disponible en el tablero y la pantalla de inicio de sesión.
+const inventoryViewportMeta=document.querySelector('meta[name="viewport"]');
+const inventoryDefaultViewport=inventoryViewportMeta?.getAttribute('content')||'width=device-width,initial-scale=1,viewport-fit=cover';
+function configureCountViewport(lock){
+ if(!inventoryViewportMeta)return;
+ const normal=inventoryDefaultViewport.replace(/,?\s*(?:maximum-scale|minimum-scale|user-scalable)\s*=\s*[^,]+/gi,'');
+ const content=lock?normal+', maximum-scale=1, user-scalable=no':normal;
+ if(inventoryViewportMeta.content!==content)inventoryViewportMeta.content=content;
+ document.documentElement.classList.toggle('count-scale-locked',lock);
+}
+
 // VisualViewport detecta la altura que realmente queda por encima del teclado Android/iOS.
 // No se dibuja un teclado artificial: se conserva el teclado nativo mientras un campo tenga foco.
 let countViewportBaseline=0;
@@ -323,7 +368,7 @@ function adjustCountViewport(){
   document.body.classList.toggle('keyboard-open',keyboard);
   if(keyboard&&active){
    const rect=active.getBoundingClientRect();
-   if(rect.bottom>h-12||rect.top<66)active.scrollIntoView({block:'nearest',behavior:'instant'});
+   if(rect.bottom>h-12||rect.top<65){const scrollBox=document.querySelector('body.focus-count main');if(scrollBox){const overflow=rect.bottom-(h-12);scrollBox.scrollTop+=overflow>0?overflow:Math.min(0,rect.top-65);}}
   }
  });
 }
@@ -352,7 +397,7 @@ function applyKeyboardPreference(refocus=false){
 $('keyboardToggle').addEventListener('click',()=>{countKeyboardAlpha=!countKeyboardAlpha;applyKeyboardPreference(true)});
 applyKeyboardPreference();
 
-function setFocusMode(on){focusCounting=!!on;document.body.classList.toggle('focus-count',focusCounting);if(focusCounting&&section!=='CONTEOS')selectTab('CONTEOS',subsection||'PET');else render();window.scrollTo({top:0,behavior:'instant'});adjustCountViewport();if(on){try{$('countSku').focus({preventScroll:true});}catch(_){$('countSku').focus();}adjustCountViewport();}}
+function setFocusMode(on){focusCounting=!!on;configureCountViewport(focusCounting);document.body.classList.toggle('focus-count',focusCounting);if(focusCounting&&section!=='CONTEOS')selectTab('CONTEOS',subsection||'PET');else render();window.scrollTo({top:0,behavior:'instant'});adjustCountViewport();if(on){try{$('countSku').focus({preventScroll:true});}catch(_){$('countSku').focus();}adjustCountViewport();}}
 function renderFocusTabs(){const bar=$('focusTabs');bar.replaceChildren();for(const t of COUNT_TYPES){const b=mk('button',subsection===t?'active':'',t);b.type='button';b.setAttribute('aria-pressed',String(subsection===t));b.addEventListener('click',()=>{selectTab('CONTEOS',t);window.scrollTo({top:0,behavior:'instant'});});bar.append(b);}}
 let sb, pin='', section='PFN',subsection='', rows=[], countSummaries=[], saving=false, visible=new Set(TABS);
 const status=(message,bad=false)=>{const e=$('status');e.textContent=message;e.style.color=bad?'#a82626':'#176193'};
@@ -380,7 +425,7 @@ function renewInventoryLogin(message='Ingresa tu PIN de Inventario para revalida
 }
 function isInventoryPermissionError(e){return /sin permiso para inventario|pin sin permiso|pin inválido/i.test(String(e?.message||e||''));}
 
-async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;$('pin').value='';await load();window.ctNavigationSession?.save(candidate);try{isInventoryAdmin=(await rpc('ct_inventory_count_is_admin',{}))===true;}catch(_){isInventoryAdmin=false;}$('clearAllCounts').classList.toggle('hidden',!isInventoryAdmin);$('dailyAdjustToggle').classList.toggle('hidden',!isInventoryAdmin);$('dailySaveHistory').classList.toggle('hidden',!isInventoryAdmin);$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');if(focusCounting){section='CONTEOS';subsection='PET';document.body.classList.add('focus-count')}render();adjustCountViewport();startCountSync();if(focusCounting){try{$('countSku').focus({preventScroll:true});}catch(_){/* El usuario puede tocar SKU para abrir el teclado */}}}catch(e){pin='';window.ctNavigationSession?.clear?.();$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
+async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;$('pin').value='';await load();window.ctNavigationSession?.save(candidate);try{isInventoryAdmin=(await rpc('ct_inventory_count_is_admin',{}))===true;}catch(_){isInventoryAdmin=false;}$('clearAllCounts').classList.toggle('hidden',!isInventoryAdmin);$('dailyAdjustToggle').classList.toggle('hidden',!isInventoryAdmin);$('dailySaveHistory').classList.toggle('hidden',!isInventoryAdmin);$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');if(focusCounting){section='CONTEOS';subsection='PET';configureCountViewport(true);document.body.classList.add('focus-count')}render();adjustCountViewport();startCountSync();if(focusCounting){try{$('countSku').focus({preventScroll:true});}catch(_){/* El usuario puede tocar SKU para abrir el teclado */}}}catch(e){pin='';window.ctNavigationSession?.clear?.();$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
 async function load(){
  const [data,counts,ext]=await Promise.all([rpc('ct_inventory_rows_list',{}),rpc('ct_inventory_counts_list',{}),rpc('ct_inventory_external_list',{})]);
  rows=Array.isArray(data)?data:[];countSummaries=Array.isArray(counts)?counts:[];
