@@ -241,6 +241,15 @@ body.focus-count .skuKeyboardTools{min-width:0}
 .daily-missing-metric strong{display:block;font-size:clamp(18px,2vw,26px);line-height:1.25;color:#144c6b;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .daily-missing-metric span{display:block;font-size:11px;font-weight:800;letter-spacing:.02em;color:#446e84;margin-bottom:4px}
 @media(max-width:540px){.daily-missing-metrics{gap:6px}.daily-missing-metric{padding:9px 5px}.daily-missing-metric strong{font-size:clamp(15px,4vw,20px)}.daily-missing-metric span{font-size:9px}}
+
+/* Dictado opcional en Conteo rápido: botón pequeño, sin cubrir el teclado. */
+.voiceTools{grid-column:1/-1;display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0}
+.countVoiceToggle{background:#e0f3ed;color:#0d654e;border:1px solid #9bd2bc;min-height:37px;padding:7px 12px;white-space:nowrap}
+.countVoiceToggle.listening{background:#b92c33;color:#fff;border-color:#a41e24;animation:voicePulse 1.1s ease-in-out infinite}
+.countVoiceStatus{flex:1 1 190px;font-size:11px;color:#426b82;line-height:1.35;overflow-wrap:anywhere}
+@keyframes voicePulse{50%{filter:brightness(1.25)}}
+@media(prefers-reduced-motion:reduce){.countVoiceToggle.listening{animation:none}}
+@media(max-width:700px){body.focus-count .voiceTools{gap:5px}body.focus-count .countVoiceToggle{min-height:34px;font-size:12px}body.focus-count .countVoiceStatus{font-size:10px;flex-basis:100%}body.focus-count.keyboard-open .countVoiceStatus{display:none}}
 </style></head><body>
 <header><div><h1>📒 Módulo Inventario</h1><small>CD Girardota · Control por SKU</small></div><a href="../index.html">← Control de Transportes</a></header>
 <main><section class="card login" id="loginPanel"><div class="emoji">📒🔢</div><h2>Acceso a Inventario</h2><p>Ingresa con tu PIN de Control de Transportes. El contenido se consulta y guarda en Supabase únicamente con permiso.</p><form id="inventoryLogin"><label for="pin">PIN personal</label><input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" pattern="[0-9]{1,8}" required><button id="enter" type="submit">🔓 Ingresar</button><p id="loginError" class="error" role="alert"></p></form></section>
@@ -253,6 +262,10 @@ body.focus-count .skuKeyboardTools{min-width:0}
 <div id="countsWorkspace" class="countsLayout hidden">
   <section class="countsBox" aria-label="Ingreso de conteos"><h3>🔢 Registrar conteo · <span id="activeCountType">PET</span></h3>
     <form id="countEntryForm" class="countForm">
+      <div class="voiceTools" role="group" aria-label="Registro de conteos por voz">
+        <button id="countVoiceToggle" class="secondary countVoiceToggle" type="button" aria-pressed="false">🎙️ Dictar conteo</button>
+        <span id="countVoiceStatus" class="countVoiceStatus" role="status" aria-live="polite">Di: «SKU 21447, unidades 3, cajas 2, estibas 1».</span>
+      </div>
       <div class="skuKeyboardTools"><span>SKU</span><button id="keyboardToggle" class="secondary keyboardToggle" type="button" aria-pressed="false" aria-label="Cambiar a teclado alfabético">⌨ ABC / 123</button></div>
       <label class="skuField"><input id="countSku" type="text" inputmode="numeric" enterkeyhint="next" maxlength="80" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Escribe el SKU" required></label>
       <div id="countDescription" class="countDescription">Ingresa un SKU para habilitar las cantidades.</div>
@@ -397,7 +410,7 @@ function applyKeyboardPreference(refocus=false){
 $('keyboardToggle').addEventListener('click',()=>{countKeyboardAlpha=!countKeyboardAlpha;applyKeyboardPreference(true)});
 applyKeyboardPreference();
 
-function setFocusMode(on){focusCounting=!!on;configureCountViewport(focusCounting);document.body.classList.toggle('focus-count',focusCounting);if(focusCounting&&section!=='CONTEOS')selectTab('CONTEOS',subsection||'PET');else render();window.scrollTo({top:0,behavior:'instant'});adjustCountViewport();if(on){try{$('countSku').focus({preventScroll:true});}catch(_){$('countSku').focus();}adjustCountViewport();}}
+function setFocusMode(on){if(!on)stopCountVoice();focusCounting=!!on;configureCountViewport(focusCounting);document.body.classList.toggle('focus-count',focusCounting);if(focusCounting&&section!=='CONTEOS')selectTab('CONTEOS',subsection||'PET');else render();window.scrollTo({top:0,behavior:'instant'});adjustCountViewport();if(on){try{$('countSku').focus({preventScroll:true});}catch(_){$('countSku').focus();}adjustCountViewport();}}
 function renderFocusTabs(){const bar=$('focusTabs');bar.replaceChildren();for(const t of COUNT_TYPES){const b=mk('button',subsection===t?'active':'',t);b.type='button';b.setAttribute('aria-pressed',String(subsection===t));b.addEventListener('click',()=>{selectTab('CONTEOS',t);window.scrollTo({top:0,behavior:'instant'});});bar.append(b);}}
 let sb, pin='', section='PFN',subsection='', rows=[], countSummaries=[], saving=false, visible=new Set(TABS);
 const status=(message,bad=false)=>{const e=$('status');e.textContent=message;e.style.color=bad?'#a82626':'#176193'};
@@ -467,7 +480,7 @@ function startCountSync(){
 }
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&pin)syncCountSummaries(true)});
 window.addEventListener('online',()=>{if(pin)syncCountSummaries(true)});
-function selectTab(tab,sub){if($('externalFile'))$('externalFile').value='';section=tab;subsection=tab==='CONTEOS'?(sub||subsection||'PET'):'';$('search').value='';clearCountForm();render();}
+function selectTab(tab,sub){stopCountVoice();if($('externalFile'))$('externalFile').value='';section=tab;subsection=tab==='CONTEOS'?(sub||subsection||'PET'):'';$('search').value='';clearCountForm();render();}
 function renderTabs(){const bar=$('mainTabs');bar.replaceChildren();for(const t of TABS){if(!visible.has(t))continue;const b=mk('button','tab'+(section===t?' active':''),t);b.type='button';b.addEventListener('click',()=>selectTab(t));bar.append(b)}const vs=$('visibilityOptions');vs.replaceChildren();for(const t of TABS){const lab=mk('label'),cb=mk('input');cb.type='checkbox';cb.checked=visible.has(t);cb.addEventListener('change',()=>{if(cb.checked)visible.add(t);else if(visible.size>1)visible.delete(t);else{cb.checked=true;status('Debe permanecer visible al menos una pestaña.',true);return}if(!visible.has(section))section=[...visible][0];render()});lab.append(cb,document.createTextNode(' '+t));vs.append(lab)}
 const sbBar=$('conteosTabs');sbBar.classList.toggle('hidden',section!=='CONTEOS');sbBar.replaceChildren();if(section==='CONTEOS')for(const t of COUNT_TYPES){const b=mk('button','tab sub'+(subsection===t?' active':''),t);b.type='button';b.addEventListener('click',()=>selectTab('CONTEOS',t));sbBar.append(b)}}
 function render(){
@@ -579,7 +592,7 @@ function splitMissingUnits(sku,missing){
 function dailyValues(r,parts=partidasTotals(),zMap=new Map(zexiData.map(x=>[normalizeSku(x.sku),x]))){
  const v=unitValues(r.sku,r.unds,r.caj,r.est,r.extraBox||0,r.extraEst||0);
  const opTotals=OPS.map(o=>unitValues(r.sku,r.ops[o]?.unds??0,r.ops[o]?.caj??0,r.ops[o]?.est??0,r.ops[o]?.extraBox||0,r.ops[o]?.extraEst||0).total);
- const totalGeneral=v.total-opTotals.reduce((a,b)=>a+b,0);
+ const totalGeneral=v.total+opTotals.reduce((acc,value,i)=>acc+(OPS[i]==='ROTURAS'?-value:value),0);
  const z=zMap.get(r.sku);
  const zexi=z?numerical(z.total_general):0;
  const partida=parts.get(r.sku),pos=partida?.pos||0,neg=partida?.neg||0;
@@ -724,6 +737,90 @@ $('focusExit').addEventListener('click',()=>setFocusMode(false));
 function opUpdateDesc(){const sku=normalizeSku($('opSku').value),bd=bdMap().get(sku);$('opDescription').textContent=!sku?'Ingresa un SKU para consultar la descripción en BD.':bd?'✓ '+bd.descripcion:'⚠ SKU no encontrado en BD. Carga la BD antes de registrarlo.';$('opDescription').style.color=sku&&!bd?'#b3261e':'#215d7e';$('opSave').disabled=!bd;}
 $('opSku').addEventListener('input',opUpdateDesc);
 $('operationForm').addEventListener('submit',async e=>{e.preventDefault();if(!OPS.includes(section))return;const sku=normalizeSku($('opSku').value),bd=bdMap().get(sku);if(!bd){status('SKU no encontrado en BD.',true);return;}const parse=id=>{const x=$(id).value.trim().replace(',','.');if(!x)return 0;const n=Number(x);if(!Number.isFinite(n)||n<0||n>1e12)throw Error('Cantidad inválida: '+id);return n;};const btn=$('opSave');try{const und=parse('opUnd'),caj=parse('opCaj'),est=parse('opEst');if(und+caj+est===0)throw Error('Registra al menos una cantidad mayor que cero.');btn.disabled=true;await rpc('ct_inventory_operation_add',{p_seccion:section,p_sku:sku,p_unds:und,p_cajas:caj,p_estibas:est,p_novedad:$('opNovedad').value.trim()});await load();render();$('operationForm').reset();opUpdateDesc();status('Cantidades acumuladas para SKU '+sku+' en '+section+'.');}catch(err){status('No se pudieron guardar las cantidades: '+err.message,true);}finally{btn.disabled=false;}});
+// Voz es opcional y requiere permiso explícito de micrófono.
+// No se envían datos a Supabase desde el dictado; CONTAR sigue siendo el único guardado.
+const CountSpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+let countVoiceRecognizer=null,countVoiceListening=false;
+const voiceBtn=$('countVoiceToggle'),voiceStatus=$('countVoiceStatus');
+function setVoiceState(active,message){
+ countVoiceListening=active;
+ voiceBtn.classList.toggle('listening',active);
+ voiceBtn.setAttribute('aria-pressed',String(active));
+ voiceBtn.textContent=active?'■ Detener dictado':'🎙️ Dictar conteo';
+ if(message)voiceStatus.textContent=message;
+}
+function stopCountVoice(){
+ if(countVoiceRecognizer&&countVoiceListening){try{countVoiceRecognizer.stop()}catch(_){}}
+ setVoiceState(false);
+}
+// Acepta números transcritos como cifras o palabras sencillas en español.
+function voiceNumber(raw){
+ let str=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+ const digits=str.match(/^-?\d+(?:[.,]\d+)?$/);if(digits)return Number(str.replace(',','.'));
+ const dict={cero:0,un:1,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,once:11,doce:12,trece:13,catorce:14,quince:15,dieciseis:16,diecisiete:17,dieciocho:18,diecinueve:19,veinte:20,treinta:30,cuarenta:40,cincuenta:50,sesenta:60,setenta:70,ochenta:80,noventa:90,cien:100,ciento:100,quinientos:500,mil:1000};
+ if(Object.hasOwn(dict,str))return dict[str];
+ const twenty=str.match(/^veinti(?:\s+)?(uno|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve)$/);if(twenty)return 20+dict[twenty[1]];
+ const tens=str.match(/^(treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa) y (un|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve)$/);if(tens)return dict[tens[1]]+dict[tens[2]];
+ return null;
+}
+function voiceSku(raw){
+ const normalized=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+ const compact=normalized.replace(/[\s.,-]/g,'');
+ if(/^\d{1,80}$/.test(compact))return compact;
+ const digitWords={cero:'0',un:'1',uno:'1',una:'1',dos:'2',tres:'3',cuatro:'4',cinco:'5',seis:'6',siete:'7',ocho:'8',nueve:'9'};
+ const words=normalized.split(/[\s.,-]+/).filter(Boolean);
+ if(words.length&&words.every(w=>Object.hasOwn(digitWords,w)))return words.map(w=>digitWords[w]).join('');
+ return null;
+}
+function applyCountVoice(transcript){
+ const heard=String(transcript||'').trim();
+ const normalized=heard.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+ const parts=[
+  {key:'sku',re:/\b(?:sku|s\s*k\s*u|codigo)\b\s*[:#]?\s*/g},
+  {key:'units',re:/\b(?:unidades|unidad|unds|und)\b\s*[:#]?\s*/g},
+  {key:'boxes',re:/\b(?:cajas|caja)\b\s*[:#]?\s*/g},
+  {key:'pallets',re:/\b(?:estibas|estiba|pallets|pallet)\b\s*[:#]?\s*/g},
+  {key:'site',re:/\b(?:sitio|ubicacion|novedad)\b\s*[:#]?\s*/g}
+ ];
+ const markers=[];
+ for(const p of parts){for(const m of normalized.matchAll(p.re))markers.push({key:p.key,start:m.index,end:m.index+m[0].length});}
+ markers.sort((a,b)=>a.start-b.start);
+ if(!markers.length){setVoiceState(false,'No se reconocieron campos. Di «SKU 21447, unidades 3, cajas 2» y revisa antes de contar.');return;}
+ const extracted={};
+ for(let i=0;i<markers.length;i++){
+  const m=markers[i];const end=i+1<markers.length?markers[i+1].start:normalized.length;
+  extracted[m.key]=normalized.slice(m.end,end).replace(/^[\s:,.]+|[\s:,.]+$/g,'').replace(/\s+contar\s*$/,'').trim();
+ }
+ let updated=[];
+ if(extracted.sku){const sku=voiceSku(extracted.sku);if(sku){$('countSku').value=sku;countReady();updated.push('SKU '+sku);}else updated.push('SKU no reconocido');}
+ const entries=[['units','countUnits','unidades'],['boxes','countBoxes','cajas'],['pallets','countPallets','estibas']];
+ for(const [key,id,label] of entries){if(!(key in extracted))continue;
+  const n=voiceNumber(extracted[key]);const input=$(id);
+  if(n===null||n<0||n>1e12){updated.push(label+' no reconocido');continue;}
+  if(input.disabled){updated.push(label+' sin SKU válido para '+subsection);continue;}
+  input.value=String(n);updated.push(label+' '+n);
+ }
+ if(extracted.site&& !$('countSite').disabled){$('countSite').value=extracted.site;updated.push('sitio '+extracted.site);}
+ countReady();
+ setVoiceState(false,(updated.length?'Dictado: '+updated.join(' · ')+'. ':'No se aplicaron campos. ')+'Revisa las cantidades y presiona CONTAR para guardar.');
+}
+if(!CountSpeechRecognition){voiceBtn.disabled=true;voiceStatus.textContent='Tu navegador no admite reconocimiento de voz aquí. Puedes usar el micrófono del teclado o ingresar manualmente.';}
+else{
+ voiceBtn.addEventListener('click',()=>{
+  if(countVoiceListening){stopCountVoice();return;}
+  if(section!=='CONTEOS'){voiceStatus.textContent='Abre CONTEOS antes de dictar.';return;}
+  // Ocultar teclado y dejar espacio para la confirmación del dictado.
+  if(document.activeElement?.matches?.('#countEntryForm input'))document.activeElement.blur();
+  const recog=new CountSpeechRecognition();countVoiceRecognizer=recog;
+  recog.lang='es-CO';recog.continuous=false;recog.interimResults=false;recog.maxAlternatives=1;
+  recog.onresult=event=>{if(countVoiceRecognizer!==recog)return;const text=Array.from(event.results).map(r=>r[0]?.transcript||'').join(' ');applyCountVoice(text);};
+  recog.onerror=event=>{if(countVoiceRecognizer!==recog)return;const desc=event.error==='not-allowed'?'Permiso de micrófono denegado':event.error==='no-speech'?'No se detectó voz':event.error==='network'?'Servicio de voz no disponible':'Error de voz: '+event.error;setVoiceState(false,desc+'. Puedes continuar escribiendo.');};
+  recog.onend=()=>{if(countVoiceRecognizer===recog){countVoiceRecognizer=null;if(countVoiceListening)setVoiceState(false,'Dictado terminado. Revisa los campos antes de contar.');}};
+  try{recog.start();setVoiceState(true,'Escuchando… di «SKU 21447, unidades 3, cajas 2, estibas 1».');}
+  catch(e){countVoiceRecognizer=null;setVoiceState(false,'No se pudo iniciar el micrófono: '+e.message);}
+ });
+}
+
 $('countSku').addEventListener('input',countReady);
 $('countEntryForm').addEventListener('submit',recordCount);
 $('undoLastCount').addEventListener('click',undoLastCount);
