@@ -109,6 +109,16 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
 
 .operationForm{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0;padding:16px;border:1px solid #b7d5e8;background:#f2f9fc;border-radius:14px;align-items:end}.operationForm label{font-size:12px;font-weight:750;display:flex;flex-direction:column;gap:5px;min-width:0}.operationForm input{width:100%;min-width:0;border:1px solid #b4d0e2;border-radius:8px;padding:11px;font-size:16px;background:#fff}.operationForm .operationTitle,.operationForm .operationDescription{grid-column:1/-1}.operationForm .operationTitle{font-size:16px;font-weight:800;color:#155780}.operationForm .operationDescription{min-height:19px;font-size:12px;color:#4b7590}.operationForm button[type=submit]{min-height:44px}.operationForm #opSku{font-size:16px}@media(max-width:660px){.operationForm{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px}.operationForm button[type=submit]{grid-column:1/-1}}
 .dailyWrap{max-height:72vh}.dailyWrap table{min-width:2200px}.dailyWrap th{font-size:11px}.dailyWrap td{font-variant-numeric:tabular-nums;text-align:right}.dailyWrap td:first-child,.dailyWrap td:nth-child(2){text-align:left}.countDescription{font-weight:650}
+/* Modo conteo: tamaño 1:1 y selector de teclado nativo. Sin zoom por foco. */
+.skuKeyboardTools{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:800;color:#1c4b68}
+.keyboardToggle{min-height:36px;font-size:12px;padding:7px 12px;white-space:nowrap;touch-action:manipulation}
+body.focus-count .skuKeyboardTools{font-size:12px}
+body.focus-count .keyboardToggle{min-height:36px;font-size:12px}
+body.focus-count #countEntryForm input{font-size:16px!important;line-height:normal;max-width:100%;transform:none!important;zoom:1}
+body.focus-count #countSku{font-size:17px!important}
+body.focus-count .countForm{min-width:0}
+body.focus-count #countsWorkspace,body.focus-count .countsBox{width:100%;max-width:100%;min-width:0}
+@media(max-width:700px){body.focus-count .skuKeyboardTools{margin-bottom:-4px}body.focus-count #countEntryForm input{font-size:16px!important}}
 /* Totales por operación derivados de BD: lectura únicamente */
 #inventoryPanel .calculated-num{white-space:nowrap;text-align:right;font-weight:750;font-variant-numeric:tabular-nums;background:#ecf6fa;color:#125575;padding:10px 12px}
 #inventoryPanel .total-num{background:#dff2eb;color:#0a6743}
@@ -210,11 +220,12 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
 <div id="countsWorkspace" class="countsLayout hidden">
   <section class="countsBox" aria-label="Ingreso de conteos"><h3>🔢 Registrar conteo · <span id="activeCountType">PET</span></h3>
     <form id="countEntryForm" class="countForm">
-      <label class="skuField">SKU<input id="countSku" type="text" inputmode="numeric" enterkeyhint="next" maxlength="80" autocomplete="off" placeholder="Escribe el SKU" required></label>
+      <div class="skuKeyboardTools"><span>SKU</span><button id="keyboardToggle" class="secondary keyboardToggle" type="button" aria-pressed="false" aria-label="Cambiar a teclado alfabético">⌨ ABC / 123</button></div>
+      <label class="skuField"><input id="countSku" type="text" inputmode="numeric" enterkeyhint="next" maxlength="80" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Escribe el SKU" required></label>
       <div id="countDescription" class="countDescription">Ingresa un SKU para habilitar las cantidades.</div>
-      <label>CANT UNDS<input id="countUnits" enterkeyhint="next" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
-      <label>CANT CAJAS<input id="countBoxes" enterkeyhint="next" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
-      <label>CANT ESTIBAS<input id="countPallets" enterkeyhint="done" type="number" min="0" step="any" inputmode="decimal" placeholder="0" disabled></label>
+      <label>CANT UNDS<input id="countUnits" enterkeyhint="next" type="text" inputmode="decimal" placeholder="0" disabled></label>
+      <label>CANT CAJAS<input id="countBoxes" enterkeyhint="next" type="text" inputmode="decimal" placeholder="0" disabled></label>
+      <label>CANT ESTIBAS<input id="countPallets" enterkeyhint="done" type="text" inputmode="decimal" placeholder="0" disabled></label>
       <label class="siteField">SITIO (opcional)<input id="countSite" type="text" maxlength="240" placeholder="Escribe el lugar o la novedad" disabled></label>
       <div class="countActions"><button class="countNow" id="countSubmit" type="submit" disabled>CONTAR</button><button class="countUndo" id="undoLastCount" type="button">↶ Deshacer último conteo</button><button class="countClear hidden" id="clearAllCounts" type="button">🗑 BORRAR TODO</button></div>
     </form><p class="countsFooter">Al pulsar CONTAR se guarda el movimiento y se limpia el formulario. Los SKU repetidos se acumulan en el resumen.</p>
@@ -322,7 +333,26 @@ window.addEventListener('resize',adjustCountViewport);
 window.addEventListener('orientationchange',()=>{countViewportBaseline=0;adjustCountViewport()});
 $('countEntryForm').addEventListener('focusin',adjustCountViewport);
 $('countEntryForm').addEventListener('focusout',()=>requestAnimationFrame(adjustCountViewport));
-function setFocusMode(on){focusCounting=!!on;document.body.classList.toggle('focus-count',focusCounting);if(focusCounting&&section!=='CONTEOS')selectTab('CONTEOS',subsection||'PET');else render();window.scrollTo({top:0,behavior:'instant'});adjustCountViewport();}
+// Cambia el teclado solicitado al sistema operativo sin introducir un teclado superpuesto.
+// En Android/iOS su apertura depende de una interacción real y de las preferencias del equipo.
+let countKeyboardAlpha=false;
+function applyKeyboardPreference(refocus=false){
+ const active=document.activeElement;
+ const wasInForm=active?.matches?.('#countEntryForm input');
+ const fields=['countSku','countUnits','countBoxes','countPallets','countSite'];
+ for(const id of fields){const el=$(id);el.inputMode=countKeyboardAlpha?'text':(id==='countSku'?'numeric':id==='countSite'?'text':'decimal');}
+ const toggle=$('keyboardToggle');toggle.textContent=countKeyboardAlpha?'⌨ ABC · Cambiar a 123':'⌨ 123 · Cambiar a ABC';
+ toggle.setAttribute('aria-pressed',String(countKeyboardAlpha));
+ toggle.setAttribute('aria-label',countKeyboardAlpha?'Cambiar a teclado numérico':'Cambiar a teclado alfabético');
+ if(refocus){const target=wasInForm&&!active.disabled?active:$('countSku');
+  // Algunos teclados requieren reenfocar para reconocer el nuevo inputmode.
+  target.blur();try{target.focus({preventScroll:true})}catch(_){target.focus()}
+  adjustCountViewport();}
+}
+$('keyboardToggle').addEventListener('click',()=>{countKeyboardAlpha=!countKeyboardAlpha;applyKeyboardPreference(true)});
+applyKeyboardPreference();
+
+function setFocusMode(on){focusCounting=!!on;document.body.classList.toggle('focus-count',focusCounting);if(focusCounting&&section!=='CONTEOS')selectTab('CONTEOS',subsection||'PET');else render();window.scrollTo({top:0,behavior:'instant'});adjustCountViewport();if(on){try{$('countSku').focus({preventScroll:true});}catch(_){$('countSku').focus();}adjustCountViewport();}}
 function renderFocusTabs(){const bar=$('focusTabs');bar.replaceChildren();for(const t of COUNT_TYPES){const b=mk('button',subsection===t?'active':'',t);b.type='button';b.setAttribute('aria-pressed',String(subsection===t));b.addEventListener('click',()=>{selectTab('CONTEOS',t);window.scrollTo({top:0,behavior:'instant'});});bar.append(b);}}
 let sb, pin='', section='PFN',subsection='', rows=[], countSummaries=[], saving=false, visible=new Set(TABS);
 const status=(message,bad=false)=>{const e=$('status');e.textContent=message;e.style.color=bad?'#a82626':'#176193'};
@@ -350,7 +380,7 @@ function renewInventoryLogin(message='Ingresa tu PIN de Inventario para revalida
 }
 function isInventoryPermissionError(e){return /sin permiso para inventario|pin sin permiso|pin inválido/i.test(String(e?.message||e||''));}
 
-async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;$('pin').value='';await load();window.ctNavigationSession?.save(candidate);try{isInventoryAdmin=(await rpc('ct_inventory_count_is_admin',{}))===true;}catch(_){isInventoryAdmin=false;}$('clearAllCounts').classList.toggle('hidden',!isInventoryAdmin);$('dailyAdjustToggle').classList.toggle('hidden',!isInventoryAdmin);$('dailySaveHistory').classList.toggle('hidden',!isInventoryAdmin);$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');if(focusCounting){section='CONTEOS';subsection='PET';document.body.classList.add('focus-count')}render();adjustCountViewport();startCountSync();}catch(e){pin='';window.ctNavigationSession?.clear?.();$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
+async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;$('pin').value='';await load();window.ctNavigationSession?.save(candidate);try{isInventoryAdmin=(await rpc('ct_inventory_count_is_admin',{}))===true;}catch(_){isInventoryAdmin=false;}$('clearAllCounts').classList.toggle('hidden',!isInventoryAdmin);$('dailyAdjustToggle').classList.toggle('hidden',!isInventoryAdmin);$('dailySaveHistory').classList.toggle('hidden',!isInventoryAdmin);$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');if(focusCounting){section='CONTEOS';subsection='PET';document.body.classList.add('focus-count')}render();adjustCountViewport();startCountSync();if(focusCounting){try{$('countSku').focus({preventScroll:true});}catch(_){/* El usuario puede tocar SKU para abrir el teclado */}}}catch(e){pin='';window.ctNavigationSession?.clear?.();$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
 async function load(){
  const [data,counts,ext]=await Promise.all([rpc('ct_inventory_rows_list',{}),rpc('ct_inventory_counts_list',{}),rpc('ct_inventory_external_list',{})]);
  rows=Array.isArray(data)?data:[];countSummaries=Array.isArray(counts)?counts:[];
