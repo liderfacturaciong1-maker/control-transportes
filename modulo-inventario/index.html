@@ -174,6 +174,24 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
  #inventoryPanel .dailyWrap tbody td.daily-balance::before{color:#164a63}
 }
 
+/* Seguimiento histórico de cierres diarios y comparación por período. */
+.history-tools{display:flex;gap:9px;align-items:end;flex-wrap:wrap;margin:14px 0;padding:13px;border:1px solid #c8dce9;background:#f3f9fc;border-radius:12px}
+.history-tools label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:800;color:#194f70;min-width:118px}
+.history-tools select,.history-tools input{border:1px solid #b7d1e2;border-radius:8px;background:#fff;font:inherit;padding:9px;min-height:39px;color:#193d56;max-width:185px}
+.history-tools button{min-height:39px}
+.history-table-wrap{max-height:68vh;overflow:auto;border:1px solid #cbdfea;border-radius:10px}
+.history-table{width:max-content;min-width:100%;border-collapse:collapse;font-size:12px}
+.history-table th,.history-table td{text-align:center;vertical-align:middle;white-space:nowrap;padding:10px 9px;font-weight:750;border:1px solid #dce9f1}
+.history-table thead th{background:#1b557a;color:white;position:sticky;top:0;z-index:2}
+.history-table thead tr:nth-child(2) th{top:38px;background:#27719b}
+.history-table .history-sku{position:sticky;left:0;z-index:3;background:#f7fbfd;min-width:105px}
+.history-table .history-desc{position:sticky;left:105px;z-index:3;background:#f7fbfd;min-width:210px;max-width:300px;white-space:normal;text-align:left}
+.history-table thead .history-sku,.history-table thead .history-desc{background:#174c6c;z-index:4}
+.history-table td.history-neg{color:#a21d24;background:#fff0ef}
+.history-table td.history-pos{color:#136b48}
+.history-save{background:#147d57!important;color:white!important}
+.history-note{font-size:12px;color:#55778a;line-height:1.5}
+@media(max-width:750px){.history-tools label{flex:1 1 40%}.history-tools select,.history-tools input{max-width:100%;width:100%}.history-table .history-desc{min-width:165px;max-width:200px}}
 /* Indicadores de faltantes: agregados de los SKU visibles según filtro FLIA. */
 .daily-missing-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 14px}
 .daily-missing-metric{min-width:0;border:1px solid #c5dce8;background:#edf6fb;border-radius:12px;padding:11px 14px;text-align:center}
@@ -207,11 +225,25 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
     <p class="countsInfo">CANT UN acumula «CANT UNDS». CANT CAJ acumula «CANT CAJAS». CANT EST acumula «CANT ESTIBAS». NOVEDAD reúne los sitios registrados sin duplicarlos. Cada entrada se conserva por separado en Supabase.</p>
   </section>
 </div>
-<div id="dailyPanel" class="hidden"><div class="controls"><label for="dailyFamily"><b>Filtrar familia</b></label><select id="dailyFamily" aria-label="Filtrar SKU según la columna FLIA de BD"><option value="TODOS">Todas las familias</option></select><button type="button" class="secondary" id="dailyDownload">⬇ Descargar resumen del día Excel</button><button type="button" id="dailyAdjustToggle" class="secondary hidden">✏️ AJUSTAR CONTEOS</button></div><p class="hint">Base del resumen: todos los SKU cargados en ZEXI. El filtro de familias utiliza FLIA de BD; los SKU sin FLIA solo se muestran en Todas las familias. Se cruzan las cantidades de CONTEOS, PFN, PNC, ROTURAS, REEMPAQUE, VERTIMIENTO y PARTIDAS por SKU. Los SKU sin movimientos muestran cero. Puedes ocultar columnas con el ojo tachado.</p><p id="dailyAdjustHint" class="hint hidden">Modo ajuste: selecciona «Editar» en el SKU para modificar cinco cantidades. Solo administrador. Las equivalencias ajustadas no modifican la BD maestra.</p><div id="dailyMissingMetrics" class="daily-missing-metrics" aria-label="Acumulados de faltantes de la familia filtrada" aria-live="polite">
+<div id="dailyPanel" class="hidden"><div class="controls"><label for="dailyFamily"><b>Filtrar familia</b></label><select id="dailyFamily" aria-label="Filtrar SKU según la columna FLIA de BD"><option value="TODOS">Todas las familias</option></select><button type="button" class="secondary" id="dailyDownload">⬇ Descargar resumen del día Excel</button><button type="button" class="history-save hidden" id="dailySaveHistory">💾 GUARDAR Y REGISTRAR</button><button type="button" id="dailyAdjustToggle" class="secondary hidden">✏️ AJUSTAR CONTEOS</button></div><p class="hint">Base del resumen: todos los SKU cargados en ZEXI. El filtro de familias utiliza FLIA de BD; los SKU sin FLIA solo se muestran en Todas las familias. Se cruzan las cantidades de CONTEOS, PFN, PNC, ROTURAS, REEMPAQUE, VERTIMIENTO y PARTIDAS por SKU. Los SKU sin movimientos muestran cero. Puedes ocultar columnas con el ojo tachado.</p><p id="dailyAdjustHint" class="hint hidden">Modo ajuste: selecciona «Editar» en el SKU para modificar cinco cantidades. Solo administrador. Las equivalencias ajustadas no modifican la BD maestra.</p><div id="dailyMissingMetrics" class="daily-missing-metrics" aria-label="Acumulados de faltantes de la familia filtrada" aria-live="polite">
  <div class="daily-missing-metric"><span>FALTANTE UNDS</span><strong id="dailyMissingUnits">0</strong></div>
  <div class="daily-missing-metric"><span>FALTANTE CAJ</span><strong id="dailyMissingBoxes">0</strong></div>
  <div class="daily-missing-metric"><span>FALTANTE EST</span><strong id="dailyMissingPallets">0</strong></div>
 </div><div id="dailyHiddenColumns" class="daily-hiddenbar" aria-label="Columnas ocultas"></div><div class="wrap dailyWrap"><table id="dailyTable"><thead id="dailyHead"></thead><tbody id="dailyRows"></tbody></table></div></div>
+<section id="historyPanel" class="hidden" aria-label="Seguimiento histórico de inventarios">
+ <h3 style="color:#184e70;margin:3px 0">📅 SEGUIMIENTO · COMPARATIVO DE FALTANTES</h3>
+ <p class="history-note">Cierres históricos guardados desde RESUMEN CONTEO DEL DÍA. Cada día, semana o mes muestra el último cierre registrado de ese período para cada SKU. Un guion significa que el SKU no tiene cierre en ese período. Los históricos no se borran al iniciar un nuevo conteo.</p>
+ <div class="history-tools">
+  <label>Comparar por<select id="historyPeriod"><option value="dia">Días</option><option value="semana">Semanas</option><option value="mes">Meses</option></select></label>
+  <label>Desde<input id="historyFrom" type="date"></label>
+  <label>Hasta<input id="historyTo" type="date"></label>
+  <label>Familia (FLIA)<select id="historyFamily"><option value="TODOS">Todas las familias</option></select></label>
+  <button type="button" id="historySearch">↻ Consultar cierres</button>
+  <button type="button" class="secondary" id="historyDownload">⬇ Descargar comparativo Excel</button>
+ </div>
+ <p class="status" id="historyStatus" role="status"></p>
+ <div class="history-table-wrap"><table class="history-table"><thead id="historyHead"></thead><tbody id="historyRows"></tbody></table></div>
+ </section>
 <section id="externalPanel" class="external-panel hidden" aria-label="Carga de archivos ZEXI y PARTIDAS">
  <div class="external-tools"><label for="externalFile">Archivo Excel<input type="file" id="externalFile" accept=".xlsx,.xls"></label>
  <button type="button" id="externalUpload">⬆ Cargar archivo</button><button type="button" id="externalDownload" class="secondary">⬇ Descargar datos</button></div>
@@ -251,12 +283,13 @@ body.focus-count input{scroll-margin-top:86px;scroll-margin-bottom:15px}
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const COLUMNS=['SKU','DESCRIPCION','CANT UNDS','CANT CAJ','CANT EST','NOVEDAD'];
-const TABS=['PFN','PNC','ROTURAS','REEMPAQUE','VERTIMIENTO','ZEXI','BD','PARTIDAS','CONTEOS','RESUMEN CONTEO DEL DIA'];
+const TABS=['PFN','PNC','ROTURAS','REEMPAQUE','VERTIMIENTO','ZEXI','BD','PARTIDAS','CONTEOS','RESUMEN CONTEO DEL DIA','SEGUIMIENTO'];
 const OPS=['PFN','PNC','ROTURAS','REEMPAQUE','VERTIMIENTO'];
 const familyOf=x=>{const f=String(x||'').trim().toUpperCase();return f==='LTA'?'LATA':f==='RNBRL'?'RN':f;};
 const COUNT_TYPES=['PET','LATA','TW','RN'];
 let countSyncTimer=null,countSyncBusy=false,countSyncOnline=true,countMutationBusy=false,isInventoryAdmin=false,adjustMode=false,adjustTarget=null;
 let zexiData=[],partidasData=[];
+let historyRecords=[],historyLoaded=false,historyBusy=false,historyRenderRows=[],historyRenderPeriods=[];
 const focusRequested=new URLSearchParams(location.search).get('modo')==='conteo';
 const prefersMobile=window.matchMedia('(max-width: 700px) and (pointer: coarse)').matches;
 let focusCounting=focusRequested||prefersMobile;
@@ -317,7 +350,7 @@ function renewInventoryLogin(message='Ingresa tu PIN de Inventario para revalida
 }
 function isInventoryPermissionError(e){return /sin permiso para inventario|pin sin permiso|pin inválido/i.test(String(e?.message||e||''));}
 
-async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;$('pin').value='';await load();window.ctNavigationSession?.save(candidate);try{isInventoryAdmin=(await rpc('ct_inventory_count_is_admin',{}))===true;}catch(_){isInventoryAdmin=false;}$('clearAllCounts').classList.toggle('hidden',!isInventoryAdmin);$('dailyAdjustToggle').classList.toggle('hidden',!isInventoryAdmin);$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');if(focusCounting){section='CONTEOS';subsection='PET';document.body.classList.add('focus-count')}render();adjustCountViewport();startCountSync();}catch(e){pin='';window.ctNavigationSession?.clear?.();$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
+async function enter(candidate){const btn=$('enter');btn.disabled=true;$('loginError').textContent='Verificando autorización…';try{const {data,error}=await sb.rpc('ct_inventory_can_access',{p_pin:candidate});if(error)throw error;if(data!==true)throw Error('PIN sin permiso o inválido');pin=candidate;$('pin').value='';await load();window.ctNavigationSession?.save(candidate);try{isInventoryAdmin=(await rpc('ct_inventory_count_is_admin',{}))===true;}catch(_){isInventoryAdmin=false;}$('clearAllCounts').classList.toggle('hidden',!isInventoryAdmin);$('dailyAdjustToggle').classList.toggle('hidden',!isInventoryAdmin);$('dailySaveHistory').classList.toggle('hidden',!isInventoryAdmin);$('loginPanel').classList.add('hidden');$('inventoryPanel').classList.remove('hidden');if(focusCounting){section='CONTEOS';subsection='PET';document.body.classList.add('focus-count')}render();adjustCountViewport();startCountSync();}catch(e){pin='';window.ctNavigationSession?.clear?.();$('loginError').textContent='No se pudo ingresar: '+(e.message||'Verifica permiso e instalación SQL')}finally{btn.disabled=false}}
 async function load(){
  const [data,counts,ext]=await Promise.all([rpc('ct_inventory_rows_list',{}),rpc('ct_inventory_counts_list',{}),rpc('ct_inventory_external_list',{})]);
  rows=Array.isArray(data)?data:[];countSummaries=Array.isArray(counts)?counts:[];
@@ -364,23 +397,23 @@ function renderTabs(){const bar=$('mainTabs');bar.replaceChildren();for(const t 
 const sbBar=$('conteosTabs');sbBar.classList.toggle('hidden',section!=='CONTEOS');sbBar.replaceChildren();if(section==='CONTEOS')for(const t of COUNT_TYPES){const b=mk('button','tab sub'+(subsection===t?' active':''),t);b.type='button';b.addEventListener('click',()=>selectTab('CONTEOS',t));sbBar.append(b)}}
 function render(){
  renderTabs();renderFocusTabs();
- const isCount=section==='CONTEOS', isDaily=section==='RESUMEN CONTEO DEL DIA',isBD=section==='BD',isExternal=section==='ZEXI'||section==='PARTIDAS';
+ const isCount=section==='CONTEOS', isDaily=section==='RESUMEN CONTEO DEL DIA',isHistory=section==='SEGUIMIENTO',isBD=section==='BD',isExternal=section==='ZEXI'||section==='PARTIDAS';
  $('externalPanel').classList.toggle('hidden',!isExternal);if(isExternal)renderExternal();
- $('dailyPanel').classList.toggle('hidden',!isDaily);
+ $('dailyPanel').classList.toggle('hidden',!isDaily);$('historyPanel').classList.toggle('hidden',!isHistory);if(isHistory){renderHistory();if(!historyLoaded&&!historyBusy)loadHistory();}
  $('countsWorkspace').classList.toggle('hidden',!isCount);$('countAllDownload').classList.toggle('hidden',!isCount);
- $('addRow').classList.toggle('hidden',isCount||isDaily||isBD||isExternal);
- $('downloadCurrent').classList.toggle('hidden',isCount||isDaily||isBD||isExternal);
- $('bdHint').classList.toggle('hidden',isCount||isDaily||isExternal);
- document.querySelector('.summary').classList.toggle('hidden',isCount||isDaily||isExternal);
- document.querySelector('#inventoryPanel .card > .wrap').classList.toggle('hidden',isCount||isDaily||isExternal);
- $('search').classList.toggle('hidden',isDaily||isCount||isExternal);
- $('crossToggle').classList.toggle('hidden',isDaily||isCount||isExternal);
+ $('addRow').classList.toggle('hidden',isCount||isDaily||isHistory||isBD||isExternal);
+ $('downloadCurrent').classList.toggle('hidden',isCount||isDaily||isHistory||isBD||isExternal);
+ $('bdHint').classList.toggle('hidden',isCount||isDaily||isHistory||isExternal);
+ document.querySelector('.summary').classList.toggle('hidden',isCount||isDaily||isHistory||isExternal);
+ document.querySelector('#inventoryPanel .card > .wrap').classList.toggle('hidden',isCount||isDaily||isHistory||isExternal);
+ $('search').classList.toggle('hidden',isDaily||isCount||isHistory||isExternal);
+ $('crossToggle').classList.toggle('hidden',isDaily||isCount||isHistory||isExternal);
  if(isCount)renderCountSummary();if(isDaily)renderDaily();
  $('sectionTitle').textContent=isCount?'CONTEOS · '+subsection:section;
- $('sectionHint').textContent=isExternal?(section==='ZEXI'?'Saldo por Material (A) y Total General (H), sin decimales.':'Movimientos firmados por SKU; conversión con Factor (D) y Un x Est (G) de BD.'):isBD?'BD: Código (A), Descripción (B) y Flia (C).':isDaily?'Consolidado con todos los SKU de ZEXI, alimentado por los conteos y las cinco pestañas de novedades.':'Registra cantidades adicionales por SKU: cada ingreso se suma al acumulado existente. La descripción se obtiene de BD.';
+ $('sectionHint').textContent=isExternal?(section==='ZEXI'?'Saldo por Material (A) y Total General (H), sin decimales.':'Movimientos firmados por SKU; conversión con Factor (D) y Un x Est (G) de BD.'):isBD?'BD: Código (A), Descripción (B) y Flia (C).':isHistory?'Comparativo por SKU y fecha de los cierres guardados.':isDaily?'Consolidado con todos los SKU de ZEXI, alimentado por los conteos y las cinco pestañas de novedades.':'Registra cantidades adicionales por SKU: cada ingreso se suma al acumulado existente. La descripción se obtiene de BD.';
  $('bdFileTools').classList.toggle('hidden',!isBD);$('operationForm').classList.toggle('hidden',!OPS.includes(section));$('operationName').textContent=section;
  const data=getRows(),bd=bdMap(),term=$('search').value.toLowerCase().trim(),filtered=data.filter(r=>[r.sku,bdDesc(r.sku),r.descripcion].some(v=>String(v||'').toLowerCase().includes(term)));
- $('sectionCount').textContent=isExternal?((section==='ZEXI'?zexiData:partidasData).length+' registros'):((isDaily?dailyData().length:data.length)+' SKU');
+ $('sectionCount').textContent=isExternal?((section==='ZEXI'?zexiData:partidasData).length+' registros'):((isDaily?dailyData().length:isHistory?historyRecords.length:data.length)+' SKU');
  $('metricRows').textContent=data.length;$('metricInBd').textContent=data.filter(r=>bd.has(normalizeSku(r.sku))).length;$('metricMissing').textContent=data.filter(r=>!bd.has(normalizeSku(r.sku))).length;
  const head=document.querySelector('#inventoryPanel .card > .wrap thead tr');head.replaceChildren();
  const labels=isBD?['CÓDIGO','DESCRIPCIÓN','FLIA','FACTOR','ESTIBADO 1','FAMILIA INV','ACCIONES']:section==='ZEXI'?['SKU','DESCRIPCIÓN','CANTIDAD UN','CANTIDAD','CA CANTIDAD EST','ACCIONES']:['SKU','DESCRIPCIÓN','CANT UNDS','CANT CAJ','UNDS X CAJ','CANT EST','UNDS X EST','TOTAL UNIDADES','NOVEDAD','ACCIONES'];
@@ -631,6 +664,102 @@ $('addRow').addEventListener('click',addRow);
 $('refresh').addEventListener('click',async()=>{try{await load();render();status('Información actualizada desde la base compartida.')}catch(e){status('No se pudo actualizar: '+(e?.message||e)+'. La sesión continúa abierta.',true)}});
 $('downloadCurrent').addEventListener('click',()=>download(getRows(),'Inventario_'+(section==='CONTEOS'?subsection:section)+'.xlsx'));
 $('downloadBD').addEventListener('click',downloadBD);
+
+// --- SEGUIMIENTO: los cierres guardados son independientes de los conteos actuales. ---
+function historyToday(){const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]));return parts.year+'-'+parts.month+'-'+parts.day;}
+function initializeHistoryDates(){
+ const today=historyToday();$('historyTo').value=today;
+ const [yy,mm,dd]=today.split('-').map(Number);
+ const start=new Date(Date.UTC(yy,mm-1,dd));start.setUTCDate(start.getUTCDate()-30);
+ $('historyFrom').value=start.toISOString().slice(0,10);
+}
+function historySetMessage(message,bad=false){const el=$('historyStatus');el.textContent=message;el.style.color=bad?'#ab2828':'#195b7c';}
+function syncHistoryFamilies(){
+ const sel=$('historyFamily'),old=sel.value||'TODOS';
+ const families=[...new Set([...rows.filter(x=>x.seccion==='BD').map(x=>String(x.familia||'').trim().toUpperCase()),...historyRecords.map(x=>String(x.familia||'').trim().toUpperCase())].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+ sel.replaceChildren();for(const f of ['TODOS',...families]){const option=document.createElement('option');option.value=f;option.textContent=f==='TODOS'?'Todas las familias':f;sel.append(option)}sel.value=families.includes(old)?old:'TODOS';
+}
+async function saveDailyHistory(){
+ if(!isInventoryAdmin){status('Solo el administrador puede guardar cierres históricos.',true);return;}
+ if(historyBusy)return;
+ const selected=filteredDailyData();
+ if(!selected.length){status('No hay SKU de ZEXI para guardar en esta familia.',true);return;}
+ const f=$('dailyFamily').value||'TODOS';
+ if(!confirm('¿Guardar una copia histórica de '+selected.length+' SKU para '+(f==='TODOS'?'todas las familias':f)+'?\nEste cierre conservará los valores actuales y no borrará conteos.'))return;
+ const btn=$('dailySaveHistory');btn.disabled=true;
+ try{
+  // Captura coherente del servidor antes de registrar los totales históricos.
+  await load();
+  const arr=filteredDailyData(),parts=partidasTotals(),zIndex=new Map(zexiData.map(x=>[normalizeSku(x.sku),x]));
+  if(!arr.length)throw Error('No hay SKU disponibles después de actualizar.');
+  const payload=arr.map(r=>{const v=dailyValues(r,parts,zIndex);return {
+   sku:String(v[0]),descripcion:String(v[1]||''),familia:rawBdFamily(r.sku),
+   cant_unds:v[2],cant_caj:v[3],unds_x_caj:v[4],cant_est:v[5],unds_x_est:v[6],total_unidades:v[7],
+   total_pfn:v[8],total_pnc:v[9],total_roturas:v[10],total_reempaque:v[11],total_vertimiento:v[12],
+   total_general:v[13],zexi:v[14],partidas_pos:v[15],partidas_neg:v[16],resumen:v[17],faltante:v[18],
+   faltante_est:v[19],faltante_caj:v[20],faltante_unds:v[21]};});
+  const saved=await rpc('ct_inventory_history_save',{p_family:f,p_rows:payload});
+  status('Cierre histórico guardado: '+saved.count+' SKU · '+saved.snapshot_date+'.');
+  historyLoaded=false;
+ }catch(e){status('No se pudo guardar el seguimiento: '+e.message,true)}finally{btn.disabled=false;}
+}
+async function loadHistory(){
+ if(historyBusy||!pin)return;
+ const from=$('historyFrom').value,to=$('historyTo').value;
+ if(!from||!to||from>to){historySetMessage('Selecciona un intervalo de fechas válido.',true);return;}
+ historyBusy=true;$('historySearch').disabled=true;
+ try{
+  const result=await rpc('ct_inventory_history_list',{p_from_date:from,p_to_date:to,p_family:'TODOS'});
+  historyRecords=Array.isArray(result)?result:[];historyLoaded=true;
+  syncHistoryFamilies();renderHistory();
+  historySetMessage('Se consultaron '+historyRecords.length+' registros históricos.');
+ }catch(e){historySetMessage('No se pudo consultar el seguimiento: '+e.message,true)}finally{historyBusy=false;$('historySearch').disabled=false;}
+}
+function historyPeriodKey(date,mode){
+ if(mode==='dia')return date;
+ if(mode==='mes')return String(date).slice(0,7);
+ const d=new Date(String(date).slice(0,10)+'T12:00:00Z');
+ d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));
+ return d.toISOString().slice(0,10);
+}
+function historyPeriodLabel(k,mode){return mode==='mes'?k:mode==='semana'?'Semana del '+k:k;}
+function renderHistory(){
+ if(!historyLoaded)return;
+ syncHistoryFamilies();
+ const family=$('historyFamily').value,mode=$('historyPeriod').value;
+ const selected=historyRecords.filter(r=>family==='TODOS'||String(r.familia||'').toUpperCase()===family);
+ // El último cierre dentro del período es el válido, no la suma de saldos de varios días.
+ const lookup=new Map(),periods=new Set(),skus=new Map();
+ for(const r of selected){const sku=normalizeSku(r.sku),p=historyPeriodKey(r.snapshot_date,mode),k=sku+'|'+p;
+  periods.add(p);if(!skus.has(sku)||!skus.get(sku))skus.set(sku,r.descripcion||'');
+  const previous=lookup.get(k),stamp=String(r.saved_at||'')+'|'+String(r.snapshot_id||'');
+  if(!previous||stamp>=previous._stamp)lookup.set(k,{...r,_stamp:stamp});
+ }
+ const keys=[...periods].sort();historyRenderPeriods=keys;
+ if(keys.length>12){historySetMessage('El intervalo tiene '+keys.length+' períodos; para mantener legible el comparativo selecciona hasta 12.',true);}
+ const displayKeys=keys.slice(-12);historyRenderPeriods=displayKeys;
+ const head=$('historyHead'),body=$('historyRows');head.replaceChildren();body.replaceChildren();
+ const header1=mk('tr'),header2=mk('tr');
+ for(const [h,cls] of [['SKU ZEXI','history-sku'],['DESCRIPCIÓN','history-desc']]){const th=mk('th',cls,h);th.rowSpan=2;header1.append(th)}
+ for(const p of displayKeys){const th=mk('th','',historyPeriodLabel(p,mode));th.colSpan=3;header1.append(th);
+  for(const h of ['FALTANTE UNDS','FALTANTE CAJ','FALTANTE EST'])header2.append(mk('th','',h));}
+ head.append(header1,header2);
+ historyRenderRows=[...skus].sort((a,b)=>a[0].localeCompare(b[0],'es',{numeric:true})).map(([sku,desc])=>{const entries=displayKeys.map(p=>lookup.get(sku+'|'+p)||null);return {sku,desc,entries};});
+ for(const data of historyRenderRows){const row=mk('tr');row.append(mk('td','history-sku',data.sku),mk('td','history-desc',data.desc));
+  for(const entry of data.entries){for(const field of ['faltante_unds','faltante_caj','faltante_est']){const value=entry?Number(entry[field]??0):null;const cell=mk('td',value===null?'':value<0?'history-neg':value>0?'history-pos':'',value===null?'—':String(value));row.append(cell)}}body.append(row)}
+ if(!historyRenderRows.length){const r=mk('tr'),cell=mk('td','','No existen cierres guardados para este período y familia.');cell.colSpan=2+displayKeys.length*3;r.append(cell);body.append(r)}
+}
+function downloadHistory(){if(!historyLoaded||!historyRenderRows.length){historySetMessage('No hay datos para descargar.',true);return;}
+ const header=['SKU ZEXI','DESCRIPCIÓN',...historyRenderPeriods.flatMap(p=>['FALTANTE UNDS '+p,'FALTANTE CAJ '+p,'FALTANTE EST '+p])];
+ const data=historyRenderRows.map(r=>[r.sku,r.desc,...r.entries.flatMap(e=>e?[e.faltante_unds,e.faltante_caj,e.faltante_est]:['','',''])]);
+ const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet([header,...data]);ws['!cols']=header.map((_,i)=>({wch:i===1?40:19}));XLSX.utils.book_append_sheet(wb,ws,'COMPARATIVO');XLSX.writeFile(wb,'Seguimiento_Conteos_'+$('historyPeriod').value+'.xlsx');}
+$('dailySaveHistory').addEventListener('click',saveDailyHistory);
+$('historySearch').addEventListener('click',loadHistory);
+$('historyPeriod').addEventListener('change',renderHistory);
+$('historyFamily').addEventListener('change',renderHistory);
+$('historyDownload').addEventListener('click',downloadHistory);
+initializeHistoryDates();
+
 $('dailyFamily').addEventListener('change',renderDaily);$('dailyAdjustToggle').addEventListener('click',()=>{if(!isInventoryAdmin)return;adjustMode=!adjustMode;$('dailyAdjustToggle').textContent=adjustMode?'✕ Terminar ajustes':'✏️ AJUSTAR CONTEOS';$('dailyAdjustHint').classList.toggle('hidden',!adjustMode);renderDaily()});$('dailyDownload').addEventListener('click',downloadDaily);
 $('uploadBD').addEventListener('click',uploadBD);
 $('externalUpload').addEventListener('click',uploadExternal);$('externalDownload').addEventListener('click',downloadExternal);
